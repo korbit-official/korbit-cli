@@ -1,0 +1,18 @@
+# Built binaries: `go build -o korbit .` (dev) and `go install` -> korbit-cli
+/korbit
+/korbit-cli
+/dist/
+
+# Test / coverage artifacts
+*.out
+*.test
+
+# OS files
+.DS_Store
+.envrc
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.sw?

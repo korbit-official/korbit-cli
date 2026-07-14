@@ -1,0 +1,121 @@
+# Copyright (c) 2026 Korbit Inc.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# GoReleaser configuration — the release build for korbit-cli. It replaces the
+# old `make dist` cross-compile loop: same target matrix, same -trimpath and
+# release ldflags, plus version injection from the git tag and macOS code
+# signing. See RELEASING.md for the full workflow (signing creds, notarization).
+#
+# Local smoke test (no publish, no notarization; signing is skipped when no
+# signing identity is configured):  goreleaser release --snapshot --clean
+version: 2
+
+project_name: korbit
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: korbit
+    binary: korbit
+    main: .
+    env:
+      - CGO_ENABLED=0 # pure-Go deps (modernc sqlite, coder/websocket); no C toolchain needed
+    flags:
+      - -trimpath
+    ldflags:
+      # -s -w strips the symbol table and DWARF; -X injects the release version
+      # (GoReleaser's .Version is the git tag with any leading "v" stripped).
+      - -s -w
+      - -X github.com/korbit-official/korbit-cli/internal/version.Version={{ .Version }}
+    # Target matrix: darwin/arm64, linux/{amd64,arm64}, windows/{amd64,arm64}.
+    # Intel macOS (darwin/amd64) is intentionally not built.
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: darwin
+        goarch: amd64
+    # macOS binaries are signed by default (rcodesign). The hook is a no-op for
+    # non-darwin targets; on a snapshot build with no signing identity, or when
+    # KORBIT_SKIP_MACOS_SIGN is set, it skips with a warning so the matrix still
+    # builds on any machine.
+    #
+    # The second hook packs each (already-signed) binary into a per-platform
+    # .mcpb Desktop Extension. It runs AFTER signing so the bundled binary is the
+    # signed one; notarization (a separate later step) does not alter the bytes,
+    # so the packed binary stays the notarized one. The resulting dist/*.mcpb are
+    # folded into checksums.txt via checksum.extra_files below.
+    hooks:
+      post:
+        - cmd: ./scripts/macos-sign.sh "{{ .Path }}"
+          env:
+            - GOOS={{ .Os }}
+            - IS_SNAPSHOT={{ .IsSnapshot }}
+        - cmd: ./scripts/build-mcpb.sh "{{ .Path }}"
+          env:
+            - GOOS={{ .Os }}
+            - GOARCH={{ .Arch }}
+            - VERSION={{ .Version }}
+
+archives:
+  - id: korbit
+    ids:
+      - korbit
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+  # Fold the per-platform .mcpb bundles (built by the build-mcpb.sh post hook)
+  # into the same checksums file, so the one signed checksums.txt below
+  # authenticates every download — archives and Desktop Extensions alike.
+  extra_files:
+    - glob: ./dist/*.mcpb
+
+# Sign the checksums file — verifying the signature plus the hashes it lists
+# authenticates every artifact. A raw RSA/SHA-256 (PKCS#1 v1.5) detached
+# signature (checksums.txt.sig) is emitted over checksums.txt; the key comes
+# from the environment and a snapshot with no key (or KORBIT_SKIP_RSA_SIGN) skips
+# with a warning. Verify with openssl. See RELEASING.md for the verifier pin.
+signs:
+  - id: rsa
+    artifacts: checksum
+    signature: "${artifact}.sig"
+    cmd: ./scripts/openssl-sign.sh
+    args:
+      - "${artifact}"
+      - "${signature}"
+    env:
+      - IS_SNAPSHOT={{ .IsSnapshot }}
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-dev-{{ .ShortCommit }}"
+
+release:
+  # Publishing is a separate, deliberate step (scripts/publish.sh via the gh
+  # CLI) so the same signed+notarized artifacts can go to a staging repo for
+  # review and then the public repo. Disabling it here guarantees `goreleaser
+  # release` (i.e. `make release`) never contacts GitHub — it only builds, signs,
+  # and (separately) notarizes.
+  disable: true
+
+changelog:
+  # Each release is a one-commit snapshot on a clean linear history, so a
+  # git-log-derived changelog would be meaningless. The published release notes
+  # come from `gh release create --generate-notes` in scripts/publish.sh.
+  disable: true
