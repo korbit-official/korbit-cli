@@ -141,10 +141,18 @@ func (c *Client) Candles(ctx context.Context, req CandlesRequest, pol korbit.Pol
 // PairsRequest has no parameters.
 type PairsRequest struct{}
 
-// Pair is one trading pair and its status.
+// Pair is one trading pair: its status, its currencies, and its order value
+// bounds. MinOrderValue/MaxOrderValue are decimal strings denominated in
+// QuoteCurrency, and are empty for a pair that publishes no such bound — the
+// absence means the pair has none, not zero, and never licenses another pair's
+// figure in its place.
 type Pair struct {
-	Symbol string `json:"symbol"`
-	Status string `json:"status"`
+	Symbol        string `json:"symbol"`
+	Status        string `json:"status"`
+	BaseCurrency  string `json:"baseCurrency,omitempty"`
+	QuoteCurrency string `json:"quoteCurrency,omitempty"`
+	MinOrderValue string `json:"minOrderValue,omitempty"`
+	MaxOrderValue string `json:"maxOrderValue,omitempty"`
 }
 
 func (c *Client) Pairs(ctx context.Context, _ PairsRequest, pol korbit.Policy) ([]Pair, json.RawMessage, korbit.Meta, error) {

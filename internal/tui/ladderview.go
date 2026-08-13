@@ -86,14 +86,14 @@ func (l ladderModel) title() string {
 // (resolved order + live preview + controls) on confirm, and the on-the-wire
 // note while busy. The render and the body-height math both read it, so the
 // ladder rows above always shrink by exactly what the strip occupies.
-func (l ladderModel) stripLines(inner int, gate string, bands []ops.TickBand, fees *FeeRates, pal uikit.Palette) []string {
+func (l ladderModel) stripLines(inner int, gate string, bands []ops.TickBand, bounds ops.OrderValueBounds, fees *FeeRates, pal uikit.Palette) []string {
 	sep := uikit.StyDim.Render(strings.Repeat("─", maxInt(0, inner)))
 	switch l.view {
 	case ladderConfirm:
 		if l.armed.kind == armCancel {
 			return append([]string{sep}, l.cancelStripLines(inner)...)
 		}
-		return append([]string{sep}, l.confirmStripLines(inner, gate, bands, fees)...)
+		return append([]string{sep}, l.confirmStripLines(inner, gate, bands, bounds, fees)...)
 	case ladderBusy:
 		verb := i18n.T("order")
 		if l.armed.kind == armCancel {
@@ -102,7 +102,7 @@ func (l ladderModel) stripLines(inner int, gate string, bands []ops.TickBand, fe
 		return []string{sep,
 			uikit.StyDim.Render(uikit.Truncate(i18n.T("%s on the wire — the result lands in a moment (esc hides this)", verb), inner))}
 	}
-	return []string{sep, l.browseFootLine(inner, bands, fees, pal)}
+	return []string{sep, l.browseFootLine(inner, bands, bounds, fees, pal)}
 }
 
 // browseFootLine is the browse strip: an inline error when one stands,
@@ -110,7 +110,7 @@ func (l ladderModel) stripLines(inner int, gate string, bands []ops.TickBand, fe
 // per side, with any notional-bound breach flagged — and the verbs it feeds.
 // Resolving BEFORE the arm is the point: a preset whose notional the server
 // would reject must not look placeable until enter is one key away.
-func (l ladderModel) browseFootLine(inner int, bands []ops.TickBand, fees *FeeRates, pal uikit.Palette) string {
+func (l ladderModel) browseFootLine(inner int, bands []ops.TickBand, bounds ops.OrderValueBounds, fees *FeeRates, pal uikit.Palette) string {
 	if l.stripErr != "" {
 		return uikit.StyErr.Render(uikit.Truncate("⚠ "+l.stripErr, inner))
 	}
@@ -126,7 +126,7 @@ func (l ladderModel) browseFootLine(inner int, bands []ops.TickBand, fees *FeeRa
 	// wrap the whole line in one style, because the warn ⚠ / side-color segments
 	// end with an ANSI reset that would otherwise leak into the following text.
 	line := uikit.StyDim.Render(i18n.T("size %s", presetLabel(pct)))
-	if est := l.presetEstimates(pct, bands, fees, pal); est != "" {
+	if est := l.presetEstimates(pct, bands, bounds, fees, pal); est != "" {
 		line += uikit.StyDim.Render(" ≈ ") + est
 	} else {
 		line += uikit.StyDim.Render(" " + i18n.T("of balance"))
@@ -140,7 +140,7 @@ func (l ladderModel) browseFootLine(inner int, bands []ops.TickBand, fees *FeeRa
 // balances). Each side runs the same engine path the arm-plus-confirm pair
 // would (applyPreset, then buildPreview over the sized draft), so a notional
 // the server would bounce carries its ⚠ here, before the arm.
-func (l ladderModel) presetEstimates(pct int, bands []ops.TickBand, fees *FeeRates, pal uikit.Palette) string {
+func (l ladderModel) presetEstimates(pct int, bands []ops.TickBand, bounds ops.OrderValueBounds, fees *FeeRates, pal uikit.Palette) string {
 	if l.cursorPrice == "" {
 		return ""
 	}
@@ -153,7 +153,7 @@ func (l ladderModel) presetEstimates(pct int, bands []ops.TickBand, fees *FeeRat
 		if reason != "" {
 			continue
 		}
-		p := buildPreview(sized, book, hasBook, l.store.BalancesFor(l.accountSeq), bands, fees)
+		p := buildPreview(sized, book, hasBook, l.store.BalancesFor(l.accountSeq), bands, bounds, fees)
 		// Each fragment carries its own style (see browseFootLine): the side in
 		// the book's bid/ask color (buy = Up, sell = Down — the same colors the
 		// ladder rows use), plus any warn ⚠ pop, so callers concatenate without
@@ -181,10 +181,10 @@ func (l ladderModel) presetEstimates(pct int, bands []ops.TickBand, fees *FeeRat
 // freshness), the preplace warnings — each on its own line, like the panel:
 // the facts line truncates at narrow widths, and a clipped warning is a
 // safety disclosure silently lost — any inline rejection, and the controls.
-func (l ladderModel) confirmStripLines(inner int, gate string, bands []ops.TickBand, fees *FeeRates) []string {
+func (l ladderModel) confirmStripLines(inner int, gate string, bands []ops.TickBand, bounds ops.OrderValueBounds, fees *FeeRates) []string {
 	d := l.armed.draft
 	book, hasBook := l.store.Orderbook(d.symbol)
-	p := buildPreview(d, book, hasBook, l.store.BalancesFor(l.accountSeq), bands, fees)
+	p := buildPreview(d, book, hasBook, l.store.BalancesFor(l.accountSeq), bands, bounds, fees)
 
 	size := d.sizeValue()
 	unit := uikit.FmtCurrency(p.BaseCcy)
@@ -274,7 +274,9 @@ func (l ladderModel) cancelStripLines(inner int) []string {
 // live on the order panel's caches — one fetch (kicked when any entry surface
 // opens) feeds the panel, the command bar, and the ladder alike.
 func (m model) ladderBands() []ops.TickBand { return m.order.bands[m.symbol()] }
-func (m model) ladderFees() *FeeRates       { return m.order.symFeesFor(m.symbol()) }
+
+func (m model) ladderBounds() ops.OrderValueBounds { return m.order.boundsFor(m.symbol()) }
+func (m model) ladderFees() *FeeRates              { return m.order.symFeesFor(m.symbol()) }
 
 // ladderBusyGate is the money single-flight alone — the arm/confirm gate for
 // a ladder cancel, which (like x elsewhere) must not require a fresh book.
@@ -295,7 +297,7 @@ func (m model) ladderGeom() (left, w int) {
 // ladderStrip is the current foot strip (the single source renderLadder and
 // the body-row math read).
 func (m model) ladderStrip(inner int) []string {
-	return m.ladder.stripLines(inner, m.orderGate(), m.ladderBands(), m.ladderFees(), m.pal)
+	return m.ladder.stripLines(inner, m.orderGate(), m.ladderBands(), m.ladderBounds(), m.ladderFees(), m.pal)
 }
 
 // ladderBodyRows is how many ladder content rows fit above the strip.

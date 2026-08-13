@@ -404,7 +404,7 @@ func TestOrderFeesFollowActiveAccount(t *testing.T) {
 		return FeeRates{MakerRate: "0.001", TakerRate: "0.001"}, nil
 	}
 	store := state.New(state.Config{}, func() int64 { return 0 })
-	o := newOrderModel(store, 2, nil, feeFn, []int{10, 25, 50, 100})
+	o := newOrderModel(store, 2, nil, nil, feeFn, []int{10, 25, 50, 100})
 
 	msgs := runCmds(o.fetchMeta("btc_krw"))
 	var fm orderFeesMsg
@@ -433,7 +433,7 @@ func TestOrderFeesFollowActiveAccount(t *testing.T) {
 
 	// A reply for another account is cached under ITS key — invisible to the
 	// active account's read, present the moment that account becomes active.
-	o2 := newOrderModel(store, 2, nil, feeFn, []int{10})
+	o2 := newOrderModel(store, 2, nil, nil, feeFn, []int{10})
 	o2.draft.symbol = "btc_krw"
 	o2 = o2.applyFees(orderFeesMsg{symbol: "btc_krw", accountSeq: 1, fees: FeeRates{MakerRate: "9"}})
 	if o2.symFees() != nil {

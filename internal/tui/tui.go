@@ -34,6 +34,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/korbit-official/korbit-cli/internal/candles"
+	"github.com/korbit-official/korbit-cli/internal/ops"
 	"github.com/korbit-official/korbit-cli/internal/stream"
 )
 
@@ -47,7 +48,7 @@ type OrderForm struct {
 	Type   string // limit | market
 	Price  string // limit only
 	Qty    string // limit, and market sell
-	Amt    string // market buy (KRW to spend)
+	Amt    string // market buy
 	TIF    string // time-in-force, always set (gtc/ioc/fok/po; a market order is ioc)
 	PP     bool   // price protection (market orders): cap taker fills near the mid
 	// AccountSeq is the sub-account the order is placed under (>= 1). Stamped
@@ -155,6 +156,13 @@ type Config struct {
 	// validates — and grouping unavailable. Must be safe to call from a tea
 	// command goroutine.
 	TickSizePolicy func(symbol string) (TickPolicy, error)
+	// OrderValueBounds fetches a pair's order value bounds and quote currency
+	// from the public pair listing. They back the order panel's and the ladder's
+	// below-min / above-max warnings, which are raised only against the bound the
+	// pair itself publishes. nil (or a failed fetch) leaves those warnings out —
+	// the server still rejects an out-of-bounds order — and never substitutes
+	// another pair's figure. Must be safe to call from a tea command goroutine.
+	OrderValueBounds func(symbol string) (ops.OrderValueBounds, error)
 	// Fees fetches a sub-account's trading-fee policy for a symbol (a signed
 	// read). It takes the account explicitly (the fee tier can differ per
 	// sub-account) so it follows the active account across a switch; results

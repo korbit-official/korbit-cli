@@ -57,7 +57,7 @@ func (d orderDraft) usesAmt() bool   { return d.typ == "market" && d.side == "bu
 // selects among tifOptions, a market order is ioc-only (fixed by tif).
 func (d orderDraft) tifCyclable() bool { return d.typ != "market" }
 
-// notionalIsEstimate reports whether the order's KRW notional is valued against
+// notionalIsEstimate reports whether the order's quote-currency notional is valued against
 // the live book rather than fixed by the frozen wire fields — true only for a
 // market sell, whose notional is qty × best bid and so moves with the market. A
 // limit order's notional is price × qty and a market buy's is its amt, both
@@ -230,7 +230,7 @@ type orderPreview struct {
 	Sim      ops.PlaceSimulation
 	Warnings []ops.PlaceWarning
 
-	Notional   string // estimated KRW notional ("" when the size is not set yet)
+	Notional   string // estimated notional in QuoteCcy ("" when the size is not set yet)
 	PctFromMid string // a limit price's signed distance from mid, e.g. "-0.02%"
 	TickSize   string // tick size at the draft price ("" when unknown / not limit)
 	FeeEst     string // estimated fee in quote terms ("" when rates unknown)
@@ -245,9 +245,9 @@ type orderPreview struct {
 
 // buildPreview computes the preview for a draft against the live inputs. A
 // missing book or an analysis error yields OK=false with the reason; missing
-// bands/fees/balances just leave their derived fields empty (each is optional
-// and best-effort).
-func buildPreview(d orderDraft, book state.Orderbook, hasBook bool, bals []state.Balance, bands []ops.TickBand, fees *FeeRates) orderPreview {
+// bands/bounds/fees/balances just leave their derived fields empty or their
+// checks unrun (each is optional and best-effort).
+func buildPreview(d orderDraft, book state.Orderbook, hasBook bool, bals []state.Balance, bands []ops.TickBand, bounds ops.OrderValueBounds, fees *FeeRates) orderPreview {
 	base, quote := splitSymbol(d.symbol)
 	p := orderPreview{
 		BaseCcy: base, QuoteCcy: quote,
@@ -258,7 +258,7 @@ func buildPreview(d orderDraft, book state.Orderbook, hasBook bool, bals []state
 		p.Err = i18n.T("waiting for a live orderbook")
 		return p
 	}
-	sim, ws, err := ops.AnalyzePlace(d.values(), opsLevels(book.Bids), opsLevels(book.Asks), bands)
+	sim, ws, err := ops.AnalyzePlace(d.values(), opsLevels(book.Bids), opsLevels(book.Asks), bands, bounds)
 	if err != nil {
 		p.Err = err.Error()
 		return p
@@ -266,7 +266,7 @@ func buildPreview(d orderDraft, book state.Orderbook, hasBook bool, bals []state
 	p.OK = true
 	p.Sim = sim
 	p.Warnings = ws
-	p.Notional = sim.NotionalKRW
+	p.Notional = sim.Notional
 
 	if d.usesPrice() && d.price != "" {
 		if tick, ok := ops.TickSizeAt(bands, d.price); ok {
@@ -280,7 +280,7 @@ func buildPreview(d orderDraft, book state.Orderbook, hasBook bool, bals []state
 			rate, kind = fees.TakerRate, "taker"
 		}
 		if est, ok := mulDec(p.Notional, rate); ok {
-			p.FeeEst = est.Round(0).String()
+			p.FeeEst = roundSigFigs(est, feeSigFigs).String()
 			p.FeeRate = rate
 			p.FeeKind = kind
 		}
@@ -534,12 +534,7 @@ func placeGateReason(inFlight, settled, bookReady, feesKnown bool) string {
 // --- small helpers ---
 
 // splitSymbol splits a trading pair into base and quote ("btc_krw" → btc, krw).
-func splitSymbol(symbol string) (base, quote string) {
-	if i := strings.IndexByte(symbol, '_'); i > 0 {
-		return symbol[:i], symbol[i+1:]
-	}
-	return symbol, ""
-}
+func splitSymbol(symbol string) (base, quote string) { return ops.SplitSymbol(symbol) }
 
 // availableOf finds the available balance for a currency ("" when unknown).
 func availableOf(bals []state.Balance, currency string) string {
@@ -573,6 +568,26 @@ func parseDec(s string) (decimal.Decimal, bool) {
 }
 
 // mulDec multiplies two decimal strings; ok=false when either is unparseable.
+// feeSigFigs is how many significant figures an estimated fee is DISPLAYED to.
+// A fee is denominated in the pair's quote currency, so its magnitude spans
+// whole thousands on one market and a small fraction on another; a fixed number
+// of decimal places is either noise on the first or a rounded-to-zero fee on the
+// second. Significant figures read correctly on both. Display only — the fee the
+// exchange charges is exact.
+const feeSigFigs = 3
+
+// roundSigFigs rounds d to n significant figures (half-up).
+func roundSigFigs(d decimal.Decimal, n int32) decimal.Decimal {
+	if d.IsZero() {
+		return d
+	}
+	// The coefficient's digit count plus the exponent places the leading digit:
+	// d is in [10^mag, 10^(mag+1)), so keeping n figures means rounding at
+	// n-1-mag decimal places (negative places round to tens/hundreds/…).
+	mag := int32(d.NumDigits()) + d.Exponent() - 1
+	return d.Round(n - 1 - mag)
+}
+
 func mulDec(a, b string) (decimal.Decimal, bool) {
 	ad, ok1 := parseDec(a)
 	bd, ok2 := parseDec(b)

@@ -454,6 +454,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string, tuiRun func(tui.Conf
 		SetTrackedOrders:  sess.SetTrackedOrderScopes,
 		Candles:           tuiCandles(cx, baseURL, timeoutMs, publicRec),
 		TickSizePolicy:    tuiTickSizePolicy(cx, baseURL, timeoutMs, publicRec),
+		OrderValueBounds:  tuiOrderValueBounds(cx, baseURL, timeoutMs, publicRec),
 		Fees:              fees,
 		Out:               cx.IO.Out,
 		In:                os.Stdin,
@@ -584,6 +585,46 @@ func tuiTickSizePolicy(cx *clienv.Cmd, baseURL string, timeoutMs int, rec *callr
 		}
 		return p, nil
 	}
+}
+
+// tuiOrderValueBounds builds the order panel's bound-fetch seam
+// (tui.Config.OrderValueBounds): a public read of the pair listing, from which
+// the symbol's quote currency and order value bounds are taken. Recorded through
+// the shared public-read recorder (journaled only in --debug, per
+// DefaultPolicy). The panel caches per symbol; a failure, or a pair that
+// publishes no bound, simply leaves that bound unchecked — the server is the
+// authority, and no other pair's figure is ever substituted.
+func tuiOrderValueBounds(cx *clienv.Cmd, baseURL string, timeoutMs int, rec *callrec.Recorder) func(symbol string) (ops.OrderValueBounds, error) {
+	tuiLog, _ := tuiLogging(cx)
+	client := cx.BuildClient(clienv.ClientSpec{
+		Surface:   korbit.SurfaceTUI,
+		Detail:    "pairs",
+		BaseURL:   baseURL,
+		TimeoutMs: timeoutMs,
+		Rec:       rec,
+		Log:       tuiLog,
+	})
+	raw := rawapi.New(client, tuiLog)
+	return func(symbol string) (ops.OrderValueBounds, error) {
+		pairs, _, _, err := raw.Pairs(context.Background(), rawapi.PairsRequest{}, korbit.Policy{Idempotent: true})
+		return resolveTUIBounds(pairs, err, symbol)
+	}
+}
+
+// resolveTUIBounds turns a pair-listing read into the panel's bounds. A FAILED
+// read resolves against no listing rather than returning nothing: on the KRW
+// market that yields the documented figures, so the panel's ⚠ <min / ⚠ >max
+// match what `order place --dry-run` raises against the same failed read. The
+// error still rides along, so the panel clears its retry guard and upgrades to
+// the pair's published bounds once the listing lands.
+//
+// Split out from the closure above so this — the whole behavioral contract of
+// the seam — is reachable from a test without standing up a client.
+func resolveTUIBounds(pairs []rawapi.Pair, err error, symbol string) (ops.OrderValueBounds, error) {
+	if err != nil {
+		return ops.ResolveBoundsForSymbol(nil, symbol), err
+	}
+	return ops.ResolveBoundsForSymbol(pairs, symbol), nil
 }
 
 // tuiFees builds the order panel's fee-rate fetch seam (tui.Config.Fees): a

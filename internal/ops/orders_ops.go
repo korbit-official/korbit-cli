@@ -46,12 +46,12 @@ func init() {
 			accountSeq,
 		},
 		Notes: []string{
-			"Sizing: limit -> --price + --qty; market/best BUY -> --amt only (KRW to spend); market/best SELL -> --qty only.",
+			"Sizing: limit -> --price + --qty; market/best BUY -> --amt only (the quote currency to spend); market/best SELL -> --qty only.",
 			"The output is the FULL order (status, fills), not just the accept ack: order place reconciles by clientOrderId and returns the fetched order. The clientOrderId is always echoed — persist it and reuse it via --client-order-id to retry THIS order; never mint a new one for a retry.",
 			"On a network/5xx failure the placement is reconciled by clientOrderId, not blindly resent: it resolves to the existing order if it landed, else reports UNKNOWN (verify with `{prog} order get --client-order-id ...`) — a placed order is never reported failed.",
 			"Pass --no-reconcile to send once and return the raw accept acknowledgement with no follow-up fetch (an ambiguous failure is reported UNKNOWN; verify before retrying).",
-			"Notional bounds: 5,000 KRW <= price*qty (or amt) <= 1,000,000,000 KRW.",
-			"Preview with --dry-run: it prints the unsigned request AND runs a customer-protection check against live public market data (orderbook + tick size, fetched from the same base URL the order uses — no credentials touched). The output's `warnings` flag risky orders: high market-order slippage / insufficient liquidity, a limit price far from market (fat-finger), a post-only that would be rejected for crossing, a fill-or-kill that would be killed, a tick-misaligned price, an out-of-bounds notional, or an order that sweeps past the visible book depth (its fill/slippage estimate is only a lower bound). Advisory only — never blocks the order.",
+			"Notional bounds are per market, in the pair's quote currency: read this pair's own minOrderValue/maxOrderValue (and its quoteCurrency) from `{prog} pairs` and check price*qty (or amt) against them. A bound the pair omits is one it does not have — skip that check rather than applying another market's figure.",
+			"Preview with --dry-run: it prints the unsigned request AND runs a customer-protection check against live public market data (orderbook + tick size + the pair's order value bounds, fetched from the same base URL the order uses — no credentials touched). The output's `warnings` flag risky orders: high market-order slippage / insufficient liquidity, a limit price far from market (fat-finger), a post-only that would be rejected for crossing, a fill-or-kill that would be killed, a tick-misaligned price, an out-of-bounds notional, or an order that sweeps past the visible book depth (its fill/slippage estimate is only a lower bound). Advisory only — never blocks the order.",
 		},
 		Response: orderResponseFields,
 		Examples: []string{

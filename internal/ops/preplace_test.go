@@ -20,7 +20,11 @@ import (
 type fakeMarketDoer struct {
 	orderbook string
 	tickSize  string
-	err       error
+	// pairs is the /v2/currencyPairs payload the bound checks read the pair's
+	// minOrderValue/maxOrderValue and quote currency from. Empty means the listing
+	// carries no entry for the symbol, so both bound checks are skipped.
+	pairs string
+	err   error
 }
 
 func (d fakeMarketDoer) Do(_ context.Context, call korbit.Call, _ korbit.Policy) (json.RawMessage, korbit.Meta, error) {
@@ -32,6 +36,11 @@ func (d fakeMarketDoer) Do(_ context.Context, call korbit.Call, _ korbit.Policy)
 		return json.RawMessage(d.orderbook), korbit.Meta{}, nil
 	case "/v2/tickSizePolicy":
 		return json.RawMessage(d.tickSize), korbit.Meta{}, nil
+	case "/v2/currencyPairs":
+		if d.pairs == "" {
+			return json.RawMessage(`[]`), korbit.Meta{}, nil
+		}
+		return json.RawMessage(d.pairs), korbit.Meta{}, nil
 	}
 	return json.RawMessage(`{}`), korbit.Meta{}, nil
 }
@@ -42,6 +51,11 @@ const sampleBook = `{"timestamp":1,
 	"asks":[{"price":"10001000","qty":"2"},{"price":"10100000","qty":"5"}]}`
 
 const sampleTick = `[{"symbol":"btc_krw","tickSizePolicy":[{"priceGte":"0","tickSize":"1000"}],"orderbookLevels":[]}]`
+
+// the pair listing as the API serves it: the currencies and the order value
+// bounds the analysis checks an order against.
+const samplePairs = `[{"symbol":"btc_krw","status":"launched","baseCurrency":"btc","quoteCurrency":"krw",
+	"minOrderValue":"5000","maxOrderValue":"1000000000"}]`
 
 // a book whose second ask (11,000,000) sits outside a 5% band around the
 // 10,000,000 mid (cap 10,500,000), so a price-protected taker buy trims there.
@@ -249,7 +263,7 @@ func TestPrePlacePostOnlyWouldReject(t *testing.T) {
 }
 
 func TestPrePlaceTickAndNotional(t *testing.T) {
-	doer := fakeMarketDoer{orderbook: sampleBook, tickSize: sampleTick}
+	doer := fakeMarketDoer{orderbook: sampleBook, tickSize: sampleTick, pairs: samplePairs}
 	// Price off the 1000 tick grid + a sub-minimum notional.
 	ws := run(t, doer, map[string]string{
 		"symbol": "btc_krw", "side": "buy", "orderType": "limit", "price": "9000500", "qty": "0.0001",
@@ -319,7 +333,7 @@ func TestPrePlaceBestPostOnlyRestsAtQueuePeg(t *testing.T) {
 	if sim.Marketable || sim.EstFilledQty != "" || !strings.Contains(sim.Disposition, "rests") {
 		t.Fatalf("a post-only best order should rest, not fill: %+v", sim)
 	}
-	if sim.BestBid == "" || sim.NotionalKRW == "" {
+	if sim.BestBid == "" || sim.Notional == "" {
 		t.Fatalf("a best order should still report reference prices + notional: %+v", sim)
 	}
 }

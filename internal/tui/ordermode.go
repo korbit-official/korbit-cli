@@ -14,6 +14,7 @@ import (
 	"github.com/korbit-official/korbit-cli/internal/i18n"
 	"github.com/korbit-official/korbit-cli/internal/ops"
 	"github.com/korbit-official/korbit-cli/internal/stream/state"
+	"github.com/korbit-official/korbit-cli/internal/tui/uikit"
 )
 
 // Order mode ('b'/'s', modeOrder): a docked order-entry panel that
@@ -95,6 +96,9 @@ type orderModel struct {
 	store      *state.Store
 	accountSeq int                                     // the active sub-account (balance readiness + fee tier); re-stamped on a switch
 	fetchBands func(symbol string) (TickPolicy, error) // nil = no tick grid, no grouping
+	// fetchBounds reads a pair's order value bounds and quote currency; nil (or a
+	// failed fetch) = no below-min / above-max warnings for that pair.
+	fetchBounds func(symbol string) (ops.OrderValueBounds, error)
 	// fetchFees reads a symbol's fee policy for a sub-account (the fee tier can
 	// differ per account), so it takes the account explicitly; nil = no estimates.
 	fetchFees func(symbol string, accountSeq int) (FeeRates, error)
@@ -128,6 +132,13 @@ type orderModel struct {
 	levels   map[string][]string // valid orderbook grouping levels (nil = not fetched yet)
 	bandsReq map[string]bool     // a fetch is in flight (or done) for the symbol
 
+	// bounds caches each pair's published order value bounds for the session —
+	// pair configuration changes with listings, not with orders. A missing entry
+	// (not fetched, or a failed fetch) is the zero value, which raises no bound
+	// warning at all rather than one from another pair's figures.
+	bounds    map[string]ops.OrderValueBounds
+	boundsReq map[string]bool
+
 	// fees caches the fetched fee policies for the whole session, keyed by
 	// {account, symbol} — the fee tier is per sub-account, so an account
 	// switch reads (or fetches) its own entry and never invalidates
@@ -149,6 +160,11 @@ type orderBandsMsg struct {
 	policy TickPolicy
 	err    error
 }
+type orderBoundsMsg struct {
+	symbol string
+	bounds ops.OrderValueBounds
+	err    error
+}
 type orderFeesMsg struct {
 	symbol     string
 	accountSeq int // the account the fees were fetched for (the cache key's account half)
@@ -156,21 +172,27 @@ type orderFeesMsg struct {
 	err        error
 }
 
-func newOrderModel(store *state.Store, accountSeq int, fetchBands func(string) (TickPolicy, error), fetchFees func(string, int) (FeeRates, error), sizeLevels []int) orderModel {
+func newOrderModel(store *state.Store, accountSeq int, fetchBands func(string) (TickPolicy, error), fetchBounds func(string) (ops.OrderValueBounds, error), fetchFees func(string, int) (FeeRates, error), sizeLevels []int) orderModel {
 	return orderModel{
-		store:      store,
-		accountSeq: accountSeq,
-		fetchBands: fetchBands,
-		fetchFees:  fetchFees,
-		price:      newFormInput(i18n.T("limit price (krw)"), 20),
+		store:       store,
+		accountSeq:  accountSeq,
+		fetchBands:  fetchBands,
+		fetchBounds: fetchBounds,
+		fetchFees:   fetchFees,
+		// The price/amount placeholders name the pair's quote currency; until a
+		// symbol is open there is no currency to name, so they start generic and
+		// `open` re-labels them.
+		price:      newFormInput(i18n.T("limit price"), 20),
 		qty:        newFormInput(i18n.T("quantity"), 20),
-		amt:        newFormInput(i18n.T("krw to spend"), 20),
+		amt:        newFormInput(i18n.T("amount to spend"), 20),
 		presetIdx:  -1,
 		sizeLevels: sizeLevels,
 		drafts:     map[string]orderDraft{},
 		bands:      map[string][]ops.TickBand{},
 		levels:     map[string][]string{},
 		bandsReq:   map[string]bool{},
+		bounds:     map[string]ops.OrderValueBounds{},
+		boundsReq:  map[string]bool{},
 		fees:       map[feesKey]FeeRates{},
 		feesReq:    map[feesKey]bool{},
 	}
@@ -202,6 +224,12 @@ func (o orderModel) open(symbol, side string) (orderModel, tea.Cmd) {
 	o.formErr = ""
 	o.presetIdx = -1
 	o.cursorPrice = ""
+
+	// Label the quote-denominated fields with the pair's own quote currency.
+	if quote := ops.QuoteOf(symbol); quote != "" {
+		o.price.Placeholder = i18n.T("limit price (%s)", uikit.FmtCurrency(quote))
+		o.amt.Placeholder = i18n.T("%s to spend", uikit.FmtCurrency(quote))
+	}
 
 	// Seed the price from the side's own best level (a resting default): the
 	// best bid for a buy, the best ask for a sell.
@@ -240,8 +268,9 @@ func (o orderModel) defaultCursor() int {
 	return 0
 }
 
-// fetchMeta starts the tick-band and fee fetches for symbol, once per symbol
-// per session (a failed fetch clears its guard so the next open retries).
+// fetchMeta starts the tick-band, order-value-bound, and fee fetches for
+// symbol, once per symbol per session (a failed fetch clears its guard so the
+// next open retries).
 func (o *orderModel) fetchMeta(symbol string) tea.Cmd {
 	var cmds []tea.Cmd
 	if o.fetchBands != nil && !o.bandsReq[symbol] {
@@ -250,6 +279,14 @@ func (o *orderModel) fetchMeta(symbol string) tea.Cmd {
 		cmds = append(cmds, func() tea.Msg {
 			p, err := fetch(symbol)
 			return orderBandsMsg{symbol: symbol, policy: p, err: err}
+		})
+	}
+	if o.fetchBounds != nil && !o.boundsReq[symbol] {
+		o.boundsReq[symbol] = true
+		fetch := o.fetchBounds
+		cmds = append(cmds, func() tea.Msg {
+			b, err := fetch(symbol)
+			return orderBoundsMsg{symbol: symbol, bounds: b, err: err}
 		})
 	}
 	if k := (feesKey{accountSeq: o.accountSeq, symbol: symbol}); o.fetchFees != nil && !o.feesReq[k] {
@@ -285,6 +322,25 @@ func (o orderModel) applyBands(msg orderBandsMsg) orderModel {
 	return o
 }
 
+func (o orderModel) applyBounds(msg orderBoundsMsg) orderModel {
+	if msg.err != nil {
+		// Clear the guard so the next trigger retries. A failed fetch still
+		// carries the seam's best-effort bounds — on the KRW market, the
+		// documented figures — so keep them unless a real fetch has already
+		// landed. A warning `order place` raises must not be missing here just
+		// because the listing read failed.
+		delete(o.boundsReq, msg.symbol)
+		if _, seen := o.bounds[msg.symbol]; !seen && msg.bounds != (ops.OrderValueBounds{}) {
+			o.bounds[msg.symbol] = msg.bounds
+		}
+		return o
+	}
+	// A pair with no published bound lands as the zero-bound entry: fetched, and
+	// carrying nothing to check against.
+	o.bounds[msg.symbol] = msg.bounds
+	return o
+}
+
 func (o orderModel) applyFees(msg orderFeesMsg) orderModel {
 	// Land the reply under the key it was fetched for — even when the user has
 	// since switched accounts, the entry is that account's to keep (the cache
@@ -298,9 +354,19 @@ func (o orderModel) applyFees(msg orderFeesMsg) orderModel {
 	return o
 }
 
-// symBands/symFees are the active symbol's cached metadata (nil when unknown).
+// symBands/symBounds/symFees are the active symbol's cached metadata (the zero
+// value when unknown).
 func (o orderModel) symBands() []ops.TickBand { return o.bands[o.draft.symbol] }
 func (o orderModel) symFees() *FeeRates       { return o.symFeesFor(o.draft.symbol) }
+func (o orderModel) symBounds() ops.OrderValueBounds {
+	return o.boundsFor(o.draft.symbol)
+}
+
+// boundsFor is a symbol's cached bounds: zero before any fetch has been recorded
+// for it, and after a FAILED fetch whatever that fetch's best-effort fallback
+// carried (see applyBounds) — so a bound can be present while a real listing read
+// is still outstanding.
+func (o orderModel) boundsFor(symbol string) ops.OrderValueBounds { return o.bounds[symbol] }
 
 // fields is the field-cursor ring for the current draft (the sizing matrix
 // decides which size rows exist; pp is a market-order rail).
@@ -386,7 +452,7 @@ func (o *orderModel) pullInputs() {
 // preview is the live analysis of the current draft.
 func (o orderModel) preview() orderPreview {
 	book, hasBook := o.store.Orderbook(o.draft.symbol)
-	return buildPreview(o.draft, book, hasBook, o.store.BalancesFor(o.accountSeq), o.symBands(), o.symFees())
+	return buildPreview(o.draft, book, hasBook, o.store.BalancesFor(o.accountSeq), o.symBands(), o.symBounds(), o.symFees())
 }
 
 // anchor resolves a price anchor against the live market.

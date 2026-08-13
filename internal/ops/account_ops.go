@@ -55,13 +55,13 @@ func init() {
 				accountSeq,
 			},
 			Notes: []string{
-				"Check buyFeeCurrency before sizing a buy: if it is krw, reserve price*qty*(1+maxFeeRate); if it is the base coin, the fee comes out of the coin you receive.",
+				"Check buyFeeCurrency before sizing a buy: if it is the pair's quote currency (the symbol's second segment), reserve price*qty*(1+maxFeeRate) of it; if it is the base coin, the fee comes out of the coin you receive.",
 			},
 			Response: []cmdmeta.ResponseField{
 				{Name: "symbol", Type: "string", Desc: "trading pair"},
 				{Name: "buyFeeCurrency", Type: "string", Desc: "fee currency for buy orders"},
 				{Name: "sellFeeCurrency", Type: "string", Desc: "fee currency for sell orders"},
-				{Name: "maxFeeRate", Type: "string", Desc: "max fee rate (reserve this for krw-fee buys)"},
+				{Name: "maxFeeRate", Type: "string", Desc: "max fee rate (reserve this when the buy fee is charged in the quote currency)"},
 				{Name: "takerFeeRate", Type: "string", Desc: "taker fee rate"},
 				{Name: "makerFeeRate", Type: "string", Desc: "maker fee rate"},
 			},

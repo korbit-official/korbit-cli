@@ -439,7 +439,7 @@ func newModel(cfg Config) model {
 	// account changes.
 	m.funding = newFundingModel(cfg.Funding, m.store, m.accountSeq(), cfg.Now)
 	sizeLevels := resolveOrderLevels(cfg.OrderLevels)
-	m.order = newOrderModel(m.store, m.accountSeq(), cfg.TickSizePolicy, cfg.Fees, sizeLevels)
+	m.order = newOrderModel(m.store, m.accountSeq(), cfg.TickSizePolicy, cfg.OrderValueBounds, cfg.Fees, sizeLevels)
 	m.ladder = newLadderModel(m.store, m.accountSeq(), sizeLevels)
 	m.cmdbar = newCmdBar()
 	m.bookGrp = map[string]string{}
@@ -714,6 +714,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case orderBandsMsg:
 		m.order = m.order.applyBands(msg)
+		return m, nil
+
+	case orderBoundsMsg:
+		m.order = m.order.applyBounds(msg)
 		return m, nil
 
 	case orderFeesMsg:

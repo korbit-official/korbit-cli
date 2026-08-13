@@ -176,7 +176,7 @@ func TestAnalyzePlacePure(t *testing.T) {
 	sim, ws, err := AnalyzePlace(map[string]string{
 		"symbol": "btc_krw", "side": "buy", "orderType": "limit",
 		"price": "9990000", "qty": "0.01",
-	}, bids, asks, bands)
+	}, bids, asks, bands, OrderValueBounds{})
 	if err != nil {
 		t.Fatalf("AnalyzePlace: %v", err)
 	}
@@ -186,15 +186,18 @@ func TestAnalyzePlacePure(t *testing.T) {
 	if sim.BestBid != "9999000" || sim.BestAsk != "10001000" || sim.Mid != "10000000" {
 		t.Fatalf("reference prices: bid %s ask %s mid %s", sim.BestBid, sim.BestAsk, sim.Mid)
 	}
-	if sim.NotionalKRW != "99900" {
-		t.Fatalf("notional: %s", sim.NotionalKRW)
+	if sim.Notional != "99900" {
+		t.Fatalf("notional: %s", sim.Notional)
+	}
+	if sim.QuoteCurrency != "krw" {
+		t.Fatalf("quote currency: %s", sim.QuoteCurrency)
 	}
 
 	// Off-grid price: the pure path flags it from the supplied bands.
 	_, ws, err = AnalyzePlace(map[string]string{
 		"symbol": "btc_krw", "side": "buy", "orderType": "limit",
 		"price": "9990500", "qty": "0.01",
-	}, bids, asks, bands)
+	}, bids, asks, bands, OrderValueBounds{})
 	if err != nil {
 		t.Fatalf("AnalyzePlace: %v", err)
 	}
@@ -206,7 +209,7 @@ func TestAnalyzePlacePure(t *testing.T) {
 	_, ws, err = AnalyzePlace(map[string]string{
 		"symbol": "btc_krw", "side": "buy", "orderType": "limit",
 		"price": "9990500", "qty": "0.01",
-	}, bids, asks, nil)
+	}, bids, asks, nil, OrderValueBounds{})
 	if err != nil {
 		t.Fatalf("AnalyzePlace: %v", err)
 	}
@@ -217,7 +220,7 @@ func TestAnalyzePlacePure(t *testing.T) {
 	// An empty side is an unusable book.
 	if _, _, err := AnalyzePlace(map[string]string{
 		"symbol": "btc_krw", "side": "buy", "orderType": "limit", "price": "1", "qty": "1",
-	}, bids, nil, nil); err == nil {
+	}, bids, nil, nil, OrderValueBounds{}); err == nil {
 		t.Fatal("empty asks: want an error")
 	}
 }

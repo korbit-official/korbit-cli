@@ -196,7 +196,7 @@ func parseOrderCmd(text, symbol string) (cmdParse, error) {
 	// only a market order constrains the shape.
 	if p.market {
 		if p.side == "buy" && p.qty != "" {
-			return p, fmt.Errorf("a market buy is sized in KRW — use an amount (500k %s) or a percent, not a quantity", quote)
+			return p, fmt.Errorf("a market buy is sized in the quote currency — use an amount (500k %s) or a percent, not a quantity", quote)
 		}
 		if p.side == "sell" && p.amt != "" {
 			return p, fmt.Errorf("a market sell is sized in base quantity, not a %s amount (no price to convert)", quote)
@@ -615,7 +615,7 @@ func (m model) renderCmdBarLines(w int) (string, string) {
 // carries them regardless).
 func (m model) cmdEcho(d orderDraft, note string, armed bool, w int) string {
 	book, hasBook, _, _ := m.cmdBarMarket()
-	p := buildPreview(d, book, hasBook, m.store.BalancesFor(m.accountSeq()), m.order.bands[m.symbol()], m.order.symFeesFor(m.symbol()))
+	p := buildPreview(d, book, hasBook, m.store.BalancesFor(m.accountSeq()), m.order.bands[m.symbol()], m.order.boundsFor(m.symbol()), m.order.symFeesFor(m.symbol()))
 
 	// The size and price are wire values, not estimates. In the armed review —
 	// the final confirmation of what is sent — render them exact so the figures

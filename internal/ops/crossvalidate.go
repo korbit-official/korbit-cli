@@ -74,10 +74,10 @@ func crossValidatePlace(p map[string]string) error {
 		}
 		if side == "buy" {
 			if has("qty") {
-				return output.Usagef("--qty is not allowed for a %s order — size it with --amt (the KRW amount to spend) only", kind)
+				return output.Usagef("--qty is not allowed for a %s order — size it with --amt (the quote-currency amount to spend) only", kind)
 			}
 			if !has("amt") {
-				return output.Usagef("a %s order is sized by --amt (the KRW amount to spend), not --qty", kind)
+				return output.Usagef("a %s order is sized by --amt (the quote-currency amount to spend), not --qty", kind)
 			}
 		} else {
 			if has("amt") {

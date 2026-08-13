@@ -193,13 +193,13 @@ on every signed call (a safety disclosure, always shown), so you always know whi
 | type | buy | sell |
 |---|---|---|
 | `limit` | `--price` + `--qty` | `--price` + `--qty` |
-| `market` | `--amt` (KRW to spend) | `--qty` (coin to sell) |
+| `market` | `--amt` (quote currency to spend) | `--qty` (coin to sell) |
 | `best` | `--amt` + `--tif` + `--best-nth` | `--qty` + `--tif` + `--best-nth` |
 
 **Step 1 — dry-run (simulate + risk-check).** `order place … --dry-run` signs nothing and places
 nothing; it prints the unsigned request plus two advisory blocks built from live **public** market
-data (the orderbook + tick policy at the same base URL the real order would use, so no credentials are
-touched):
+data (the orderbook + tick policy + the pair's order value bounds, at the same base URL the real order
+would use, so no credentials are touched):
 
 - `simulation` — the estimated fill against the current book: `marketable`, `estFilledQty`,
   `estAvgFillPrice` / `estWorstFillPrice`, slippage, `fullyFilled`, and the remaining-qty disposition.
@@ -259,15 +259,15 @@ get` before treating funds as free.
 | `error.code` | Meaning | What you do |
 |---|---|---|
 | `DUPLICATE_CLIENT_ORDER_ID` | An earlier attempt already placed this | Treat as success → `order get --client-order-id …`; do not resend |
-| `NO_BALANCE` | Insufficient `available` (a KRW-fee buy also reserves the fee) | Re-read `balance`, shrink the order |
-| `ORDER_VALUE_TOO_SMALL` / `_TOO_LARGE` | Notional outside 5k–1B KRW | Resize |
+| `NO_BALANCE` | Insufficient `available` (a buy whose fee is charged in the quote currency also reserves the fee) | Re-read `balance`, shrink the order |
+| `ORDER_VALUE_TOO_SMALL` / `_TOO_LARGE` | Notional outside the pair's order value bounds, in the pair's quote currency | Resize; read the pair's own bounds from `pairs` (`minOrderValue` / `maxOrderValue`, in its `quoteCurrency`) — they differ per pair, and a pair that omits one has none |
 | `PRICE_TICK_SIZE_INVALID` | Price off the tick grid | Round to the tick grid and retry |
 | `TRY_AGAIN` (on cancel) | Order mid-processing | Auto-retried within `--retry-timeout`; if it still surfaces, wait ~1s and run the cancel again |
 | `EXCEED_TIME_WINDOW` | Host clock drift | Reads/cancels/`order place` auto-resync once and retry; single-shot withdrawals don't — pass `--time-sync on` to sign with a corrected clock. `doctor` shows the offset |
 | HTTP 429 (`retryAfterSec`) | Rate limited | Idempotent calls auto-wait within `--retry-timeout`; for a write, wait `retryAfterSec` then resend yourself |
 
-A `--dry-run` pre-empts most of these (`PRICE_OFF_TICK`, notional bounds, a would-cross/post-only
-reject) before you ever send — so a dry-run-first habit turns most exit-3 rejections into warnings you
+A `--dry-run` pre-empts most of these (`PRICE_OFF_TICK`, notional bounds where the pair publishes
+them, a would-cross/post-only reject) before you ever send — so a dry-run-first habit turns most exit-3 rejections into warnings you
 handle up front. The tool auto-retries **idempotent** calls only (all reads, `order cancel`, `withdraw
 cancel`, `deposit generate`) within `--retry-timeout` (default 5s). Money-moving writes are never
 auto-retried.

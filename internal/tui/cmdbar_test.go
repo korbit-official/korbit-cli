@@ -48,10 +48,10 @@ func TestParseOrderCmd(t *testing.T) {
 		{in: "b 0.05 @", err: "missing the price"},
 		{in: "b 0.05 @ zzz", err: "bad price"},
 		{in: "b 0.05 @ 1 gtc extra", err: "unexpected"},
-		{in: "b 0.05 eth @ 1", err: "after the size"},           // eth is neither base nor quote of btc_krw
-		{in: "b 0.000000001 krw @ mkt", err: "too small"},       // amount below the 8dp request precision rounds to zero
-		{in: "b 0.05 @ mkt", err: "market buy is sized in KRW"}, // bare number is a qty; a market buy needs an amount
-		{in: "s 500k krw @ mkt", err: "market sell is sized"},   // a KRW amount can't size a market sell
+		{in: "b 0.05 eth @ 1", err: "after the size"},                          // eth is neither base nor quote of btc_krw
+		{in: "b 0.000000001 krw @ mkt", err: "too small"},                      // amount below the 8dp request precision rounds to zero
+		{in: "b 0.05 @ mkt", err: "market buy is sized in the quote currency"}, // bare number is a qty; a market buy needs an amount
+		{in: "s 500k krw @ mkt", err: "market sell is sized"},                  // a KRW amount can't size a market sell
 		{in: "b 500k krw @ mkt gtc", err: "only ioc"},
 	}
 	for _, c := range cases {

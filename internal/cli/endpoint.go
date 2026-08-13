@@ -485,8 +485,8 @@ func (d dryRunDoc) FormatText(w io.Writer) {
 			{"best bid / ask", sim.BestBid + " / " + sim.BestAsk},
 			{"mid", sim.Mid},
 		}
-		if sim.NotionalKRW != "" {
-			rows = append(rows, [2]string{"notional (KRW)", sim.NotionalKRW})
+		if sim.Notional != "" {
+			rows = append(rows, [2]string{"notional" + quoteUnit(sim.QuoteCurrency), sim.Notional})
 		}
 		if sim.EstPegPrice != "" {
 			rows = append(rows, [2]string{"est. peg price", sim.EstPegPrice})
@@ -496,7 +496,7 @@ func (d dryRunDoc) FormatText(w io.Writer) {
 			rows = append(rows, [2]string{"est. filled qty", sim.EstFilledQty})
 		}
 		if sim.EstFilledQuote != "" {
-			rows = append(rows, [2]string{"est. filled (KRW)", sim.EstFilledQuote})
+			rows = append(rows, [2]string{"est. filled" + quoteUnit(sim.QuoteCurrency), sim.EstFilledQuote})
 		}
 		if sim.EstAvgFillPrice != "" {
 			rows = append(rows, [2]string{"est. avg fill price", sim.EstAvgFillPrice})
@@ -526,6 +526,16 @@ func (d dryRunDoc) FormatText(w io.Writer) {
 	if d.ChecksSkipped != "" {
 		fmt.Fprintf(w, "\n\n  note: %s", d.ChecksSkipped)
 	}
+}
+
+// quoteUnit renders a quote-denominated row label's unit suffix — " (KRW)" for a
+// KRW-quoted pair, " (USDT)" for a USDT-quoted one, and nothing when the symbol
+// carries no quote currency. The currency comes from the pair, never assumed.
+func quoteUnit(quoteCurrency string) string {
+	if quoteCurrency == "" {
+		return ""
+	}
+	return " (" + strings.ToUpper(quoteCurrency) + ")"
 }
 
 // preplaceCheck runs the order-place customer-protection preflight: it builds a

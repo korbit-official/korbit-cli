@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/korbit-official/korbit-cli/internal/output"
+	"github.com/korbit-official/korbit-cli/internal/rawapi"
 	"github.com/korbit-official/korbit-cli/internal/stream"
 )
 
@@ -283,4 +284,35 @@ func TestResolveTUIAccounts(t *testing.T) {
 			t.Fatalf("active=%d subs=%v err=%v, want the single-account fallback [2]", active, subs, err)
 		}
 	})
+}
+
+// A failed pair-listing read must still hand the panel the KRW market's
+// documented bounds, so the TUI's ⚠ <min / ⚠ >max appear exactly where
+// `order place --dry-run` raises them against the same failure. Returning the
+// zero value here — which this seam used to do — silently removed a warning the
+// CLI still gave, on the only market that exists today.
+func TestResolveTUIBoundsKeepsTheFallbackOnAFailedRead(t *testing.T) {
+	boom := errors.New("network down")
+
+	got, err := resolveTUIBounds(nil, boom, "btc_krw")
+	if !errors.Is(err, boom) {
+		t.Fatalf("the error must ride along so the panel retries, got %v", err)
+	}
+	if got.Min != "5000" || got.Max != "1000000000" || got.QuoteCurrency != "krw" {
+		t.Fatalf("a failed read must still yield the KRW fallback, got %+v", got)
+	}
+
+	// Any other market stays unbounded — nothing is invented for a market whose
+	// figures this code has never known.
+	if got, _ := resolveTUIBounds(nil, boom, "btc_xaut"); got.Min != "" || got.Max != "" {
+		t.Fatalf("a failed read must not invent bounds off the KRW market: %+v", got)
+	}
+
+	// A listing that DID arrive is used verbatim, bounds and all.
+	ok, err := resolveTUIBounds([]rawapi.Pair{
+		{Symbol: "btc_krw", QuoteCurrency: "krw", MinOrderValue: "7000"},
+	}, nil, "btc_krw")
+	if err != nil || ok.Min != "7000" {
+		t.Fatalf("a landed listing must win: %+v err=%v", ok, err)
+	}
 }

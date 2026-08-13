@@ -27,13 +27,8 @@ var (
 	// from the mid in the UNFAVORABLE direction (a buy far above / a sell far
 	// below) — the classic extra-digit mistake.
 	fatFingerWarnPct = decimal.NewFromFloat(20.0)
-	// The server's notional bounds for KRW-quoted pairs (also stated in the
-	// order place Notes). Checked only for *_krw symbols.
-	minNotionalKRW = decimal.NewFromInt(5_000)
-	maxNotionalKRW = decimal.NewFromInt(1_000_000_000)
-
-	oneHundred = decimal.NewFromInt(100)
-	two        = decimal.NewFromInt(2)
+	oneHundred       = decimal.NewFromInt(100)
+	two              = decimal.NewFromInt(2)
 )
 
 // PlaceWarningCode is the stable symbolic identifier of a pre-place warning —
@@ -94,10 +89,17 @@ type PlaceSimulation struct {
 	// Disclaimer is always set and states plainly that this is an estimate.
 	Disclaimer string `json:"disclaimer"`
 
-	BestBid     string `json:"bestBid"`
-	BestAsk     string `json:"bestAsk"`
-	Mid         string `json:"mid"`
-	NotionalKRW string `json:"notionalKrw,omitempty"`
+	BestBid string `json:"bestBid"`
+	BestAsk string `json:"bestAsk"`
+	Mid     string `json:"mid"`
+
+	// QuoteCurrency is the currency Notional and EstFilledQuote are denominated
+	// in: the one the pair publishes, or the symbol's quote segment ("btc_krw" →
+	// "krw") when the pair's entry was not supplied. Empty when neither is known.
+	QuoteCurrency string `json:"quoteCurrency,omitempty"`
+	// Notional is the order's estimated value in QuoteCurrency ("" when the size
+	// is not determinable from the request).
+	Notional string `json:"notional,omitempty"`
 
 	// EstPegPrice is the price a best (BBO) order derives from the current book —
 	// its --best-nth level on the side its tif selects. Empty for non-best orders
@@ -109,7 +111,7 @@ type PlaceSimulation struct {
 	// fill; they are empty for a non-crossing limit (which rests in full).
 	Marketable        bool   `json:"marketable"`
 	EstFilledQty      string `json:"estFilledQty,omitempty"`
-	EstFilledQuote    string `json:"estFilledQuoteKrw,omitempty"`
+	EstFilledQuote    string `json:"estFilledQuote,omitempty"`
 	EstAvgFillPrice   string `json:"estAvgFillPrice,omitempty"`
 	EstWorstFillPrice string `json:"estWorstFillPrice,omitempty"`
 	EstSlippagePct    string `json:"estSlippagePct,omitempty"`
@@ -136,9 +138,10 @@ type BookLevel struct {
 }
 
 // PrePlaceCheck runs the customer-protection analysis behind `order place
-// --dry-run`. It fetches PUBLIC market data only (orderbook + tick-size policy)
-// through the supplied creds-less client, so it signs nothing and works before
-// any key is set up. The returned warnings are advisory. A non-nil error means
+// --dry-run`. It fetches PUBLIC market data only (orderbook, tick-size policy,
+// and the pair listing the order value bounds come from) through the supplied
+// creds-less client, so it signs nothing and works before any key is set up.
+// The returned warnings are advisory. A non-nil error means
 // the orderbook could not be fetched (offline, or an invalid/untradable symbol)
 // and the analysis was skipped — the caller still emits its plan, just without
 // the safety checks.
@@ -159,7 +162,7 @@ func PrePlaceCheck(ctx context.Context, raw *rawapi.Client, values map[string]st
 	if req.OrderType == "limit" {
 		bands = fetchTickBands(ctx, raw, req.Symbol)
 	}
-	return AnalyzePlace(values, toBookLevels(book.Bids), toBookLevels(book.Asks), bands)
+	return AnalyzePlace(values, toBookLevels(book.Bids), toBookLevels(book.Asks), bands, fetchOrderValueBounds(ctx, raw, req.Symbol))
 }
 
 // toBookLevels converts fetched orderbook levels to the transport-free form.
@@ -172,13 +175,15 @@ func toBookLevels(in []rawapi.OrderbookLevel) []BookLevel {
 }
 
 // AnalyzePlace is the pure core of the pre-place analysis: the same simulation
-// and warnings as PrePlaceCheck, over a caller-supplied orderbook snapshot and
-// (optional) tick-size policy — no I/O. values are the order's validated wire
-// params (the same map the place operation runs on); bids/asks are the book's
-// levels in any order (they are sorted defensively); nil/empty bands skip the
-// tick-alignment check. The error reports an unusable (empty) book — the
+// and warnings as PrePlaceCheck, over a caller-supplied orderbook snapshot,
+// (optional) tick-size policy, and (optional) order value bounds — no I/O.
+// values are the order's validated wire params (the same map the place
+// operation runs on); bids/asks are the book's levels in any order (they are
+// sorted defensively); nil/empty bands skip the tick-alignment check; a zero
+// bounds, or one whose Min/Max the pair does not publish, skips the
+// corresponding bound check. The error reports an unusable (empty) book — the
 // analysis needs both sides for a mid.
-func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, bands []TickBand) (PlaceSimulation, []PlaceWarning, error) {
+func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, bands []TickBand, bounds OrderValueBounds) (PlaceSimulation, []PlaceWarning, error) {
 	req := placeRequest(analysisValues(values))
 
 	asks := sortedLevels(askLevels, true)  // ascending: best ask first
@@ -194,9 +199,18 @@ func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, ba
 	typ := string(req.OrderType)
 	tif := strings.ToLower(tifStr(req.TimeInForce))
 
+	// Every quote-denominated field below is in this currency: the one the pair
+	// publishes, falling back to the symbol's second segment when the bounds were
+	// not supplied. The payload states it so a caller never has to infer it.
+	quote := bounds.QuoteCurrency
+	if quote == "" {
+		quote = QuoteOf(strings.ToLower(string(req.Symbol)))
+	}
+
 	sim := PlaceSimulation{
 		Disclaimer: SimulationDisclaimer,
 		BestBid:    dec(bestBid), BestAsk: dec(bestAsk), Mid: dec(mid),
+		QuoteCurrency: quote,
 	}
 	var ws []PlaceWarning
 	add := func(code PlaceWarningCode, format string, a ...any) {
@@ -406,15 +420,22 @@ func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, ba
 		}
 	}
 
-	// Notional bounds (KRW-quoted pairs only): catch a too-small / too-large
-	// order before the server rejects it.
-	if notional, ok := orderNotionalKRW(req, bestBid); ok {
-		sim.NotionalKRW = dec(notional)
-		if notional.LessThan(minNotionalKRW) {
-			add(WarnNotionalBelowMin, "order notional ~%s KRW is below the %s KRW minimum — it will be rejected.", dec(notional), minNotionalKRW)
+	// Notional, in the pair's quote currency. Each bound WARNING is raised only
+	// against the bound this pair publishes; a bound it does not publish is
+	// skipped, leaving the server as the authority. The notional itself is
+	// reported for every pair (the fee estimate downstream is gated on it).
+	if notional, ok := orderNotional(req, bestBid); ok {
+		sim.Notional = dec(notional)
+		// The unit is the pair entry's own quote currency wherever the entry
+		// carries one, so a published bound is labelled by the same entry that
+		// published it. It falls back to the symbol's second segment only when
+		// the entry names no currency — the same currency by API contract.
+		unit := strings.ToUpper(quote)
+		if min, ok := bounds.min(); ok && notional.LessThan(min) {
+			add(WarnNotionalBelowMin, "order notional ~%s %s is below the %s %s minimum — it will be rejected.", dec(notional), unit, dec(min), unit)
 		}
-		if notional.GreaterThan(maxNotionalKRW) {
-			add(WarnNotionalAboveMax, "order notional ~%s KRW exceeds the %s KRW maximum — it will be rejected.", dec(notional), maxNotionalKRW)
+		if max, ok := bounds.max(); ok && notional.GreaterThan(max) {
+			add(WarnNotionalAboveMax, "order notional ~%s %s exceeds the %s %s maximum — it will be rejected.", dec(notional), unit, dec(max), unit)
 		}
 	}
 
@@ -643,16 +664,14 @@ func sortedLevels(in []BookLevel, ascending bool) []bookLevel {
 	return out
 }
 
-// orderNotionalKRW estimates the order's KRW notional for a *_krw pair (the bound
-// is KRW-specific); ok=false for a non-KRW pair or when the size is unknown. A
-// market/best sell is valued at the best bid.
-func orderNotionalKRW(req rawapi.OrderPlaceRequest, bestBid decimal.Decimal) (decimal.Decimal, bool) {
-	if !strings.HasSuffix(strings.ToLower(string(req.Symbol)), "_krw") {
-		return decimal.Decimal{}, false
-	}
+// orderNotional estimates the order's value in the pair's QUOTE currency —
+// whatever that currency is; nothing here depends on which. ok=false only when
+// the size is not determinable from the request. A market/best sell is valued at
+// the best bid.
+func orderNotional(req rawapi.OrderPlaceRequest, bestBid decimal.Decimal) (decimal.Decimal, bool) {
 	typ := string(req.OrderType)
 	if req.Side == "buy" && (typ == "market" || typ == "best") {
-		return decOf(req.Amt) // amt is the KRW to spend
+		return decOf(req.Amt) // amt is the quote currency to spend
 	}
 	qty, ok := decOf(req.Qty)
 	if !ok {
@@ -778,6 +797,19 @@ func fetchTickBands(ctx context.Context, raw *rawapi.Client, symbol rawapi.Symbo
 		bands = append(bands, TickBand{PriceGte: b.PriceGte, TickSize: b.TickSize})
 	}
 	return bands
+}
+
+// fetchOrderValueBounds reads the pair's currencies and order value bounds from
+// the public pair listing. Best-effort like the tick bands: a failed read is
+// resolved as if the listing were empty, which on a KRW-quoted symbol leaves the
+// documented KRW figures in place (ResolveBoundsForSymbol) and elsewhere skips
+// the bound checks — never a substituted figure from another pair.
+func fetchOrderValueBounds(ctx context.Context, raw *rawapi.Client, symbol rawapi.Symbol) OrderValueBounds {
+	pairs, _, _, err := raw.Pairs(ctx, rawapi.PairsRequest{}, korbit.Policy{Idempotent: true})
+	if err != nil {
+		pairs = nil
+	}
+	return ResolveBoundsForSymbol(pairs, string(symbol))
 }
 
 // ---- decimal helpers (advisory display/threshold math only — order values stay

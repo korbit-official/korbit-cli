@@ -371,7 +371,8 @@ type placeDryRunDoc struct {
 }
 
 // placeDryRunResult runs the order_place customer-protection preflight for the
-// dryRun tool path: it fetches PUBLIC market data (orderbook + tick size) at the
+// dryRun tool path: it fetches PUBLIC market data (orderbook + tick size + the
+// pair's order value bounds) at the
 // chosen key's resolved baseURL — so a per-key/sandbox host previews against its
 // own book — and returns the simulated fill + warnings. It signs nothing and
 // reads no key secret (baseURL is resolved metadata-only via MetaBaseURL), so a

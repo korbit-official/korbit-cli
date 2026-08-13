@@ -5,6 +5,7 @@
 package tui
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -21,6 +22,17 @@ import (
 // arm → confirm → place loop, market orders, cancel-at-row, tick nudges, and
 // the gates — all driven through the model like a user would.
 
+// testOrderValueBounds stands in for the pair listing: it publishes the bounds
+// the below-min / above-max warnings check an order value against, in the quote
+// currency the symbol names.
+func testOrderValueBounds(symbol string) (ops.OrderValueBounds, error) {
+	return ops.OrderValueBounds{
+		QuoteCurrency: ops.QuoteOf(symbol),
+		Min:           "5000",
+		Max:           "1000000000",
+	}, nil
+}
+
 // ladderTestModel is a private-mode model with the tick policy wired and the
 // market seeded, sitting in ladder mode with the metadata fetch landed.
 func ladderTestModel(t *testing.T, tr Trader) model {
@@ -34,6 +46,7 @@ func ladderTestModel(t *testing.T, tr Trader) model {
 		TickSizePolicy: func(string) (TickPolicy, error) {
 			return TickPolicy{Bands: []ops.TickBand{{PriceGte: "0", TickSize: "1000"}}}, nil
 		},
+		OrderValueBounds: testOrderValueBounds,
 	})
 	mm, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 32})
 	m = seedOrderMarket(t, mm.(model))
@@ -43,6 +56,41 @@ func ladderTestModel(t *testing.T, tr Trader) model {
 		t.Fatal("'t' must open the trade ladder")
 	}
 	return m
+}
+
+// A failing pair-listing read must not cost the KRW market its bound warnings.
+// The seam is best-effort: it hands back what a listing-less resolution yields
+// (the documented KRW figures) ALONGSIDE the error, and applyBounds keeps them
+// while clearing the retry guard. Before this, an error dropped the bounds
+// entirely and the ladder/order panel showed no ⚠ <min for an order that
+// `order place --dry-run` warns about against the very same failure.
+func TestBoundsSurviveAFailedListingFetch(t *testing.T) {
+	failing := func(symbol string) (ops.OrderValueBounds, error) {
+		return ops.ResolveBoundsForSymbol(nil, symbol), errors.New("network down")
+	}
+	o := newOrderModel(nil, 1, nil, failing, nil, nil)
+	b, err := failing("btc_krw")
+	o = o.applyBounds(orderBoundsMsg{symbol: "btc_krw", bounds: b, err: err})
+
+	if got := o.boundsFor("btc_krw"); got.Min != "5000" || got.QuoteCurrency != "krw" {
+		t.Fatalf("a failed fetch must keep the fallback bounds, got %+v", got)
+	}
+	if o.boundsReq["btc_krw"] {
+		t.Error("the retry guard must be cleared so the next trigger refetches")
+	}
+	// A later successful fetch replaces the fallback with the pair's own figures.
+	o = o.applyBounds(orderBoundsMsg{symbol: "btc_krw", bounds: ops.OrderValueBounds{
+		QuoteCurrency: "krw", Min: "7000", Max: "900000000",
+	}})
+	if got := o.boundsFor("btc_krw"); got.Min != "7000" {
+		t.Fatalf("a landed fetch must win over the fallback, got %+v", got)
+	}
+	// And a later failure must not overwrite what already landed.
+	b2, err2 := failing("btc_krw")
+	o = o.applyBounds(orderBoundsMsg{symbol: "btc_krw", bounds: b2, err: err2})
+	if got := o.boundsFor("btc_krw"); got.Min != "7000" {
+		t.Fatalf("a failed refetch must not clobber landed bounds, got %+v", got)
+	}
 }
 
 // TestLadderGates: without a Trader (public mode), 't' only toasts and the
@@ -181,7 +229,7 @@ func TestConfirmRendersExactWireAmount(t *testing.T) {
 	lm := ladderTestModel(t, &fakeTrader{})
 	lm.ladder.armed = ladderArmed{kind: armPlace, draft: d}
 	lm.ladder.view = ladderConfirm
-	strip := plain(strings.Join(lm.ladder.confirmStripLines(200, "", lm.ladderBands(), lm.ladderFees()), "\n"))
+	strip := plain(strings.Join(lm.ladder.confirmStripLines(200, "", lm.ladderBands(), lm.ladderBounds(), lm.ladderFees()), "\n"))
 	if !strings.Contains(strip, want) {
 		t.Errorf("ladder confirm must show the exact wire amount %q:\n%q", want, strip)
 	}
@@ -219,7 +267,7 @@ func TestConfirmMarketSellNotionalLabeledEstimate(t *testing.T) {
 	lm.ladder.armed = ladderArmed{kind: armPlace, draft: sell}
 	// bestBid 100,000,000 × 0.5 = 50,000,000 KRW, marked "~ " (the tilde-space is
 	// unique to the notional lead; est-fill/fee use "~<digit>").
-	strip := plain(strings.Join(lm.ladder.confirmStripLines(200, "", lm.ladderBands(), lm.ladderFees()), "\n"))
+	strip := plain(strings.Join(lm.ladder.confirmStripLines(200, "", lm.ladderBands(), lm.ladderBounds(), lm.ladderFees()), "\n"))
 	if !strings.Contains(strip, "~ 50,000,000") {
 		t.Errorf("a market-sell confirm must mark the notional an estimate:\n%q", strip)
 	}
@@ -654,7 +702,7 @@ func TestLadderFootLineDimContinuity(t *testing.T) {
 		`[{"currency":"krw","balance":"9000000000","available":"9000000000","tradeInUse":"0","withdrawalInUse":"0","avgPrice":"0"},
 		  {"currency":"btc","balance":"0.5","available":"0.5","tradeInUse":"0","withdrawalInUse":"0","avgPrice":"0"}]`))
 	m, _ = press(t, m, k('2', "2")) // 25% → over-max buy
-	styled := m.ladder.browseFootLine(400, m.ladderBands(), m.ladderFees(), m.pal)
+	styled := m.ladder.browseFootLine(400, m.ladderBands(), m.ladderBounds(), m.ladderFees(), m.pal)
 	if !strings.Contains(styled, uikit.StyWarn.Render(" ⚠ >max")) {
 		t.Fatalf("the over-max warn should render as its own warn fragment: %q", styled)
 	}
@@ -676,7 +724,7 @@ func TestLadderFootLineSideColors(t *testing.T) {
 	mm, _ := m.Update(tea.ColorProfileMsg{Profile: colorprofile.TrueColor})
 	m = mm.(model)
 	m, _ = press(t, m, k('2', "2")) // 25%: neither side breaches, so clean segments
-	styled := m.ladder.browseFootLine(400, m.ladderBands(), m.ladderFees(), m.pal)
+	styled := m.ladder.browseFootLine(400, m.ladderBands(), m.ladderBounds(), m.ladderFees(), m.pal)
 
 	if m.pal.Up.Fg.Render("x") == m.pal.Down.Fg.Render("x") {
 		t.Fatal("Up and Down should differ under truecolor — the side test would be vacuous")
@@ -692,7 +740,7 @@ func TestLadderFootLineSideColors(t *testing.T) {
 	// where PaletteFor swaps the tints but not the roles.
 	m.colorScheme = uikit.ColorSchemeRedBlue
 	m.pal = uikit.PaletteFor(m.colorScheme, m.profile)
-	styled = m.ladder.browseFootLine(400, m.ladderBands(), m.ladderFees(), m.pal)
+	styled = m.ladder.browseFootLine(400, m.ladderBands(), m.ladderBounds(), m.ladderFees(), m.pal)
 	if m.pal.Up.Fg.Render("x") == m.pal.Down.Fg.Render("x") {
 		t.Fatal("Up and Down should differ under red-blue too")
 	}

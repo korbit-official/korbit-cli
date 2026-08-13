@@ -143,14 +143,27 @@ func seedOrders(t *testing.T, m model, symbol string, ids ...int64) model {
 // back into the model — used to drive a sequential cancel-all batch.
 func drainCmds(t *testing.T, m model, cmd tea.Cmd) model {
 	t.Helper()
-	for i := 0; cmd != nil && i < 1000; i++ {
-		msg := cmd()
-		if msg == nil {
-			break
+	queue := []tea.Cmd{cmd}
+	for i := 0; len(queue) > 0 && i < 1000; i++ {
+		next := queue[0]
+		queue = queue[1:]
+		if next == nil {
+			continue
 		}
-		var mm tea.Model
-		mm, cmd = m.Update(msg)
+		msg := next()
+		if msg == nil {
+			continue
+		}
+		// A batched command hands its children back as a message the runtime
+		// expands; off the runtime this helper has to expand them itself, or only
+		// one of the batched fetches (bands, bounds, fees) would ever land.
+		if batch, ok := msg.(tea.BatchMsg); ok {
+			queue = append(queue, batch...)
+			continue
+		}
+		mm, more := m.Update(msg)
 		m = mm.(model)
+		queue = append(queue, more)
 	}
 	return m
 }

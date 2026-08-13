@@ -238,16 +238,28 @@ func fmtPairs(raw json.RawMessage) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	headers := []string{"symbol", "status"}
+	// The bound columns are the reason to read this endpoint before sizing an
+	// order, so the text table carries them too — the agent-facing notes point
+	// at `pairs` for them, and a two-column table would send a reader to --json
+	// with no hint that they were missing. Empty means the pair publishes no
+	// such bound; it is never zero.
+	headers := []string{"symbol", "status", "base", "quote", "minOrderValue", "maxOrderValue"}
 	var rows [][]string
 	for _, e := range arr {
 		m, ok := textout.AsObject(e)
 		if !ok {
 			return "", false
 		}
-		rows = append(rows, []string{textout.Jstr(m, "symbol"), textout.Jstr(m, "status")})
+		rows = append(rows, []string{
+			textout.Jstr(m, "symbol"),
+			textout.Jstr(m, "status"),
+			textout.Jstr(m, "baseCurrency"),
+			textout.Jstr(m, "quoteCurrency"),
+			textout.Jstr(m, "minOrderValue"),
+			textout.Jstr(m, "maxOrderValue"),
+		})
 	}
-	return textout.Table(headers, rows, []bool{false, false}), true
+	return textout.Table(headers, rows, []bool{false, false, false, false, true, true}), true
 }
 
 func fmtTicksize(raw json.RawMessage) (string, bool) {

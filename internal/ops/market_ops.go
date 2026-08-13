@@ -106,10 +106,17 @@ func init() {
 		meta: OpMeta{
 			ID: []string{"pairs"}, Section: cmdmeta.SectionMarket,
 			Method: "GET", Path: "/v2/currencyPairs",
-			Summary: "list trading pairs and their status (launched | stopped)",
+			Summary: "list trading pairs with their status, currencies, and order value bounds",
 			Response: []cmdmeta.ResponseField{
 				{Name: "symbol", Type: "string", Desc: "trading pair"},
 				{Name: "status", Type: "string", Desc: "launched | stopped"},
+				{Name: "baseCurrency", Type: "string", Desc: "the asset being traded"},
+				{Name: "quoteCurrency", Type: "string", Desc: "the currency the pair is priced in; the unit of the two bounds below"},
+				{Name: "minOrderValue", Type: "string", Desc: "minimum order value, in quoteCurrency (absent: the pair has no minimum)"},
+				{Name: "maxOrderValue", Type: "string", Desc: "maximum order value, in quoteCurrency (absent: the pair has no maximum)"},
+			},
+			Notes: []string{
+				"Order value bounds are per pair: check qty*price (or amt for a market buy) against this pair's minOrderValue/maxOrderValue before placing, or the order is rejected with ORDER_VALUE_TOO_SMALL/ORDER_VALUE_TOO_LARGE. A bound this pair omits is one it does not have — skip that check rather than applying another pair's figure.",
 			},
 			Examples: []string{"{prog} pairs"},
 			Safety:   cmdmeta.SafetyReadOnly,

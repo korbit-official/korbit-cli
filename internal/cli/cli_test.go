@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -33,11 +34,18 @@ type stubDoer struct {
 	resp *http.Response
 	err  error
 	last *http.Request
-	body string
+	// paths records every request path in order, for a command that makes more
+	// than one call (the place dry-run's market-data preflight reads the
+	// orderbook, the tick-size policy, and the pair listing).
+	paths  []string
+	signed bool // any request carried an api key
+	body   string
 }
 
 func (s *stubDoer) Do(r *http.Request) (*http.Response, error) {
 	s.last = r
+	s.paths = append(s.paths, r.URL.Path)
+	s.signed = s.signed || r.Header.Get("x-kapi-key") != ""
 	if r.Body != nil {
 		b, _ := io.ReadAll(r.Body)
 		s.body = string(b)
@@ -592,11 +600,11 @@ func TestPlaceDryRunWarnsOnSlippage(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
-	if doer.last == nil || doer.last.URL.Path != "/v2/orderbook" {
-		t.Fatalf("expected a public orderbook fetch, got: %+v", doer.last)
+	if !slices.Contains(doer.paths, "/v2/orderbook") {
+		t.Fatalf("expected an orderbook fetch, got: %v", doer.paths)
 	}
-	if doer.last.Header.Get("x-kapi-key") != "" {
-		t.Fatalf("the market-data fetch must be public (unsigned)")
+	if doer.signed {
+		t.Fatalf("every market-data fetch in the preflight must be public (unsigned): %v", doer.paths)
 	}
 	if !strings.Contains(out, "HIGH_SLIPPAGE") {
 		t.Fatalf("expected a HIGH_SLIPPAGE warning: %s", out)

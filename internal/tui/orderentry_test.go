@@ -73,7 +73,7 @@ func TestDraftValuesFollowSizingMatrix(t *testing.T) {
 func TestBuildPreviewRestingLimit(t *testing.T) {
 	d := newOrderDraft("btc_krw", "buy")
 	d.price, d.qty = "9990000", "0.05"
-	p := buildPreview(d, entryBook, true, entryBals, entryBands, nil)
+	p := buildPreview(d, entryBook, true, entryBals, entryBands, ops.OrderValueBounds{}, nil)
 	if !p.OK {
 		t.Fatalf("preview not OK: %s", p.Err)
 	}
@@ -102,13 +102,13 @@ func TestBuildPreviewFeeUsesTakerWhenMarketable(t *testing.T) {
 
 	d := newOrderDraft("btc_krw", "buy")
 	d.price, d.qty = "9990000", "0.05" // rests → maker
-	p := buildPreview(d, entryBook, true, entryBals, entryBands, fees)
+	p := buildPreview(d, entryBook, true, entryBals, entryBands, ops.OrderValueBounds{}, fees)
 	if p.FeeKind != "maker" || p.FeeEst != "500" { // 499500 × 0.001 ≈ 500
 		t.Fatalf("maker fee: kind=%s est=%s", p.FeeKind, p.FeeEst)
 	}
 
 	d.price = "10001000" // crosses → taker
-	p = buildPreview(d, entryBook, true, entryBals, entryBands, fees)
+	p = buildPreview(d, entryBook, true, entryBals, entryBands, ops.OrderValueBounds{}, fees)
 	if !p.Sim.Marketable || p.FeeKind != "taker" {
 		t.Fatalf("marketable limit: marketable=%v kind=%s", p.Sim.Marketable, p.FeeKind)
 	}
@@ -116,7 +116,7 @@ func TestBuildPreviewFeeUsesTakerWhenMarketable(t *testing.T) {
 
 func TestBuildPreviewNoBook(t *testing.T) {
 	d := newOrderDraft("btc_krw", "buy")
-	p := buildPreview(d, state.Orderbook{}, false, nil, nil, nil)
+	p := buildPreview(d, state.Orderbook{}, false, nil, nil, ops.OrderValueBounds{}, nil)
 	if p.OK || p.Err == "" {
 		t.Fatalf("no book: %+v", p)
 	}
@@ -368,5 +368,71 @@ func TestPlaceGateReason(t *testing.T) {
 	}
 	if got := placeGateReason(false, true, true, false); got == "" {
 		t.Fatal("unknown fee policy must gate")
+	}
+}
+
+// A pair quoted in something other than KRW must show the same panel figures.
+// The quote currency here is named nowhere else in the module, so a currency
+// list gating any of these paths fails this test instead of passing it.
+func TestBuildPreviewOnNonKRWQuotedPair(t *testing.T) {
+	const quote = "xaut"
+	book := state.Orderbook{
+		Symbol: "btc_" + quote,
+		Bids:   []state.PriceLevel{{Price: "93900.00", Qty: "2"}, {Price: "93800.00", Qty: "5"}},
+		Asks:   []state.PriceLevel{{Price: "94100.00", Qty: "2"}, {Price: "94200.00", Qty: "5"}},
+	}
+	bands := []ops.TickBand{{PriceGte: "0", TickSize: "0.01"}}
+	bals := []state.Balance{{Currency: quote, Available: "1000"}, {Currency: "btc", Available: "0.5"}}
+	fees := &FeeRates{MakerRate: "0.001", TakerRate: "0.0015", MaxRate: "0.002", BuyFeeCurrency: quote}
+
+	d := newOrderDraft("btc_"+quote, "buy")
+	d.price, d.qty = "93800.00", "0.001"
+	p := buildPreview(d, book, true, bals, bands, ops.OrderValueBounds{}, fees)
+	if !p.OK {
+		t.Fatalf("preview not OK: %s", p.Err)
+	}
+	if p.BaseCcy != "btc" || p.QuoteCcy != quote {
+		t.Fatalf("currencies: base=%s quote=%s", p.BaseCcy, p.QuoteCcy)
+	}
+	if p.AvailQuote != "1000" {
+		t.Fatalf("available quote: %s", p.AvailQuote)
+	}
+	// The notional is what the fee estimate is gated on — both must be present.
+	if p.Notional != "93.8" {
+		t.Fatalf("notional: %q, want 93.8", p.Notional)
+	}
+	// 93.8 × 0.001 = 0.0938, displayed to 3 significant figures. A fee rounded to
+	// whole units would read "0" — no fee at all.
+	if p.FeeKind != "maker" || p.FeeEst != "0.0938" {
+		t.Fatalf("fee: kind=%s est=%q", p.FeeKind, p.FeeEst)
+	}
+	// No notional-bound warning: those figures belong to the KRW market.
+	for _, w := range p.Warnings {
+		if w.Code == ops.WarnNotionalBelowMin || w.Code == ops.WarnNotionalAboveMax {
+			t.Fatalf("claimed a notional bound on a %s pair: %s", quote, w.Message)
+		}
+	}
+}
+
+// The fee is DISPLAYED to 3 significant figures, so it reads correctly whether
+// the quote currency puts it in the thousands or in a small fraction.
+func TestRoundSigFigs(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"0", "0"},
+		{"499.5", "500"},
+		{"149.99985", "150"},
+		{"0.1409685", "0.141"},
+		{"0.00012345", "0.000123"},
+		{"1234567", "1230000"},
+		{"-149.99985", "-150"},
+	}
+	for _, c := range cases {
+		in, err := decimal.NewFromString(c.in)
+		if err != nil {
+			t.Fatalf("parse %q: %v", c.in, err)
+		}
+		if got := roundSigFigs(in, feeSigFigs).String(); got != c.want {
+			t.Errorf("roundSigFigs(%s) = %s; want %s", c.in, got, c.want)
+		}
 	}
 }

@@ -339,6 +339,18 @@ func TestHumanFormattersPinFieldMapping(t *testing.T) {
 			[]string{"99", "123", "sell", "krw"},
 		},
 		{
+			// The order value bounds are why an agent reads this endpoint before
+			// sizing, and the `order place` note points at `pairs` for them — so
+			// the TEXT table has to carry them, not just --json. Pinned because
+			// the two-to-six column growth is a recorded consumer-visible change
+			// with nothing else guarding it.
+			"pairs",
+			[]string{"pairs"},
+			`{"success":true,"data":[{"symbol":"btc_krw","status":"launched","baseCurrency":"btc","quoteCurrency":"krw","minOrderValue":"5000","maxOrderValue":"1000000000"}]}`,
+			[]string{"symbol", "status", "base", "quote", "minOrderValue", "maxOrderValue",
+				"btc_krw", "launched", "btc", "krw", "5000", "1000000000"},
+		},
+		{
 			"whoami",
 			[]string{"whoami", "--key", "bot"},
 			`{"success":true,"data":{"apiKey":"K1","type":"ed25519","status":"active","permissions":["readOrders"]}}`,

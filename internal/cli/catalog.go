@@ -37,6 +37,15 @@ import (
 // field flows straight to stdout). See the "JSON stability model" invariant in
 // AGENTS.md. So bump catalogVersion when a CLI-owned shape changes, not when the
 // API's own response fields change.
+//
+// One CLI-owned document is deliberately OUTSIDE this scope: the `order place
+// --dry-run` `simulation` object. It is advisory estimate output — nothing
+// settles on it, and it already carries a disclaimer saying so — and it is
+// expected to gain and re-denominate fields as the risk checks grow. Versioning
+// it would spend the one signal consumers have on shapes no order depends on. A
+// consumer that must detect a simulation-field change reads the field set, not
+// catalogVersion. (Its two multi-quote renames — notionalKrw -> notional,
+// estFilledQuoteKrw -> estFilledQuote — were made under this rule.)
 
 type catalog struct {
 	Name           string            `json:"name"`
