@@ -229,7 +229,7 @@ func TestConfirmRendersExactWireAmount(t *testing.T) {
 	lm := ladderTestModel(t, &fakeTrader{})
 	lm.ladder.armed = ladderArmed{kind: armPlace, draft: d}
 	lm.ladder.view = ladderConfirm
-	strip := plain(strings.Join(lm.ladder.confirmStripLines(200, "", lm.ladderBands(), lm.ladderBounds(), lm.ladderFees()), "\n"))
+	strip := plain(strings.Join(lm.ladder.confirmStripLines(200, noGate, lm.ladderBands(), lm.ladderBounds(), lm.ladderFees()), "\n"))
 	if !strings.Contains(strip, want) {
 		t.Errorf("ladder confirm must show the exact wire amount %q:\n%q", want, strip)
 	}
@@ -267,7 +267,7 @@ func TestConfirmMarketSellNotionalLabeledEstimate(t *testing.T) {
 	lm.ladder.armed = ladderArmed{kind: armPlace, draft: sell}
 	// bestBid 100,000,000 × 0.5 = 50,000,000 KRW, marked "~ " (the tilde-space is
 	// unique to the notional lead; est-fill/fee use "~<digit>").
-	strip := plain(strings.Join(lm.ladder.confirmStripLines(200, "", lm.ladderBands(), lm.ladderBounds(), lm.ladderFees()), "\n"))
+	strip := plain(strings.Join(lm.ladder.confirmStripLines(200, noGate, lm.ladderBands(), lm.ladderBounds(), lm.ladderFees()), "\n"))
 	if !strings.Contains(strip, "~ 50,000,000") {
 		t.Errorf("a market-sell confirm must mark the notional an estimate:\n%q", strip)
 	}

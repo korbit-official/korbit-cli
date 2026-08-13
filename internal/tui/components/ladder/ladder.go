@@ -24,13 +24,15 @@ import (
 )
 
 // Row is one ladder row. Rows are the live book's levels (not one-per-tick —
-// on a KRW book a per-tick ladder would show a sliver of the market), plus
+// where the tick is small against the price, a per-tick ladder would show a
+// sliver of the market), plus
 // synthetic rows for the account's resting orders that sit on no visible
 // level: a distant own order pulls in as an edge row, an inside-spread order
 // inserts at its price position — nothing the account owns is ever off-screen.
 type Row struct {
 	Price    string // "" for padding and the mid line
 	Mid      bool   // the last/spread separator row
+	Header   bool   // the column-label row (drawn once at the top)
 	Edge     bool   // synthetic: carries an own order, not a visible book level
 	BidQty   string // book qty at this level on the bid side ("" = none)
 	AskQty   string // book qty on the ask side ("" = none)
@@ -44,18 +46,18 @@ type Row struct {
 // whose resting orders fill the MINE columns (Data.Mine) — it MUST be in the
 // key because a pure account switch changes which orders are shown
 // (OpenOrdersFor) without bumping OrderRev, so without it the memo would keep
-// the previous account's MINE overlay; Settled and Ready gate the loading
-// state; CursorPrice is the j/k cursor's row, ArmedPrice marks an armed order's
-// price, FlashID highlights a just-accepted order in its MINE cell. W and H are
-// the CONTENT size (the parent owns the panel border, title, and strip).
+// the previous account's MINE overlay; Status is the book pane's shared
+// classification that gates the loading/empty state; CursorPrice is the j/k
+// cursor's row, ArmedPrice marks an armed order's price, FlashID highlights a
+// just-accepted order in its MINE cell. W and H are the CONTENT size (the parent
+// owns the panel border, title, and strip).
 type Key struct {
 	BookRev     uint64
 	OrderRev    uint64
 	TickerRev   uint64
 	AccountSeq  int
 	Symbol      string
-	Settled     bool
-	Ready       bool
+	Status      state.DataStatus
 	TickerReady bool
 	LastTick    state.Direction // colors the last price on the mid line
 	CursorPrice string          // the ladder cursor's row ("" = none)
@@ -70,8 +72,9 @@ type Key struct {
 // open orders for the symbol (any revision-worthy change bumps OrderRev, so
 // the Key still decides the hit).
 type Data struct {
-	Book      state.Orderbook
-	HasBook   bool
+	Book state.Orderbook
+	// No HasBook: loading vs empty vs present is Key.Status (see the orderbook
+	// component's Data for why there is only one source for it).
 	Ticker    state.Ticker
 	HasTicker bool
 	Mine      []state.Order
@@ -185,7 +188,16 @@ func Rows(rows int, book state.Orderbook, mine []state.Order, level string) []Ro
 	if rows < 1 {
 		return nil
 	}
-	perSide := (rows - 1) / 2
+	// The header is a leading row of the layout (not chrome the parent adds), so
+	// the render, cursor walking, and click mapping all read it through this one
+	// source and stay aligned. It is dropped on a short pane so price levels win.
+	out := make([]Row, 0, rows)
+	layoutRows := rows
+	if rows >= uikit.MinHeaderRows {
+		out = append(out, Row{Header: true})
+		layoutRows = rows - 1
+	}
+	perSide := (layoutRows - 1) / 2
 	if perSide < 1 {
 		perSide = 1
 	}
@@ -194,7 +206,6 @@ func Rows(rows int, book state.Orderbook, mine []state.Order, level string) []Ro
 	asks := mergeSide(book.Asks, mineIdx, false, perSide)
 	bids := mergeSide(book.Bids, mineIdx, true, perSide)
 
-	out := make([]Row, 0, rows)
 	for i := 0; i < perSide-len(asks); i++ {
 		out = append(out, Row{})
 	}
@@ -311,10 +322,14 @@ func fmtMine(d decimal.Decimal) string {
 
 // render draws the ladder body: exactly k.H lines of k.W cells.
 func render(k Key, d Data) string {
-	if !d.HasBook || !k.Settled || !k.Ready {
+	if k.Status != state.StatusPresent {
 		lines := make([]string, k.H)
 		if k.H > 0 {
-			lines[0] = uikit.StyDim.Render(i18n.T("loading…"))
+			msg := i18n.T("loading…")
+			if k.Status == state.StatusEmpty {
+				msg = i18n.T("no resting orders")
+			}
+			lines[0] = uikit.StyDim.Render(msg)
 		}
 		return strings.Join(lines, "\n")
 	}
@@ -332,6 +347,8 @@ func render(k Key, d Data) string {
 	lines := make([]string, 0, len(rows))
 	for _, r := range rows {
 		switch {
+		case r.Header:
+			lines = append(lines, headerLine(mineW, qtyW, priceW))
 		case r.Mid:
 			lines = append(lines, midLine(k, d, pal))
 		case r.Price == "":
@@ -343,6 +360,29 @@ func render(k Key, d Data) string {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// headerLine renders the column-label row over levelLine's exact column widths
+// and gaps, each label centered in its column. The MINE labels are dropped
+// whenever colWidths drops the MINE columns, and labels clip (never overflow)
+// on a narrow column.
+func headerLine(mineW, qtyW, priceW int) string {
+	var b strings.Builder
+	b.WriteString(" ") // the cursor-marker gutter
+	if mineW > 0 {
+		b.WriteString(uikit.PadCenter(i18n.T("mine"), mineW))
+		b.WriteString(" ")
+	}
+	b.WriteString(uikit.PadCenter(i18n.T("bid"), qtyW))
+	b.WriteString(" ")
+	b.WriteString(uikit.PadCenter(i18n.T("price"), priceW))
+	b.WriteString(" ")
+	b.WriteString(uikit.PadCenter(i18n.T("ask"), qtyW))
+	if mineW > 0 {
+		b.WriteString(" ")
+		b.WriteString(uikit.PadCenter(i18n.T("mine"), mineW))
+	}
+	return uikit.StyDim.Render(b.String())
 }
 
 // colWidths splits the content width into the five columns:

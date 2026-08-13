@@ -42,9 +42,12 @@ func order(id int64, side, price, qty, filled string) state.Order {
 // TestRowsLayout: asks above the mid (worst at the top, best at the spread),
 // bids below best-first, padding keeping the mid centered.
 func TestRowsLayout(t *testing.T) {
-	rows := Rows(9, testBook(), nil, "") // perSide = 4
+	rows := Rows(9, testBook(), nil, "") // header row + perSide 3
 	if len(rows) != 9 {
 		t.Fatalf("want 9 rows, got %d", len(rows))
+	}
+	if !rows[0].Header {
+		t.Error("row 0 should be the column header")
 	}
 	wantPrices := []string{"", "100030000", "100020000", "100010000", "", "100000000", "99990000", "99980000", ""}
 	for i, want := range wantPrices {
@@ -94,7 +97,7 @@ func TestRowsMineOnLevel(t *testing.T) {
 // on its side — nothing the account owns is ever off-screen.
 func TestRowsDistantOwnOrderPullsIn(t *testing.T) {
 	mine := []state.Order{order(3, "buy", "90000000", "0.1", "0")}
-	rows := Rows(7, testBook(), mine, "") // perSide = 3: the bid side is full
+	rows := Rows(8, testBook(), mine, "") // header row + perSide 3: the bid side is full
 	var edge *Row
 	for i := range rows {
 		if rows[i].Price == "90000000" {
@@ -145,9 +148,9 @@ func TestRowsInsideSpreadOwnOrder(t *testing.T) {
 // walking and click mapping rely on this correspondence.
 func TestRenderMatchesRows(t *testing.T) {
 	mine := []state.Order{order(1, "buy", "99990000", "0.9", "0")}
-	k := Key{Symbol: "btc_krw", Settled: true, Ready: true, W: 60, H: 9,
+	k := Key{Symbol: "btc_krw", Status: state.StatusPresent, W: 60, H: 9,
 		Style: uikit.StyleID{Profile: colorprofile.TrueColor}}
-	d := Data{Book: testBook(), HasBook: true, Mine: mine}
+	d := Data{Book: testBook(), Mine: mine}
 	lines := strings.Split(plain(New().View(k, d)), "\n")
 	rows := Rows(k.H, d.Book, d.Mine, k.Level)
 	if len(lines) != len(rows) {
@@ -175,9 +178,9 @@ func TestRenderMatchesRows(t *testing.T) {
 // TestRenderCursorAndLoading: the cursor row carries the ▸ marker; an
 // unready/unsettled book renders as loading.
 func TestRenderCursorAndLoading(t *testing.T) {
-	k := Key{Symbol: "btc_krw", Settled: true, Ready: true, CursorPrice: "100000000",
+	k := Key{Symbol: "btc_krw", Status: state.StatusPresent, CursorPrice: "100000000",
 		W: 60, H: 9, Style: uikit.StyleID{Profile: colorprofile.TrueColor}}
-	d := Data{Book: testBook(), HasBook: true}
+	d := Data{Book: testBook()}
 	out := plain(New().View(k, d))
 	cursorLine := ""
 	for _, l := range strings.Split(out, "\n") {
@@ -190,7 +193,7 @@ func TestRenderCursorAndLoading(t *testing.T) {
 	}
 
 	k2 := k
-	k2.Ready = false
+	k2.Status = state.StatusNotReady
 	k2.BookRev = 1 // a different key: no stale cache hit
 	if out := plain(New().View(k2, d)); !strings.Contains(out, "loading…") {
 		t.Errorf("an unready book should render loading…, got %q", out)
@@ -234,6 +237,32 @@ func TestRowsBucketsMineOnGroupedBook(t *testing.T) {
 		}
 		if r.Price == "99990000" && r.MineBuy != "0.2" {
 			t.Fatalf("the bucket row should carry the MINE qty, got %+v", r)
+		}
+	}
+}
+
+// TestHeaderGating: Rows spends a leading row on the header at
+// uikit.MinHeaderRows and drops it (no Header row at all) just below that.
+func TestHeaderGating(t *testing.T) {
+	if !Rows(uikit.MinHeaderRows, testBook(), nil, "")[0].Header {
+		t.Errorf("%d rows should include a leading header row", uikit.MinHeaderRows)
+	}
+	for _, r := range Rows(uikit.MinHeaderRows-1, testBook(), nil, "") {
+		if r.Header {
+			t.Fatalf("%d rows should drop the header", uikit.MinHeaderRows-1)
+		}
+	}
+}
+
+// TestHeaderMineLockstep: the header shows the MINE labels exactly when
+// colWidths keeps the MINE data columns, so the labels never sit over dropped
+// columns (w=30 drops MINE, w=44/60 keep it).
+func TestHeaderMineLockstep(t *testing.T) {
+	for _, w := range []int{30, 44, 60} {
+		mineW, qtyW, priceW := colWidths(w)
+		h := plain(headerLine(mineW, qtyW, priceW))
+		if got := strings.Contains(h, "mine"); got != (mineW > 0) {
+			t.Errorf("w=%d mineW=%d: header has mine-label=%v, want %v (%q)", w, mineW, got, mineW > 0, h)
 		}
 	}
 }

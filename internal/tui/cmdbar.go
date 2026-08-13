@@ -472,14 +472,11 @@ func (m model) cmdBarResolve() (orderDraft, string, error) {
 		m.store.BalancesFor(m.accountSeq()), m.store.BalancesReady(m.accountSeq()), m.order.bands[m.symbol()], m.order.symFeesFor(m.symbol()))
 }
 
-// armCmdBar resolves and freezes the order for review.
+// armCmdBar resolves and freezes the order for review. The gate runs on the
+// RESOLVED draft (draftGate), after parsing: what an empty book refuses
+// depends on the typed order's own type/tif, not the order panel's draft.
 func (m model) armCmdBar() (tea.Model, tea.Cmd) {
 	c := m.cmdbar
-	if gate := m.orderGate(); gate != "" {
-		c.errText = gate
-		m.cmdbar = c
-		return m, nil
-	}
 	d, note, err := m.cmdBarResolve()
 	if err != nil {
 		c.errText = err.Error()
@@ -488,6 +485,11 @@ func (m model) armCmdBar() (tea.Model, tea.Cmd) {
 	}
 	if err := d.validate(); err != nil {
 		c.errText = err.Error()
+		m.cmdbar = c
+		return m, nil
+	}
+	if gate := m.draftGate(d); gate != "" {
+		c.errText = gate
 		m.cmdbar = c
 		return m, nil
 	}
@@ -506,7 +508,7 @@ func (m model) armCmdBar() (tea.Model, tea.Cmd) {
 // dispatches the frozen order.
 func (m model) placeFromCmdBar() (tea.Model, tea.Cmd) {
 	c := m.cmdbar
-	if gate := m.orderGate(); gate != "" {
+	if gate := m.draftGate(c.armedDraft); gate != "" {
 		c.errText = gate
 		m.cmdbar = c
 		return m, nil
@@ -614,8 +616,8 @@ func (m model) renderCmdBarLines(w int) (string, string) {
 // the +n tail. The key hints re-attach only when they fit whole (the footer
 // carries them regardless).
 func (m model) cmdEcho(d orderDraft, note string, armed bool, w int) string {
-	book, hasBook, _, _ := m.cmdBarMarket()
-	p := buildPreview(d, book, hasBook, m.store.BalancesFor(m.accountSeq()), m.order.bands[m.symbol()], m.order.boundsFor(m.symbol()), m.order.symFeesFor(m.symbol()))
+	book, _, _, _ := m.cmdBarMarket()
+	p := buildPreview(d, book, m.store.OrderbookStatus(m.symbol()), m.store.BalancesFor(m.accountSeq()), m.order.bands[m.symbol()], m.order.boundsFor(m.symbol()), m.order.symFeesFor(m.symbol()))
 
 	// The size and price are wire values, not estimates. In the armed review —
 	// the final confirmation of what is sent — render them exact so the figures
@@ -662,7 +664,7 @@ func (m model) cmdEcho(d orderDraft, note string, armed bool, w int) string {
 		// localizes off its code (English renders the code itself).
 		facts = append(facts, uikit.Fact{Text: uikit.StyWarn.Render(fmt.Sprintf("⚠ %s%s", i18n.PreplaceWarnLabel(string(p.Warnings[0].Code)), cmdMoreWarnings(n-1)))})
 	}
-	if gate := m.orderGate(); gate != "" {
+	if gate := m.draftGate(d); gate != "" {
 		facts = append(facts, uikit.Fact{Text: uikit.StyWarn.Render("book ○ blocked")})
 	} else {
 		facts = append(facts, uikit.Fact{Text: uikit.StyOK.Render("book ●")})

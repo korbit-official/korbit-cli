@@ -148,7 +148,9 @@ func (m model) loadChart(sym, iv string) (tea.Model, tea.Cmd) {
 	m.feed.Reset(iv)
 	m.chartLoadingOlder = false
 	m.chartAtOldest = false
-	m.chartErr = "" // fresh attempt: a prior failure no longer applies
+	m.chartErr = ""       // fresh attempt: a prior failure no longer applies
+	m.chartSeeded = false // show loading until this symbol/interval's seed lands
+	m.chartSeedRefetching = false
 	m.chart.SetCandles(nil, true)
 	m.chart.SetVolumePane(m.chartVol)
 	m.chart.SetLastPriceLine(true)
@@ -201,6 +203,9 @@ func (m model) applyCandles(msg candlesLoadedMsg) (tea.Model, tea.Cmd) {
 		m.setChartFromFeed()
 		return m, nil
 	}
+	// A seed result (success or error) landed: the one-shot empty-chart re-fetch,
+	// if any, is done and may be re-armed by a later trade.
+	m.chartSeedRefetching = false
 	if msg.err != nil {
 		if m.feed.Empty() {
 			// Nothing loaded yet — surface why, persistently, instead of an endless
@@ -213,6 +218,7 @@ func (m model) applyCandles(msg candlesLoadedMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.chartErr = "" // a successful seed clears any prior load error
+	m.chartSeeded = true
 	m.feed.Seed(msg.bars, newestTradeID(m.store, msg.sym))
 	m.setChartFromFeed()
 	return m, nil
@@ -263,7 +269,22 @@ func (m *model) maybeBackfill() tea.Cmd {
 // and returns a fetch command when a trade rolled the bucket over, so the
 // just-closed bucket is replaced with authoritative data.
 func (m *model) foldChartTrades() tea.Cmd {
-	if !m.chartActive() || m.chartSym == "" || m.feed.Empty() {
+	if !m.chartActive() || m.chartSym == "" || !m.chartSeeded {
+		// Before the seed returns, trades wait in the store: folding first would
+		// place a bucket on the wrong grid (the grid is only known from a seed).
+		return nil
+	}
+	if m.feed.Empty() {
+		// The seed returned empty (a never-traded pair). FoldTrade can't open the
+		// first bucket itself — the bucket grid is anchored to the server's (KST)
+		// calendar, known only from an authoritative row — so once trades exist,
+		// pull a fresh seed: with trades on the book it carries the pair's first
+		// candle on the correct grid, after which folding takes over. An in-flight
+		// flag collapses a burst of first trades into one fetch.
+		if !m.chartSeedRefetching && len(m.store.TradesSince(m.chartSym, m.feed.LastTradeID())) > 0 {
+			m.chartSeedRefetching = true
+			return m.fetchCandlesCmd(m.chartGen, m.chartSym, m.chartIv)
+		}
 		return nil
 	}
 	trades := m.store.TradesSince(m.chartSym, m.feed.LastTradeID())

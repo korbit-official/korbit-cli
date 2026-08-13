@@ -42,6 +42,14 @@ func BorderFor(focused bool) lipgloss.Style {
 	return StyBorder
 }
 
+// MinHeaderRows is the smallest number of content rows at which a pane spends
+// one on a column-header label row; a shorter pane drops the header so the data
+// rows win the scarce space. Shared by the market-data panes (orderbook,
+// ladder, trades) so they gate identically. The table panes (orders, balances,
+// fills, transfers, currencies) pin their header unconditionally — their rows
+// are unreadable without it — and so do not consult this.
+const MinHeaderRows = 6
+
 // Panel draws a bordered box with a title line and exactly h-3 content lines.
 func Panel(title string, lines []string, w, h int) string {
 	return PanelStyled(StyBorder, title, lines, w, h)

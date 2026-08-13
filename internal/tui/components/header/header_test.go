@@ -14,8 +14,7 @@ import (
 
 func sampleData() Data {
 	return Data{
-		HasTicker:   true,
-		TickerReady: true,
+		Status: state.StatusPresent,
 		Ticker: state.Ticker{
 			Symbol:             "btc_krw",
 			Close:              "99500000",
@@ -71,11 +70,15 @@ func TestPublicWhenNoKey(t *testing.T) {
 func TestLoadingWhenNotReady(t *testing.T) {
 	m := New()
 	k := key()
-	if out := m.View(k, Data{HasTicker: false}); !strings.Contains(out, "loading") {
-		t.Errorf("absent ticker should show loading, got: %q", out)
-	}
-	if out := m.View(k, Data{HasTicker: true, TickerReady: false}); !strings.Contains(out, "loading") {
+	if out := m.View(k, Data{Status: state.StatusNotReady}); !strings.Contains(out, "loading") {
 		t.Errorf("not-ready ticker should show loading, got: %q", out)
+	}
+}
+
+func TestEmptyShowsAwaitingFirstTrade(t *testing.T) {
+	m := New()
+	if out := m.View(key(), Data{Status: state.StatusEmpty}); strings.Contains(out, "loading") || !strings.Contains(out, "awaiting first trade") {
+		t.Errorf("empty ticker should await first trade (not load), got: %q", out)
 	}
 }
 

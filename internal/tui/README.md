@@ -105,24 +105,40 @@ Facts to preserve:
   counters sit in the status line, the latest warn/error notice is shown
   inline, and `n` opens the full notices log. The stream layer's "up to date
   or TOLD" property must never be hidden by the UI.
-- **No pane shows stale data — it shows "loading…" instead.** Every live pane is
-  gated on a freshness latch in `state.Store` so a value is displayed only while
-  it is current; otherwise the pane reads "loading…". The latches mirror
-  `OpenOrdersReady`: a public one (`OrderbookReady`/`TradesReady`/`TickerReady`,
-  cleared on a **public** DISCONNECTED) and a private one (`OpenOrdersReady`,
-  `BalancesReady`, cleared on a **private** DISCONNECTED), each re-set when the
-  reconnect re-snapshots (a REST snapshot landing while the feed is still down
-  applies its data but does not re-set the latch) — so a drop-and-recover
-  cycle flips the affected panes to loading and back, not just a mode switch.
-  Orderbook/trades are additionally gated on `marketSettled()` (the active-symbol
-  re-subscribe has landed) and reset for the incoming pair on a switch
-  (`MarkMarketStale`), so a previously-viewed pair's retained book/trades never
-  flash as current before the new snapshot. The **data is kept**, only its
+- **No pane shows stale data — it shows "loading…" instead, and "no data yet"
+  when that is the truth.** Every live pane is gated on a freshness latch in
+  `state.Store` so a value is displayed only while it is current. The latches
+  mirror `OpenOrdersReady`: a public one (`OrderbookReady`/`TradesReady`/
+  `TickerReady`, cleared on a **public** DISCONNECTED) and a private one
+  (`OpenOrdersReady`, `BalancesReady`, cleared on a **private** DISCONNECTED),
+  each re-set when the reconnect re-snapshots (a REST snapshot landing while the
+  feed is still down applies its data but does not re-set the latch) — so a
+  drop-and-recover cycle flips the affected panes to loading and back, not just a
+  mode switch. Orderbook/trades are additionally gated on `marketSettled()` (the
+  active-symbol re-subscribe has landed) and reset for the incoming pair on a
+  switch (`MarkMarketStale`), so a previously-viewed pair's retained book/trades
+  never flash as current before the new snapshot.
+  **A frame-arrival latch alone cannot say "the server has nothing":** a pair
+  that has never traded is sent no ticker/trade snapshot at all (and an
+  orderless book may get none either), so those latches would never flip and the
+  pane would spin forever. The public market-data panes therefore read a
+  three-way `state.DataStatus` — `NotReady` | `Empty` | `Present` — from
+  `Store.{Ticker,Orderbook,Trade}Status`, which combines the frame latch with a
+  **subscribe-ack latch** fed by the `stream.Subscribed` control event (public
+  channels only; cleared on a public disconnect and on a market switch). An ack
+  counts as "settled" only once it has stayed frameless for
+  `state.SettleDelayMs` — the server acks first and sends the snapshot right
+  after, so a bare ack does not yet mean empty. `Empty` renders the pane's own
+  wording ("no resting orders", "no trades yet", "awaiting first trade") instead
+  of a spinner, and every consumer of the classification — panes, row lists, and
+  the place gate — reads it from the same three methods. The **data is kept**, only its
   display is gated (the trade ring's high-water mark still drives gap-patching).
   The sidebar is the exception to hiding: as the top-level selector it always
   lists every symbol (the list is known up front) and gates only the price —
-  a stale ticker shows the symbol with a compact "…" marker in place of the
-  change%. Fills are the other exception:
+  a ticker with no figure to show — stale, or a pair that has never traded —
+  shows the symbol with a compact "…" marker in place of the change% (the row's
+  `Ready` reads the same `TickerStatus` classification the panes do, so a
+  never-traded pair does not sit on the marker forever). Fills are the other exception:
   append-only with no re-snapshot (snapshot-only backfill), so they gate on the
   private endpoint simply being up (`Health().Private.Up`).
 - **The symbol set is broad; the heavy channels follow one active symbol.** The
@@ -238,7 +254,12 @@ Facts to preserve:
   (`foldChartTrades`/`applyCandles` call `SetCandles` on every change), so the
   inline render skips the candle copy and any indicator recompute. The
   feed stays fresh (re-sync loop + live trade folding) whenever **either** view is
-  active (`chartActive`). The chart is the one float island: a price/qty becomes a
+  active (`chartActive`). A pair with no candles yet says so rather than
+  spinning: once a seed returns (`chartSeeded`), an empty result renders "no
+  candles yet", and the pair's first trade pulls ONE authoritative re-fetch
+  (`chartSeedRefetching`) — the bucket grid is the server's (KST-anchored) and
+  only a fetched row can place the first candle on it; live trades fold in from
+  there. The chart is the one float island: a price/qty becomes a
   `float64` only at the chart edge (`chartCandles` in `chart.go`, feeding `candlechart` — a chart is a visual artifact);
   every order/balance value elsewhere stays a decimal string.
 - **Chart indicators are pluggable.** `candlechart.Indicator` is the wiring seam
@@ -617,8 +638,10 @@ the error inline and the inputs preserved. Facts to preserve:
   never depend on where the field cursor sits), typing digits edits
   the input under it, `enter` advances (arm → place), `esc` backs out one
   step. On top: `j`/`k` walk the
-  orderbook's visible levels (`orderbook.RowPrices`, the single row-layout
-  source shared with the render) writing the level's price into the draft;
+  orderbook's visible levels (`orderbook.RowPrices`, which mirrors the render
+  row for row — both take the header reservation from `splitHeader` and the
+  depth slicing from `visibleSides`, and a header row maps to `""`, no price)
+  writing the level's price into the draft;
   `b`/`s` declare the side and re-seed the price to the new side's own best
   level (`applySide` — a price picked for one side is usually marketable on
   the other, so it never survives a flip; the side row's `←`/`→` toggle
@@ -638,11 +661,18 @@ the error inline and the inputs preserved. Facts to preserve:
   renders its value grouped (`inputView` — a nine-digit price is unreadable
   raw); the draft floors the size to the request precision while the input keeps
   the raw text, so the preview and the placed order match.
-- **Placement is freshness-gated, unlike display.** Arming and placing refuse
-  unless `marketSettled() && OrderbookReady && !moneyActionInFlight()`
-  (`orderGate`/`placeGateReason`); the gate reason lands inline and on the
-  panel's book-state line. A pane can say "loading…" — an order cannot be
-  sent against a book the store no longer stands behind.
+- **Placement is freshness-gated, unlike display.** The gate has two halves.
+  `orderGate`/`placeGateReason` is draft-independent: no money action in flight,
+  the fee policy loaded, and the book **live** — `orderbookStatus != NotReady`,
+  which a settled-but-EMPTY book satisfies. `draftGate(d)` adds what depends on
+  the order itself: on an empty book only a limit that can REST (gtc/po) is
+  allowed — it would be the first maker — while a market order (nothing to fill)
+  and an ioc/fok limit (cannot rest, would cancel unfilled) are refused by the
+  one shared `emptyBookRefusal`. Every surface passes **its own** draft: the
+  panel via `panelGate()`, the command bar its resolved/armed order, the ladder
+  each arm's. The gate reason lands inline and on the panel's book-state line. A
+  pane can say "loading…" — an order cannot be sent against a book the store no
+  longer stands behind.
 - **Arming checks and freezes the review.** `arm` validates locally (size
   parses positive; a limit has an on-grid price — off-grid is rejected, never
   silently snapped), then swaps to the in-place review; `[`/`]` and `{`/`}`
@@ -702,7 +732,8 @@ the keyboard while active (`handleCmdBarKey`); the footer steps back to prose
   rejections toast; panel and ladder rejections land inline on their surface).
   The bar never touches the panel's sticky draft.
 - **Same gates as the panel**: private mode (`Trader` wired) to open;
-  `orderGate()` (freshness + money single-flight) to arm and to place. The
+  `draftGate(d)` on its OWN resolved (then armed) order to arm and to place —
+  never the panel's draft, which may be a different order type entirely. The
   bar kicks `fetchMeta` on open so the tick/fee caches warm for its
   resolution. The normal-mode footer advertises it (a clickable `::cmd` cap,
   gated with the other order-entry caps), and the empty bar's echo line shows
@@ -730,8 +761,12 @@ cursor), and a money mover still always costs exactly two deliberate keys
   per-symbol tick/fee caches (`m.order.fetchMeta`) — one fetch feeds the
   panel, the command bar, and the ladder.
 - **`ladder.Rows` is the single row-layout source.** Rows are the live book's
-  **levels** (not per-tick — a 1,000-KRW tick on a 9-digit price would show a
-  sliver of the market); tick-fine placement happens on the armed strip via
+  **levels** (not per-tick — where the tick is small against the price, a
+  per-tick ladder would show a sliver of the market); the first row is the
+  column-header label row (`Row{Header:true}`, dropped on a pane shorter than
+  `uikit.MinHeaderRows` so price rows win the scarce space), which carries no
+  price and is inert to the cursor;
+  tick-fine placement happens on the armed strip via
   `[`/`]` (±1) and `{`/`}` (±10) grid nudges. The render, the j/k cursor
   walking, and the click mapping all read the same Rows, so they can never
   drift. The component memoizes on `BookRev`+`OrderRev`+`TickerRev`+geometry+
@@ -791,8 +826,9 @@ cursor), and a money mover still always costs exactly two deliberate keys
   clipped warning is a safety disclosure silently lost) live each frame,
   `t` cycles the tif of **this** limit arm only (the draft is a copy — it
   never moves the ladder's default tif; a market order is ioc-only),
-  and enter places under `orderGate()` — arm and place both refuse against a
-  stale book. A cancel arms/places under the money single-flight only (like
+  and enter places under `draftGate(l.armed.draft)` — re-judged at confirm
+  because `t` may have cycled the tif since arming, which changes the verdict on
+  an empty book. Arm and place both refuse against a stale book. A cancel arms/places under the money single-flight only (like
   `x` elsewhere, it must not require a fresh book). A rejection returns to the
   armed strip with the error inline (nudge and re-place, or esc out); a cancel
   result returns to browsing and reports via the standard toast.

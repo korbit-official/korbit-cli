@@ -151,14 +151,16 @@ func (l ladderModel) open(symbol string) ladderModel {
 func (l ladderModel) sizePct() int { return l.sizePcts[l.symbol] }
 
 // handleKey routes one key press. placeGate is the parent's freshness+money
-// gate for placement ("" = clear); busyGate is the money single-flight alone
-// (a cancel must work against a stale book); prices are the ladder's visible
-// row prices top to bottom (the row-layout source); bands/fees are the
-// symbol's cached metadata; level is the book's grouping level ("" = raw),
-// which buckets the cancel-at-row matching the same way the MINE cells
-// bucket. The returned action asks the parent to close the mode or dispatch
-// the armed order/cancel.
-func (l ladderModel) handleKey(msg tea.KeyPressMsg, placeGate, busyGate string, prices []string, bands []ops.TickBand, fees *FeeRates, level string) (ladderModel, ladderAction) {
+// gate for placement ("" = clear), resolved per draft (model.draftGate) — the
+// ladder arms both limit and market orders, and what an empty book refuses
+// depends on the draft being armed, so a single precomputed string cannot
+// serve both b/s and B/S; busyGate is the money single-flight alone (a cancel
+// must work against a stale book); prices are the ladder's visible row prices
+// top to bottom (the row-layout source); bands/fees are the symbol's cached
+// metadata; level is the book's grouping level ("" = raw), which buckets the
+// cancel-at-row matching the same way the MINE cells bucket. The returned
+// action asks the parent to close the mode or dispatch the armed order/cancel.
+func (l ladderModel) handleKey(msg tea.KeyPressMsg, placeGate func(orderDraft) string, busyGate string, prices []string, bands []ops.TickBand, fees *FeeRates, level string) (ladderModel, ladderAction) {
 	switch l.view {
 	case ladderBusy:
 		// The action is on the wire; its result still lands wherever we are.
@@ -173,7 +175,7 @@ func (l ladderModel) handleKey(msg tea.KeyPressMsg, placeGate, busyGate string, 
 	return l.handleBrowseKey(msg, placeGate, busyGate, prices, fees, level)
 }
 
-func (l ladderModel) handleBrowseKey(msg tea.KeyPressMsg, placeGate, busyGate string, prices []string, fees *FeeRates, level string) (ladderModel, ladderAction) {
+func (l ladderModel) handleBrowseKey(msg tea.KeyPressMsg, placeGate func(orderDraft) string, busyGate string, prices []string, fees *FeeRates, level string) (ladderModel, ladderAction) {
 	switch s := msg.String(); s {
 	case "esc":
 		return l, ladderActClose
@@ -346,10 +348,14 @@ func (l ladderModel) recenter(prices []string) ladderModel {
 // resolves to a quantity/amount through the engine's %-of-balance sizing (a
 // limit sizes at the cursor price, so a 100% preset is exact), and the strip
 // swaps to the confirm view. Refused — with the reason on the strip — while
-// the gate stands, without a size preset, or (limit) without a cursor row.
-func (l ladderModel) armOrder(side, typ, gate string, fees *FeeRates) ladderModel {
-	if gate != "" {
-		l.stripErr = gate
+// the gate stands against this arm's draft, without a size preset, or (limit)
+// without a cursor row.
+func (l ladderModel) armOrder(side, typ string, gate func(orderDraft) string, fees *FeeRates) ladderModel {
+	d := newOrderDraft(l.symbol, side)
+	d.typ = typ
+	d.tifIdx = l.defaultTifIdx // inherit the ladder default (limit only; market resolves to ioc)
+	if g := gate(d); g != "" {
+		l.stripErr = g
 		return l
 	}
 	pct := l.sizePct()
@@ -357,9 +363,6 @@ func (l ladderModel) armOrder(side, typ, gate string, fees *FeeRates) ladderMode
 		l.stripErr = i18n.T("arm a size first — %s set %s %% of balance", sizeKeysLabel(l.sizeLevels), sizeValuesLabel(l.sizeLevels))
 		return l
 	}
-	d := newOrderDraft(l.symbol, side)
-	d.typ = typ
-	d.tifIdx = l.defaultTifIdx // inherit the ladder default (limit only; market resolves to ioc)
 	if d.usesPrice() {
 		if l.cursorPrice == "" {
 			l.stripErr = i18n.T("no price row under the cursor yet — j/k to pick one")
@@ -408,7 +411,7 @@ func (l ladderModel) armCancelAtCursor(busyGate, level string) ladderModel {
 	return l
 }
 
-func (l ladderModel) handleConfirmKey(msg tea.KeyPressMsg, placeGate, busyGate string, bands []ops.TickBand) (ladderModel, ladderAction) {
+func (l ladderModel) handleConfirmKey(msg tea.KeyPressMsg, placeGate func(orderDraft) string, busyGate string, bands []ops.TickBand) (ladderModel, ladderAction) {
 	switch s := msg.String(); s {
 	case "esc":
 		l.view = ladderBrowse
@@ -424,8 +427,10 @@ func (l ladderModel) handleConfirmKey(msg tea.KeyPressMsg, placeGate, busyGate s
 			l.view = ladderBusy
 			return l, ladderActCancel
 		}
-		if placeGate != "" {
-			l.stripErr = placeGate
+		// Gate the ARMED draft: its tif may have been cycled since arming (the
+		// confirm strip's t key), and on an empty book that changes the verdict.
+		if g := placeGate(l.armed.draft); g != "" {
+			l.stripErr = g
 			return l, ladderActNone
 		}
 		l.view = ladderBusy

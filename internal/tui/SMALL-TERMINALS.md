@@ -35,7 +35,7 @@ wrapped header would shift every body row under the mouse hit-tests.
 
 - **`Truncate(s, w)`** cuts a styled line to `w` display cells and marks the
   cut with a trailing `…` — a reader can always tell content was dropped.
-- **`ClipTail(s, w)` / `PadLeft(s, w)` / `PadRight(s, w)`** are the cell-level
+- **`ClipTail(s, w)` / `PadLeft(s, w)` / `PadRight(s, w)` / `PadCenter(s, w)`** are the cell-level
   (rune-based) primitives, and their truncation *direction* is chosen per
   content type: quantities and labels keep their **head** (`ClipTail`,
   `PadRight` — most-significant digits survive), while prices in dense tables
@@ -78,6 +78,15 @@ wrapped header would shift every body row under the mouse hit-tests.
   fit and fall back to `Compact` with the unit kept. The notional is the
   number a mistake hides in, and an order-of-magnitude error is *more*
   visible in `9.62B` vs `962M` than in a clipped digit string.
+- **Column headers are the one silent drop.** The orderbook, ladder and trades
+  panes spend a content row on a dim column-label row only at
+  `uikit.MinHeaderRows` or taller (`splitHeader` / `ladder.Rows`); below that
+  the labels go without a marker. The exception to "say what was dropped" is
+  deliberate: the labels are an aid to reading the rows, never a fact of their
+  own, and a marker would cost the very row the drop is buying. The columns
+  stay in the same order and position, so nothing moves when the header
+  reappears. The table panes (orders, balances, fills, transfers, currencies)
+  pin their header instead — their cells are unreadable unlabeled.
 - **Tables** (open orders, fills, transfers) size columns by weight and clip
   cell content per column (`ClipTail`) instead of dropping columns; the
   status column stays visible at any supported size.

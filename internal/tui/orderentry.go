@@ -224,10 +224,15 @@ type TickPolicy struct {
 // display-ready derived figures. Rebuilt whenever the draft or the book
 // changes; strings stay wire strings (rendering formats them).
 type orderPreview struct {
-	OK  bool   // the analysis ran against a usable book
+	OK  bool   // the draft was previewable (see buildPreview for the three cases)
 	Err string // why not, when !OK
 
-	Sim      ops.PlaceSimulation
+	// Sim is the full book simulation — the ZERO VALUE on the empty-book path,
+	// which has no depth to simulate. Read it only through fields whose zero is
+	// meaningful (Marketable false, Mid ""), never as proof a simulation ran.
+	Sim ops.PlaceSimulation
+	// Warnings are the analysis warnings. On the empty-book path only the
+	// order-value bound warnings can be raised (the rest need depth).
 	Warnings []ops.PlaceWarning
 
 	Notional   string // estimated notional in QuoteCcy ("" when the size is not set yet)
@@ -243,20 +248,30 @@ type orderPreview struct {
 	AvailQuote string // available quote balance ("" when unknown)
 }
 
-// buildPreview computes the preview for a draft against the live inputs. A
-// missing book or an analysis error yields OK=false with the reason; missing
-// bands/bounds/fees/balances just leave their derived fields empty or their
-// checks unrun (each is optional and best-effort).
-func buildPreview(d orderDraft, book state.Orderbook, hasBook bool, bals []state.Balance, bands []ops.TickBand, bounds ops.OrderValueBounds, fees *FeeRates) orderPreview {
+// buildPreview computes the preview for a draft against the live inputs. Three
+// outcomes, keyed on the book's status: a NOT-READY book (or an analysis error)
+// yields OK=false with the reason; a live-but-EMPTY book takes the
+// emptyBookPreview path, which values the order directly and leaves Sim zero;
+// a live book runs the full ops.AnalyzePlace. Missing bands/bounds/fees/
+// balances just leave their derived fields empty or their checks unrun (each is
+// optional and best-effort).
+func buildPreview(d orderDraft, book state.Orderbook, bookStatus state.DataStatus, bals []state.Balance, bands []ops.TickBand, bounds ops.OrderValueBounds, fees *FeeRates) orderPreview {
 	base, quote := splitSymbol(d.symbol)
 	p := orderPreview{
 		BaseCcy: base, QuoteCcy: quote,
 		AvailBase:  availableOf(bals, base),
 		AvailQuote: availableOf(bals, quote),
 	}
-	if !hasBook || (len(book.Bids) == 0 && len(book.Asks) == 0) {
+	switch bookStatus {
+	case state.StatusNotReady:
+		// The book is still loading (or mid-switch) — the numbers can't be trusted.
 		p.Err = i18n.T("waiting for a live orderbook")
 		return p
+	case state.StatusEmpty:
+		// The book is live but has no resting orders (a newly listed pair). There
+		// is nothing to sweep or measure a mid against, so preview a resting limit
+		// directly (it would be the first maker) and refuse what can't rest.
+		return emptyBookPreview(d, p, bands, bounds, fees)
 	}
 	sim, ws, err := ops.AnalyzePlace(d.values(), opsLevels(book.Bids), opsLevels(book.Asks), bands, bounds)
 	if err != nil {
@@ -283,6 +298,70 @@ func buildPreview(d orderDraft, book state.Orderbook, hasBook bool, bals []state
 			p.FeeEst = roundSigFigs(est, feeSigFigs).String()
 			p.FeeRate = rate
 			p.FeeKind = kind
+		}
+	}
+	return p
+}
+
+// emptyBookRefusal is the single rule for what may be placed on a live-but-empty
+// orderbook (StatusEmpty): only a limit order that can REST — gtc or po. A market
+// order has nothing to fill against, and an ioc/fok limit cannot rest, so the
+// server would accept it and immediately cancel it unfilled. Both the placement
+// gate (draftGate) and the preview (emptyBookPreview) apply this rule, so what
+// the preview refuses can never arm. "" = placeable (rests as the first maker).
+func emptyBookRefusal(d orderDraft) string {
+	if d.typ != "limit" {
+		return i18n.T("the orderbook is empty — a market order can't fill; place a limit order to rest as the first maker")
+	}
+	switch d.tif() {
+	case "ioc", "fok":
+		return i18n.T("the orderbook is empty — an ioc/fok limit can't fill and would cancel; use gtc or po to rest as the first maker")
+	}
+	return ""
+}
+
+// emptyBookPreview is the preview for a live-but-empty orderbook (a newly listed
+// pair with no resting orders). An order the empty-book rule refuses (a market
+// order, an ioc/fok limit — see emptyBookRefusal) carries the refusal as its
+// error; a gtc/po limit rests as the first maker, so its notional (price × qty)
+// and maker-fee estimate are previewed even though there is no book to sweep or
+// a mid to measure the price against. p already carries the currencies and
+// available balances.
+//
+// The book-dependent checks AnalyzePlace runs (marketability, sweep/slippage,
+// post-only-would-cross) have no meaning without depth and are simply absent.
+// The order-value bounds do NOT depend on the book, so they ARE checked here,
+// through the same ops.NotionalBoundWarnings placement uses: a below-min order
+// is the one mistake an empty book makes MORE likely (a first maker sizing
+// small to test a new listing), and it renders as an error, so losing it would
+// be the costly omission.
+func emptyBookPreview(d orderDraft, p orderPreview, bands []ops.TickBand, bounds ops.OrderValueBounds, fees *FeeRates) orderPreview {
+	if reason := emptyBookRefusal(d); reason != "" {
+		p.Err = reason
+		return p
+	}
+	qty := d.wireQty()
+	if d.price == "" || qty == "" {
+		p.Err = i18n.T("no resting orders — set a limit price to rest as the first maker")
+		return p
+	}
+	p.OK = true
+	if notional, ok := mulDec(d.price, qty); ok {
+		// Rounded to the same 8 places ops renders its own notional at, so the two
+		// preview paths read alike whatever the pair's quote currency. The bound
+		// check takes the EXACT product, as AnalyzePlace does.
+		p.Notional = notional.Round(8).String()
+		p.Warnings = ops.NotionalBoundWarnings(notional.String(), bounds, p.QuoteCcy)
+	}
+	if tick, ok := ops.TickSizeAt(bands, d.price); ok {
+		p.TickSize = tick
+	}
+	// A resting limit is always a maker, so the estimate uses the maker rate.
+	if fees != nil && p.Notional != "" {
+		if est, ok := mulDec(p.Notional, fees.MakerRate); ok {
+			p.FeeEst = roundSigFigs(est, feeSigFigs).String()
+			p.FeeRate = fees.MakerRate
+			p.FeeKind = "maker"
 		}
 	}
 	return p
@@ -515,15 +594,19 @@ func anchorPrice(anchor, side string, book state.Orderbook, hasBook bool, t stat
 // otherwise why not. Unlike the display panes (which just show "loading…"),
 // placement must refuse to run against a stale or still-loading book — the
 // preview's numbers and the user's intent were formed against data the store
-// no longer stands behind. The fee policy is part of the gate for the same
+// no longer stands behind. bookLive is true once the orderbook subscription is
+// settled, whether or not it has resting orders: an empty book is a valid place
+// target for a resting limit (the first maker), so only a NOT-ready book gates
+// here — what an EMPTY book refuses depends on the draft and is draftGate's
+// half (emptyBookRefusal). The fee policy is part of the gate for the same
 // reason: the review's fee estimate and the order's local balance hold both
 // size from it, so arming waits for the (async, retried) fetch rather than
 // reviewing against unknown fees.
-func placeGateReason(inFlight, settled, bookReady, feesKnown bool) string {
+func placeGateReason(inFlight, bookLive, feesKnown bool) string {
 	switch {
 	case inFlight:
 		return i18n.T("an order action is already in flight — wait for it to finish")
-	case !settled || !bookReady:
+	case !bookLive:
 		return i18n.T("the orderbook is not live yet — wait for it to load")
 	case !feesKnown:
 		return i18n.T("the fee policy is not loaded yet — wait for it to load")

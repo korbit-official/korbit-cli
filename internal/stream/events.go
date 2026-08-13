@@ -99,6 +99,23 @@ type Data struct {
 
 func (Data) isEvent() {}
 
+// Subscribed reports that the server acked a subscribe request for a channel —
+// the "settled" signal a consumer needs to tell a still-loading subscription
+// from one that is live but carries no data. It matters because a never-traded
+// pair emits NO ticker/trade snapshot at all (and an orderless pair may emit no
+// orderbook snapshot): without this event the only readiness signal is the
+// first data frame, which for such a pair never arrives, so the subscription
+// would look perpetually "loading". Symbols is the acked subscription's symbol
+// set (one item for a dynamic orderbook/trade subscribe; the full list for the
+// up-front ticker subscribe). It is a control event, not a user-facing Notice —
+// the monitor NDJSON ignores it.
+type Subscribed struct {
+	Channel string
+	Symbols []string
+}
+
+func (Subscribed) isEvent() {}
+
 // Level grades a Notice.
 type Level string
 

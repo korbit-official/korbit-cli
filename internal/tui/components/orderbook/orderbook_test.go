@@ -21,7 +21,6 @@ func plain(s string) string { return ansiRe.ReplaceAllString(s, "") }
 
 func sampleData() Data {
 	return Data{
-		HasBook: true,
 		Book: state.Orderbook{
 			Symbol: "btc_krw",
 			Asks:   []state.PriceLevel{{Price: "100", Qty: "1"}, {Price: "101", Qty: "2"}},
@@ -33,7 +32,7 @@ func sampleData() Data {
 }
 
 func key() Key {
-	return Key{BookRev: 1, TickerRev: 1, Symbol: "btc_krw", Settled: true, Ready: true, TickerReady: true, W: 30, H: 12}
+	return Key{BookRev: 1, TickerRev: 1, Symbol: "btc_krw", Status: state.StatusPresent, TickerReady: true, W: 30, H: 12}
 }
 
 func TestRendersDepthAndDimensions(t *testing.T) {
@@ -55,13 +54,22 @@ func TestRendersDepthAndDimensions(t *testing.T) {
 func TestLoadingWhenNotReady(t *testing.T) {
 	m := New()
 	k := key()
-	k.Ready = false
+	k.Status = state.StatusNotReady
 	if out := m.View(k, sampleData()); !strings.Contains(out, "loading") {
 		t.Errorf("not-ready book should show loading, got: %q", out)
 	}
-	k = key()
-	if out := m.View(k, Data{HasBook: false}); !strings.Contains(out, "loading") {
-		t.Errorf("absent book should show loading, got: %q", out)
+}
+
+func TestEmptyBookShowsNoRestingOrders(t *testing.T) {
+	m := New()
+	k := key()
+	k.Status = state.StatusEmpty
+	out := m.View(k, Data{})
+	if strings.Contains(out, "loading") {
+		t.Errorf("live-but-empty book must not show loading, got: %q", out)
+	}
+	if !strings.Contains(out, "no resting orders") {
+		t.Errorf("live-but-empty book should show 'no resting orders', got: %q", out)
 	}
 }
 
@@ -176,12 +184,13 @@ var ladderBook = state.Orderbook{
 	Bids:   []state.PriceLevel{{Price: "100", Qty: "1"}, {Price: "99", Qty: "2"}},
 }
 
-// RowPrices mirrors the render's slicing: ask-side padding, asks worst→best,
-// the mid line, bids best→worst, tail padding.
+// RowPrices mirrors the render's slicing: the column header, ask-side padding,
+// asks worst→best, the mid line, bids best→worst, tail padding.
 func TestRowPrices(t *testing.T) {
-	// h=13 → 10 content rows → perSide 4: pad 1, asks 103/102/101, mid, bids.
+	// h=13 → 10 content rows → header + perSide 4: header, pad 1, asks
+	// 103/102/101, mid, bids.
 	got := RowPrices(13, ladderBook)
-	want := []string{"", "103", "102", "101", "", "100", "99", "", "", ""}
+	want := []string{"", "", "103", "102", "101", "", "100", "99", "", ""}
 	if len(got) != len(want) {
 		t.Fatalf("rows = %d, want %d (%v)", len(got), len(want), got)
 	}
@@ -207,10 +216,10 @@ func TestRowPrices(t *testing.T) {
 // carries the ▸ marker on exactly the row RowPrices names.
 func TestCursorRowMatchesRowPrices(t *testing.T) {
 	k := Key{
-		BookRev: 1, Symbol: "btc_krw", Settled: true, Ready: true,
+		BookRev: 1, Symbol: "btc_krw", Status: state.StatusPresent,
 		CursorPrice: "100", W: 24, H: 13,
 	}
-	lines := strings.Split(New().View(k, Data{Book: ladderBook, HasBook: true}), "\n")
+	lines := strings.Split(New().View(k, Data{Book: ladderBook}), "\n")
 	rows := RowPrices(k.H, ladderBook)
 	cursorRow := -1
 	for i, p := range rows {
@@ -229,6 +238,50 @@ func TestCursorRowMatchesRowPrices(t *testing.T) {
 		}
 		if !has && i == 2+cursorRow {
 			t.Fatalf("cursor row %d should carry the ▸ marker: %q", i, l)
+		}
+	}
+}
+
+// TestHeaderGating: the price/qty header appears once the pane has
+// uikit.MinHeaderRows content rows and is dropped below that so levels win.
+func TestHeaderGating(t *testing.T) {
+	k := key()
+	k.H = uikit.MinHeaderRows + 3 // content rows == MinHeaderRows → header shows
+	if out := plain(New().View(k, sampleData())); !strings.Contains(out, "price") || !strings.Contains(out, "qty") {
+		t.Errorf("a pane with %d content rows should show the price/qty header: %q", uikit.MinHeaderRows, out)
+	}
+	k.H = uikit.MinHeaderRows + 2 // one fewer content row → header dropped
+	if out := plain(New().View(k, sampleData())); strings.Contains(out, "price") || strings.Contains(out, "qty") {
+		t.Errorf("a pane with %d content rows should drop the header: %q", uikit.MinHeaderRows-1, out)
+	}
+}
+
+// TestRenderMatchesRowPrices pins the render↔mapping invariant across the whole
+// size grid: depthLines (render) and RowPrices (click/cursor map) are separate
+// functions, so every price RowPrices names must appear on that exact content
+// line — the header offset included. A drift in either function is caught here.
+// Widths are swept as well as heights: the header decision is shared
+// (splitHeader), and a width-conditioned drift in one of the two would map every
+// click a level off while every height still passed.
+func TestRenderMatchesRowPrices(t *testing.T) {
+	for _, w := range []int{14, 20, 30, 44, 70} {
+		for _, h := range []int{6, 8, 9, 12, 20} {
+			k := key()
+			k.W, k.H, k.Style = w, h, uikit.StyleID{Profile: colorprofile.TrueColor}
+			lines := strings.Split(plain(New().View(k, sampleData())), "\n")
+			prices := RowPrices(h, sampleData().Book)
+			if got := len(prices); got != h-3 {
+				t.Fatalf("w=%d h=%d: RowPrices returned %d rows, want %d content rows", w, h, got, h-3)
+			}
+			for i, p := range prices {
+				if p == "" {
+					continue
+				}
+				line := i + 2 // panel border + title precede the content rows
+				if line >= len(lines) || !strings.Contains(lines[line], uikit.GroupThousands(p)) {
+					t.Errorf("w=%d h=%d: RowPrices[%d]=%q should render on content line %d, got %q", w, h, i, p, i, lines[line])
+				}
+			}
 		}
 	}
 }

@@ -41,7 +41,7 @@ func glyphCol(line, glyph string) int {
 // click test offsets into.
 func orderPanelLineScreen(m model, substr string) (col, row int, line string, ok bool) {
 	left, _, rightW := m.orderColumnGeom()
-	for i, l := range m.order.panelLines(rightW-2, m.orderGate()) {
+	for i, l := range m.order.panelLines(rightW-2, m.panelGate()) {
 		if strings.Contains(plain(l.text), substr) {
 			return left + 1, m.bodyTop() + 2 + i, l.text, true
 		}

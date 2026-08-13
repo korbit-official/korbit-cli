@@ -1795,11 +1795,13 @@ func fundingEntryLess(a, b fundingEntry) bool {
 }
 
 // estValue is the holding's estimated KRW value: balance × the pair's last
-// price, only when the <cur>_krw ticker is subscribed and ready. Display-only
-// arithmetic — wire values are never derived from it.
+// price, only when the <cur>_krw ticker carries a real traded price. Reads the
+// shared classification rather than the frame latch, so a pair that has never
+// traded — and a warmed all-zero ticker — yield no estimate instead of one
+// worth zero. Display-only arithmetic — wire values are never derived from it.
 func (f fundingModel) estValue(cur, balance string) (decimal.Decimal, bool) {
 	sym := cur + "_krw"
-	if !f.store.TickerReady(sym) {
+	if f.store.TickerStatus(sym) != state.StatusPresent {
 		return decimal.Decimal{}, false
 	}
 	t, ok := f.store.Ticker(sym)
@@ -1815,10 +1817,11 @@ func (f fundingModel) estValue(cur, balance string) (decimal.Decimal, bool) {
 }
 
 // lastPrice is the selected pair's last traded price for the detail header,
-// "" when its ticker isn't subscribed/ready.
+// "" when its ticker carries no traded price (not subscribed, still loading, or
+// a pair that has never traded).
 func (f fundingModel) lastPrice(cur string) string {
 	sym := cur + "_krw"
-	if !f.store.TickerReady(sym) {
+	if f.store.TickerStatus(sym) != state.StatusPresent {
 		return ""
 	}
 	t, ok := f.store.Ticker(sym)

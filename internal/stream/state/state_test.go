@@ -752,6 +752,66 @@ func TestPublicFreshnessTracking(t *testing.T) {
 	}
 }
 
+// TestDataStatusClassification pins the three-way loading/empty/present readout:
+// NotReady before a subscription settles, NotReady still in the moment after the
+// ack (the snapshot may be on its way), Empty once the ack has stayed frameless
+// past SettleDelayMs (a never-traded pair sends no ticker/trade snapshot),
+// Present once a content frame lands, and back to NotReady on a public
+// disconnect.
+func TestDataStatusClassification(t *testing.T) {
+	now := int64(1_000)
+	s := New(Config{}, func() int64 { return now })
+	if s.TickerStatus("btc_krw") != StatusNotReady || s.OrderbookStatus("btc_krw") != StatusNotReady || s.TradeStatus("btc_krw") != StatusNotReady {
+		t.Fatal("before any subscription: every pane must be NotReady")
+	}
+	s.Apply(stream.Subscribed{Channel: stream.ChannelTicker, Symbols: []string{"btc_krw"}})
+	s.Apply(stream.Subscribed{Channel: stream.ChannelOrderbook, Symbols: []string{"btc_krw"}})
+	s.Apply(stream.Subscribed{Channel: stream.ChannelTrade, Symbols: []string{"btc_krw"}})
+	// The ack proves the subscription is live, NOT that the server has nothing
+	// to send — the snapshot follows the ack as a separate write. Reading Empty
+	// here would flash a wrong pane and open the place gate against a book about
+	// to arrive, so the pane stays NotReady until the ack has aged.
+	if s.OrderbookStatus("btc_krw") != StatusNotReady || s.TradeStatus("btc_krw") != StatusNotReady {
+		t.Fatalf("an ack with a snapshot still possible must stay NotReady (book=%d trade=%d)", s.OrderbookStatus("btc_krw"), s.TradeStatus("btc_krw"))
+	}
+	now += SettleDelayMs // no frame followed the ack: the server has nothing
+	if s.TickerStatus("btc_krw") != StatusEmpty || s.OrderbookStatus("btc_krw") != StatusEmpty || s.TradeStatus("btc_krw") != StatusEmpty {
+		t.Fatalf("a frameless ack past the settle delay must be Empty (ticker=%d book=%d trade=%d)", s.TickerStatus("btc_krw"), s.OrderbookStatus("btc_krw"), s.TradeStatus("btc_krw"))
+	}
+	// An explicit empty orderbook frame keeps the book Empty (frame arrived, but no
+	// resting orders).
+	s.Apply(data("orderbook", "btc_krw", stream.OriginSnapshot, 1, "", `{"data":{"timestamp":1,"asks":[],"bids":[]}}`))
+	if s.OrderbookStatus("btc_krw") != StatusEmpty {
+		t.Fatal("an empty book frame must stay Empty")
+	}
+	// Content frames flip each pane to Present.
+	s.Apply(data("ticker", "btc_krw", stream.OriginSnapshot, 2, "", tickerFrame("99500000", 2)))
+	s.Apply(data("orderbook", "btc_krw", stream.OriginSnapshot, 2, "", `{"data":{"timestamp":2,"asks":[{"price":"1","qty":"2"}],"bids":[]}}`))
+	s.Apply(data("trade", "btc_krw", stream.OriginSnapshot, 2, "", wsTrades(10)))
+	if s.TickerStatus("btc_krw") != StatusPresent || s.OrderbookStatus("btc_krw") != StatusPresent || s.TradeStatus("btc_krw") != StatusPresent {
+		t.Fatal("content frames must classify Present")
+	}
+	// A public disconnect reverts every pane to NotReady (loading again).
+	s.Apply(notice(stream.Disconnected, stream.LevelWarn, 300, map[string]any{"endpoint": "public"}))
+	if s.TickerStatus("btc_krw") != StatusNotReady || s.OrderbookStatus("btc_krw") != StatusNotReady || s.TradeStatus("btc_krw") != StatusNotReady {
+		t.Fatal("a public disconnect must revert panes to NotReady")
+	}
+}
+
+// TestTickerZeroCloseIsEmpty: a zero-close ticker (a startup-warmed board with no
+// trade yet) classifies Empty, not Present — the header must not render "last 0".
+// Any zero form must read as empty, not just the canonical "0".
+func TestTickerZeroCloseIsEmpty(t *testing.T) {
+	for _, close := range []string{"0", "0.0", "0.00000000"} {
+		s := newTestStore()
+		s.Apply(stream.Subscribed{Channel: stream.ChannelTicker, Symbols: []string{"btc_krw"}})
+		s.Apply(data("ticker", "btc_krw", stream.OriginSnapshot, 1, "", tickerFrame(close, 1)))
+		if got := s.TickerStatus("btc_krw"); got != StatusEmpty {
+			t.Fatalf("ticker close %q must be Empty, got %d", close, got)
+		}
+	}
+}
+
 // TestBalancesFreshnessTracking: balances become ready on the snapshot and a
 // PRIVATE disconnect clears them (a PUBLIC one does not).
 func TestBalancesFreshnessTracking(t *testing.T) {

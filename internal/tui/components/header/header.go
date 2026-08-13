@@ -50,13 +50,12 @@ type Key struct {
 	Style        uikit.StyleID
 }
 
-// Data is what the component renders on a cache miss. HasTicker mirrors the
-// store's "ok" return and TickerReady gates the loading state; the ticker first
-// arriving bumps TickerRev, so the Key still decides the hit.
+// Data is what the component renders on a cache miss. Status is the ticker
+// pane's shared classification (loading / no data yet / present); a status
+// change bumps TickerRev, so the Key still decides the cache hit.
 type Data struct {
-	Ticker      state.Ticker
-	HasTicker   bool
-	TickerReady bool
+	Ticker state.Ticker
+	Status state.DataStatus
 }
 
 // Model is the header component. The zero value is ready to use.
@@ -145,8 +144,16 @@ func render(k Key, d Data) string {
 	// A crowded line clips at W rather than wrapping into the body's rows.
 	line1 := uikit.Truncate(left+strings.Repeat(" ", gap)+right, k.W)
 
-	line2 := uikit.StyDim.Render(i18n.T("loading…"))
-	if d.HasTicker && d.TickerReady {
+	var line2 string
+	switch d.Status {
+	case state.StatusNotReady:
+		line2 = uikit.StyDim.Render(i18n.T("loading…"))
+	case state.StatusEmpty:
+		// The subscription is live but the pair has never traded, so there is no
+		// last price / 24h stats. The orderbook pane still shows any resting bid/ask.
+		line2 = uikit.StyTitle.Render(uikit.FmtSymbol(k.Symbol)) + "  " +
+			uikit.StyDim.Render(i18n.T("no trades yet — awaiting first trade"))
+	default: // StatusPresent
 		t := d.Ticker
 		dir := pal.Up.Fg
 		arrow := "▲"

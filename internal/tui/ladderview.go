@@ -12,6 +12,7 @@ import (
 
 	"github.com/korbit-official/korbit-cli/internal/i18n"
 	"github.com/korbit-official/korbit-cli/internal/ops"
+	"github.com/korbit-official/korbit-cli/internal/stream/state"
 	"github.com/korbit-official/korbit-cli/internal/tui/components/ladder"
 	"github.com/korbit-official/korbit-cli/internal/tui/uikit"
 )
@@ -86,7 +87,7 @@ func (l ladderModel) title() string {
 // (resolved order + live preview + controls) on confirm, and the on-the-wire
 // note while busy. The render and the body-height math both read it, so the
 // ladder rows above always shrink by exactly what the strip occupies.
-func (l ladderModel) stripLines(inner int, gate string, bands []ops.TickBand, bounds ops.OrderValueBounds, fees *FeeRates, pal uikit.Palette) []string {
+func (l ladderModel) stripLines(inner int, gate func(orderDraft) string, bands []ops.TickBand, bounds ops.OrderValueBounds, fees *FeeRates, pal uikit.Palette) []string {
 	sep := uikit.StyDim.Render(strings.Repeat("─", maxInt(0, inner)))
 	switch l.view {
 	case ladderConfirm:
@@ -144,7 +145,8 @@ func (l ladderModel) presetEstimates(pct int, bands []ops.TickBand, bounds ops.O
 	if l.cursorPrice == "" {
 		return ""
 	}
-	book, hasBook := l.store.Orderbook(l.symbol)
+	book, _ := l.store.Orderbook(l.symbol)
+	bookStatus := l.store.OrderbookStatus(l.symbol)
 	var parts []string
 	for _, side := range []string{"buy", "sell"} {
 		d := newOrderDraft(l.symbol, side)
@@ -153,7 +155,7 @@ func (l ladderModel) presetEstimates(pct int, bands []ops.TickBand, bounds ops.O
 		if reason != "" {
 			continue
 		}
-		p := buildPreview(sized, book, hasBook, l.store.BalancesFor(l.accountSeq), bands, bounds, fees)
+		p := buildPreview(sized, book, bookStatus, l.store.BalancesFor(l.accountSeq), bands, bounds, fees)
 		// Each fragment carries its own style (see browseFootLine): the side in
 		// the book's bid/ask color (buy = Up, sell = Down — the same colors the
 		// ladder rows use), plus any warn ⚠ pop, so callers concatenate without
@@ -181,10 +183,10 @@ func (l ladderModel) presetEstimates(pct int, bands []ops.TickBand, bounds ops.O
 // freshness), the preplace warnings — each on its own line, like the panel:
 // the facts line truncates at narrow widths, and a clipped warning is a
 // safety disclosure silently lost — any inline rejection, and the controls.
-func (l ladderModel) confirmStripLines(inner int, gate string, bands []ops.TickBand, bounds ops.OrderValueBounds, fees *FeeRates) []string {
+func (l ladderModel) confirmStripLines(inner int, gate func(orderDraft) string, bands []ops.TickBand, bounds ops.OrderValueBounds, fees *FeeRates) []string {
 	d := l.armed.draft
-	book, hasBook := l.store.Orderbook(d.symbol)
-	p := buildPreview(d, book, hasBook, l.store.BalancesFor(l.accountSeq), bands, bounds, fees)
+	book, _ := l.store.Orderbook(d.symbol)
+	p := buildPreview(d, book, l.store.OrderbookStatus(d.symbol), l.store.BalancesFor(l.accountSeq), bands, bounds, fees)
 
 	size := d.sizeValue()
 	unit := uikit.FmtCurrency(p.BaseCcy)
@@ -232,10 +234,10 @@ func (l ladderModel) confirmStripLines(inner int, gate string, bands []ops.TickB
 	case len(p.Warnings) == 0:
 		facts = append(facts, i18n.T("⚠ none"))
 	}
-	if gate == "" {
+	if g := gate(d); g == "" {
 		facts = append(facts, uikit.StyOK.Render(i18n.T("book ● live")))
 	} else {
-		facts = append(facts, uikit.StyWarn.Render(i18n.T("book ○ %s", gate)))
+		facts = append(facts, uikit.StyWarn.Render(i18n.T("book ○ %s", g)))
 	}
 
 	out := []string{
@@ -297,7 +299,7 @@ func (m model) ladderGeom() (left, w int) {
 // ladderStrip is the current foot strip (the single source renderLadder and
 // the body-row math read).
 func (m model) ladderStrip(inner int) []string {
-	return m.ladder.stripLines(inner, m.orderGate(), m.ladderBands(), m.ladderBounds(), m.ladderFees(), m.pal)
+	return m.ladder.stripLines(inner, m.draftGate, m.ladderBands(), m.ladderBounds(), m.ladderFees(), m.pal)
 }
 
 // ladderBodyRows is how many ladder content rows fit above the strip.
@@ -309,11 +311,13 @@ func (m model) ladderBodyRows() int {
 
 // ladderRows is the ladder's visible rows for the current geometry — the
 // single row-layout source (ladder.Rows) evaluated at the live body height.
-// Empty while the book is loading/unsettled (nothing to walk or click).
+// Empty while the book is loading/unsettled, and on a settled-but-empty book
+// (no levels to walk or click) — the same classification the pane renders from,
+// so the rows and the pane can never disagree about which state they are in.
 func (m model) ladderRows() []ladder.Row {
 	sym := m.symbol()
 	book, ok := m.store.Orderbook(sym)
-	if !ok || !m.marketSettled() || !m.store.OrderbookReady(sym) {
+	if !ok || m.orderbookStatus(sym) != state.StatusPresent {
 		return nil
 	}
 	return ladder.Rows(m.ladderBodyRows(), book, m.store.OpenOrdersFor(m.accountSeq(), sym), m.bookGrp[sym])
@@ -349,7 +353,7 @@ func (m model) renderLadder(w, bodyH int) string {
 	strip := m.ladderStrip(inner)
 	bodyRows := maxInt(1, bodyH-3-len(strip))
 
-	book, hasBook := m.store.Orderbook(sym)
+	book, _ := m.store.Orderbook(sym)
 	t, hasTicker := m.store.Ticker(sym)
 	armedPrice := ""
 	if m.ladder.view != ladderBrowse && m.ladder.armed.kind == armPlace && m.ladder.armed.draft.usesPrice() {
@@ -361,13 +365,14 @@ func (m model) renderLadder(w, bodyH int) string {
 	}
 	body := m.cLadder.View(ladder.Key{
 		BookRev: m.store.BookRev(), OrderRev: m.store.OrderRev(), TickerRev: m.store.TickerRev(),
-		AccountSeq: m.accountSeq(),
-		Symbol:     sym, Settled: m.marketSettled(), Ready: m.store.OrderbookReady(sym),
-		TickerReady: m.store.TickerReady(sym), LastTick: m.store.LastTick(sym),
+		AccountSeq:  m.accountSeq(),
+		Symbol:      sym,
+		Status:      m.orderbookStatus(sym),
+		TickerReady: m.store.TickerStatus(sym) == state.StatusPresent, LastTick: m.store.LastTick(sym),
 		CursorPrice: m.ladder.cursorPrice, ArmedPrice: armedPrice, FlashID: flash,
 		Level: m.bookGrp[sym],
 		W:     inner, H: bodyRows, Style: m.styleID(),
-	}, ladder.Data{Book: book, HasBook: hasBook, Ticker: t, HasTicker: hasTicker, Mine: m.store.OpenOrdersFor(m.accountSeq(), sym)})
+	}, ladder.Data{Book: book, Ticker: t, HasTicker: hasTicker, Mine: m.store.OpenOrdersFor(m.accountSeq(), sym)})
 
 	title := m.ladder.title()
 	if lvl := m.bookGrp[sym]; lvl != "" {

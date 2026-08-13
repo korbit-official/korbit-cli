@@ -240,6 +240,21 @@ func ClipTail(s string, w int) string {
 	return head + strings.Repeat(" ", budget-keep) + "…"
 }
 
+// PadCenter centers s within w display cells, padding both sides (a leftover
+// odd cell goes to the right). When s is too wide it is clipped from the tail
+// with an ellipsis (ClipTail), so a centered label keeps its leading glyphs.
+func PadCenter(s string, w int) string {
+	width := len(s)
+	if !isASCII(s) {
+		width, _, _ = cellWidths(s)
+	}
+	if width >= w {
+		return ClipTail(s, w)
+	}
+	left := (w - width) / 2
+	return strings.Repeat(" ", left) + s + strings.Repeat(" ", w-width-left)
+}
+
 // PadRight left-aligns s into width w display cells, truncating when too long.
 func PadRight(s string, w int) string {
 	if isASCII(s) {

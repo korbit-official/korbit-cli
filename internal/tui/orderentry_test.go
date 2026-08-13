@@ -73,7 +73,7 @@ func TestDraftValuesFollowSizingMatrix(t *testing.T) {
 func TestBuildPreviewRestingLimit(t *testing.T) {
 	d := newOrderDraft("btc_krw", "buy")
 	d.price, d.qty = "9990000", "0.05"
-	p := buildPreview(d, entryBook, true, entryBals, entryBands, ops.OrderValueBounds{}, nil)
+	p := buildPreview(d, entryBook, state.StatusPresent, entryBals, entryBands, ops.OrderValueBounds{}, nil)
 	if !p.OK {
 		t.Fatalf("preview not OK: %s", p.Err)
 	}
@@ -102,23 +102,99 @@ func TestBuildPreviewFeeUsesTakerWhenMarketable(t *testing.T) {
 
 	d := newOrderDraft("btc_krw", "buy")
 	d.price, d.qty = "9990000", "0.05" // rests → maker
-	p := buildPreview(d, entryBook, true, entryBals, entryBands, ops.OrderValueBounds{}, fees)
+	p := buildPreview(d, entryBook, state.StatusPresent, entryBals, entryBands, ops.OrderValueBounds{}, fees)
 	if p.FeeKind != "maker" || p.FeeEst != "500" { // 499500 × 0.001 ≈ 500
 		t.Fatalf("maker fee: kind=%s est=%s", p.FeeKind, p.FeeEst)
 	}
 
 	d.price = "10001000" // crosses → taker
-	p = buildPreview(d, entryBook, true, entryBals, entryBands, ops.OrderValueBounds{}, fees)
+	p = buildPreview(d, entryBook, state.StatusPresent, entryBals, entryBands, ops.OrderValueBounds{}, fees)
 	if !p.Sim.Marketable || p.FeeKind != "taker" {
 		t.Fatalf("marketable limit: marketable=%v kind=%s", p.Sim.Marketable, p.FeeKind)
 	}
 }
 
-func TestBuildPreviewNoBook(t *testing.T) {
+func TestBuildPreviewNotReady(t *testing.T) {
 	d := newOrderDraft("btc_krw", "buy")
-	p := buildPreview(d, state.Orderbook{}, false, nil, nil, ops.OrderValueBounds{}, nil)
+	p := buildPreview(d, state.Orderbook{}, state.StatusNotReady, nil, nil, ops.OrderValueBounds{}, nil)
 	if p.OK || p.Err == "" {
-		t.Fatalf("no book: %+v", p)
+		t.Fatalf("not-ready book: %+v", p)
+	}
+}
+
+// An empty (live-but-orderless) book previews a limit order as a resting maker
+// and refuses a market order for want of liquidity.
+func TestBuildPreviewEmptyBook(t *testing.T) {
+	fees := &FeeRates{MakerRate: "0.001", TakerRate: "0.002", MaxRate: "0.002", BuyFeeCurrency: "krw"}
+
+	lim := newOrderDraft("btc_krw", "buy")
+	lim.price, lim.qty = "9990000", "0.05"
+	p := buildPreview(lim, state.Orderbook{}, state.StatusEmpty, entryBals, entryBands, ops.OrderValueBounds{}, fees)
+	if !p.OK {
+		t.Fatalf("empty-book limit should preview OK: %s", p.Err)
+	}
+	if p.Notional != "499500" { // 9990000 × 0.05
+		t.Fatalf("empty-book limit notional: %s", p.Notional)
+	}
+	if p.FeeKind != "maker" || p.FeeEst != "500" {
+		t.Fatalf("empty-book limit fee: kind=%s est=%s", p.FeeKind, p.FeeEst)
+	}
+	if p.PctFromMid != "" {
+		t.Fatalf("empty book has no mid: PctFromMid=%s", p.PctFromMid)
+	}
+
+	mkt := newOrderDraft("btc_krw", "buy")
+	mkt.typ, mkt.amt = "market", "500000"
+	if q := buildPreview(mkt, state.Orderbook{}, state.StatusEmpty, entryBals, entryBands, ops.OrderValueBounds{}, fees); q.OK || q.Err == "" {
+		t.Fatalf("empty-book market should be refused: %+v", q)
+	}
+
+	// Only a tif that can REST previews as the first maker: an ioc/fok limit
+	// would be accepted and immediately canceled unfilled, so it is refused
+	// (and must never carry a maker-fee estimate); po rests like gtc.
+	for i, tif := range tifOptions {
+		d := newOrderDraft("btc_krw", "buy")
+		d.price, d.qty, d.tifIdx = "9990000", "0.05", i
+		p := buildPreview(d, state.Orderbook{}, state.StatusEmpty, entryBals, entryBands, ops.OrderValueBounds{}, fees)
+		if wantOK := tif == "gtc" || tif == "po"; p.OK != wantOK {
+			t.Errorf("empty-book %s limit: OK=%v want %v (err %q)", tif, p.OK, wantOK, p.Err)
+		}
+		if !p.OK && p.FeeEst != "" {
+			t.Errorf("a refused %s limit must not estimate a fee: %q", tif, p.FeeEst)
+		}
+	}
+
+	// The order-value bounds do not need a book, so the empty-book path raises
+	// the same below-min warning placement would — through the same ops helper.
+	// An empty book is where a too-small order is MOST likely (a first maker
+	// testing a new listing), so this is the one check that must not go missing.
+	small := newOrderDraft("btc_krw", "buy")
+	small.price, small.qty = "9990000", "0.0001" // 999 KRW: below the 5,000 minimum
+	bounds := ops.OrderValueBounds{QuoteCurrency: "krw", Min: "5000", Max: "1000000000"}
+	sp := buildPreview(small, state.Orderbook{}, state.StatusEmpty, entryBals, entryBands, bounds, fees)
+	if !sp.OK {
+		t.Fatalf("a below-min limit still previews (the warning is the signal): %s", sp.Err)
+	}
+	if len(sp.Warnings) != 1 || sp.Warnings[0].Code != ops.WarnNotionalBelowMin {
+		t.Fatalf("empty-book below-min must warn: %+v", sp.Warnings)
+	}
+	// A pair publishing no bound raises nothing rather than borrowing another's.
+	if q := buildPreview(small, state.Orderbook{}, state.StatusEmpty, entryBals, entryBands, ops.OrderValueBounds{}, fees); len(q.Warnings) != 0 {
+		t.Fatalf("no published bound must raise no bound warning: %+v", q.Warnings)
+	}
+
+	// The empty-book path values the order itself rather than going through
+	// AnalyzePlace, so it must render the same way for a pair quoted in a
+	// small-magnitude currency: a fractional notional kept, and a fee that whole
+	// units would round away to "no fee at all".
+	sub := newOrderDraft("eth_btc", "buy")
+	sub.price, sub.qty = "0.0345", "2"
+	q := buildPreview(sub, state.Orderbook{}, state.StatusEmpty, nil, nil, ops.OrderValueBounds{}, fees)
+	if !q.OK {
+		t.Fatalf("empty-book limit on a btc-quoted pair: %s", q.Err)
+	}
+	if q.Notional != "0.069" || q.FeeEst != "0.000069" {
+		t.Fatalf("btc-quoted empty-book figures: notional=%q fee=%q", q.Notional, q.FeeEst)
 	}
 }
 
@@ -354,19 +430,16 @@ func TestAnchorPrice(t *testing.T) {
 }
 
 func TestPlaceGateReason(t *testing.T) {
-	if got := placeGateReason(false, true, true, true); got != "" {
+	if got := placeGateReason(false, true, true); got != "" {
 		t.Fatalf("open gate: %q", got)
 	}
-	if got := placeGateReason(true, true, true, true); got == "" {
+	if got := placeGateReason(true, true, true); got == "" {
 		t.Fatal("in-flight must gate")
 	}
-	if got := placeGateReason(false, false, true, true); got == "" {
-		t.Fatal("unsettled market must gate")
+	if got := placeGateReason(false, false, true); got == "" {
+		t.Fatal("a not-live (loading/unsettled) book must gate")
 	}
-	if got := placeGateReason(false, true, false, true); got == "" {
-		t.Fatal("not-ready book must gate")
-	}
-	if got := placeGateReason(false, true, true, false); got == "" {
+	if got := placeGateReason(false, true, false); got == "" {
 		t.Fatal("unknown fee policy must gate")
 	}
 }
@@ -387,7 +460,7 @@ func TestBuildPreviewOnNonKRWQuotedPair(t *testing.T) {
 
 	d := newOrderDraft("btc_"+quote, "buy")
 	d.price, d.qty = "93800.00", "0.001"
-	p := buildPreview(d, book, true, bals, bands, ops.OrderValueBounds{}, fees)
+	p := buildPreview(d, book, state.StatusPresent, bals, bands, ops.OrderValueBounds{}, fees)
 	if !p.OK {
 		t.Fatalf("preview not OK: %s", p.Err)
 	}

@@ -399,7 +399,7 @@ a **frozen public contract** pinned by the golden tests in
 path is `internal/jqfilter` (number-fidelity contract documented there). The
 synthesized `--candles` channel (origin `derived` — the one non-verbatim
 payload) is `internal/candles` — read the `Synth` doc in `candles/synth.go`
-(guarantee inheritance, snapshot-kicked seeds, the {interval, timestamp}
+(guarantee inheritance, first-trade-frame-kicked seeds, the {interval, timestamp}
 last-wins rule) before changing it. Two
 facts not in code comments: there is no raw-call escape hatch — every endpoint
 is a validated generated method (no `korbit.get`/`korbit.call`); and the agent

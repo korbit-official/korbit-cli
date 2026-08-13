@@ -374,6 +374,17 @@ type model struct {
 	// the overlay shows the error instead of an endless "loading…". Set only when
 	// the failure left the feed empty; cleared on a successful seed or a reload.
 	chartErr string
+	// chartSeeded latches once a seed fetch has returned for the current
+	// symbol/interval (success or empty), so an empty result reads as "no candles
+	// yet" (a never-traded pair) rather than an endless "loading…". Reset on a
+	// reload (loadChart) so a symbol/interval switch shows loading until its own
+	// seed lands.
+	chartSeeded bool
+	// chartSeedRefetching guards the one re-fetch a settled-but-empty chart issues
+	// when its first trades arrive (the seed defines the KST bucket grid a local
+	// fold cannot). It collapses a burst of first trades into a single fetch;
+	// cleared when any seed result returns (applyCandles) or on a reload.
+	chartSeedRefetching bool
 
 	// The funding screen ('f', modeFunding) — a self-contained sub-model; the
 	// parent owns only the mode switch, message/key routing, and the shared
@@ -546,6 +557,28 @@ func (m model) trackScopes(symbols ...string) []stream.OrderScope {
 // re-subscribe is debounced, so between the two the panes must show loading
 // rather than the previous symbol's retained book/trades.
 func (m model) marketSettled() bool { return m.subscribed == m.symbol() }
+
+// tickerStatus / orderbookStatus / tradeStatus are the single classification the
+// panes and the place gate read, so loading-vs-empty-vs-present is computed in one
+// place. Ticker is subscribed for every symbol up front, so it never rides the
+// market-switch gate; orderbook/trades are re-pointed per active symbol, so while
+// a switch is mid-flight (selection moved, re-subscribe debounced) they read
+// NotReady rather than surface the store's status for a not-yet-resubscribed pair.
+func (m model) tickerStatus(sym string) state.DataStatus { return m.store.TickerStatus(sym) }
+
+func (m model) orderbookStatus(sym string) state.DataStatus {
+	if !m.marketSettled() {
+		return state.StatusNotReady
+	}
+	return m.store.OrderbookStatus(sym)
+}
+
+func (m model) tradeStatus(sym string) state.DataStatus {
+	if !m.marketSettled() {
+		return state.StatusNotReady
+	}
+	return m.store.TradeStatus(sym)
+}
 
 // moneyActionInFlight reports whether ANY money action — an order place/cancel
 // or a funding request — is currently on the wire. It is the TUI-wide
@@ -919,7 +952,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if row, col, ok := m.orderPanelPos(msg.X, msg.Y); ok {
 					var act orderAction
 					_, _, rightW := m.orderColumnGeom()
-					m.order, act = m.order.panelClick(row, col, rightW-2, m.orderGate())
+					m.order, act = m.order.panelClick(row, col, rightW-2, m.panelGate())
 					if act == orderActPlace {
 						return m.dispatchPlace()
 					}
@@ -1921,7 +1954,7 @@ func (m model) handleOrderKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	var cmd tea.Cmd
 	var act orderAction
-	m.order, cmd, act = m.order.handleKey(msg, m.orderGate(), m.orderLadderRows())
+	m.order, cmd, act = m.order.handleKey(msg, m.panelGate(), m.orderLadderRows())
 	switch act {
 	case orderActClose:
 		m.mode = modeNormal
@@ -1998,7 +2031,7 @@ func (m model) handleLadderKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	var act ladderAction
-	m.ladder, act = m.ladder.handleKey(msg, m.orderGate(), m.ladderBusyGate(),
+	m.ladder, act = m.ladder.handleKey(msg, m.draftGate, m.ladderBusyGate(),
 		m.ladderPrices(), m.ladderBands(), m.ladderFees(), m.bookGrp[m.symbol()])
 	switch act {
 	case ladderActClose:
@@ -2036,11 +2069,12 @@ func (m model) dispatchLadderCancel() (tea.Model, tea.Cmd) {
 
 // orderLadderRows is the orderbook pane's visible price rows for the current
 // geometry — what order mode's j/k cursor and click mapping walk. Empty while
-// the book is loading/unsettled (the ladder then has nothing to pick).
+// the book is loading/unsettled, and on a settled-but-empty book (no levels to
+// pick) — read off the same classifier the pane renders from.
 func (m model) orderLadderRows() []string {
 	sym := m.symbol()
 	book, ok := m.store.Orderbook(sym)
-	if !ok || !m.marketSettled() || !m.store.OrderbookReady(sym) {
+	if !ok || m.orderbookStatus(sym) != state.StatusPresent {
 		return nil
 	}
 	_, h := m.bookPaneGeom()

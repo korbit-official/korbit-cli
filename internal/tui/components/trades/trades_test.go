@@ -22,7 +22,7 @@ func sampleData() Data {
 }
 
 func key() Key {
-	return Key{TradeRev: 1, Symbol: "btc_krw", Settled: true, Ready: true, W: 30, H: 12}
+	return Key{TradeRev: 1, Symbol: "btc_krw", Status: state.StatusPresent, W: 30, H: 12}
 }
 
 func TestRendersTradesAndDimensions(t *testing.T) {
@@ -43,14 +43,22 @@ func TestRendersTradesAndDimensions(t *testing.T) {
 func TestLoadingWhenNotReady(t *testing.T) {
 	m := New()
 	k := key()
-	k.Ready = false
+	k.Status = state.StatusNotReady
 	if out := m.View(k, sampleData()); !strings.Contains(out, "loading") {
 		t.Errorf("not-ready trades should show loading, got: %q", out)
 	}
-	k = key()
-	k.Settled = false
-	if out := m.View(k, sampleData()); !strings.Contains(out, "loading") {
-		t.Errorf("unsettled market should show loading, got: %q", out)
+}
+
+func TestEmptyShowsNoTradesYet(t *testing.T) {
+	m := New()
+	k := key()
+	k.Status = state.StatusEmpty
+	out := m.View(k, Data{})
+	if strings.Contains(out, "loading") {
+		t.Errorf("live-but-empty trades must not show loading, got: %q", out)
+	}
+	if !strings.Contains(out, "no trades yet") {
+		t.Errorf("live-but-empty trades should show 'no trades yet', got: %q", out)
 	}
 }
 
@@ -88,5 +96,19 @@ func TestStyleChangeInvalidates(t *testing.T) {
 	b := m.View(k, sampleData())
 	if a == b {
 		t.Error("a style change should produce a different (re-rendered) frame")
+	}
+}
+
+// TestHeaderGating: the time/price/qty header appears once the pane has
+// uikit.MinHeaderRows content rows and is dropped below that so trades win.
+func TestHeaderGating(t *testing.T) {
+	k := key()
+	k.H = uikit.MinHeaderRows + 3 // content rows == MinHeaderRows → header shows
+	if out := New().View(k, sampleData()); !strings.Contains(out, "time") {
+		t.Errorf("a pane with %d content rows should show the time/price/qty header: %q", uikit.MinHeaderRows, out)
+	}
+	k.H = uikit.MinHeaderRows + 2 // one fewer content row → header dropped
+	if out := New().View(k, sampleData()); strings.Contains(out, "time") {
+		t.Errorf("a pane with %d content rows should drop the header: %q", uikit.MinHeaderRows-1, out)
 	}
 }

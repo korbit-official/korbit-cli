@@ -44,10 +44,12 @@ import (
 // — because consumers balance on the pairing (the --stateful store's backfill
 // counter would otherwise wedge Health.Backfilling true forever).
 //
-// # Seed ordering: the snapshot kicks the fetch; in-flight trades replay
+// # Seed ordering: the first trade frame kicks the fetch; in-flight trades replay
 //
-// The initial and reconnect seeds are kicked by the trade subscription's OWN
-// snapshot frame, not eagerly, and every kick captures the trade-id watermark
+// The initial and reconnect seeds are kicked by the trade subscription's own
+// first frame — its snapshot, or, for a pair that has never traded and so
+// receives no snapshot, its first REALTIME trade — not eagerly, and every kick
+// captures the trade-id watermark
 // at that moment: everything delivered before the kick was executed before
 // the request went out, so it is inside the fetched rows and must not
 // re-fold. Trades delivered while the fetch is in flight are BUFFERED (not
@@ -162,7 +164,8 @@ type scope struct {
 	key    scopeKey
 	series Series
 
-	// stale means the next trade snapshot for the symbol must kick a seed
+	// stale means the next trade frame for the symbol (snapshot, or the first
+	// realtime trade when no snapshot comes) must kick a seed
 	// (true at start, and again after a reconnect); staleReason names why.
 	stale       bool
 	staleReason string
@@ -252,7 +255,7 @@ func NewSynth(cfg Config) (*Synth, error) {
 }
 
 // Start wires the context that bounds every fetch this synthesizer ever runs.
-// Seeds are not kicked here — the trade subscription's snapshot kicks them
+// Seeds are not kicked here — the trade subscription's first frame kicks them
 // (see the package doc's seed-ordering rationale).
 func (s *Synth) Start(ctx context.Context) { s.ctx = ctx }
 
@@ -375,8 +378,9 @@ func (s *Synth) Apply(res SeedResult) []stream.Event {
 }
 
 // OnData consumes one session data event. Only public trade events for a
-// configured symbol do anything. A snapshot frame kicks any stale scope's seed
-// (initial or post-reconnect; see the package doc); then each row folds into
+// configured symbol do anything. A snapshot frame — or a realtime trade on a
+// scope that never got one — kicks any stale scope's seed (initial or
+// post-reconnect; see the package doc); then each row folds into
 // every seeded interval series of the symbol, and the resulting candle lines
 // are emitted (finalized buckets first, then the updated live bucket).
 func (s *Synth) OnData(d stream.Data) []stream.Event {
@@ -413,7 +417,14 @@ func (s *Synth) OnData(d stream.Data) []stream.Event {
 	}
 
 	var evs []stream.Event
-	if d.Origin == stream.OriginSnapshot {
+	// The initial/reconnect seed is normally kicked by the trade channel's
+	// snapshot. A never-traded pair sends NO snapshot, so a REALTIME trade — the
+	// first the pair ever prints — must kick it too, or the pair could begin
+	// trading and its candles would never seed (the watermark advanced above, so
+	// the kick's fetch covers this frame's rows). In the normal case the snapshot
+	// arrives first (FIFO) and clears `stale`, so a later realtime trade does not
+	// re-kick. Backfill rows are history the synth folds, never a seed trigger.
+	if d.Origin == stream.OriginSnapshot || d.Origin == stream.OriginRealtime {
 		for _, k := range s.keys {
 			if k.symbol != d.Symbol {
 				continue
@@ -509,8 +520,8 @@ func (s *Synth) OnNotice(n stream.Notice) []stream.Event {
 		s.up = true
 		if s.upOnce {
 			// Trades during the downtime may already sit behind the live edge;
-			// the resubscribe snapshot (which always follows) kicks the fetch,
-			// so the snapshot's rows sit under the seed watermark.
+			// the resubscribe's first trade frame kicks the fetch, so its rows sit
+			// under the seed watermark.
 			for _, k := range s.keys {
 				s.scopes[k].stale, s.scopes[k].staleReason = true, "reconnect"
 			}

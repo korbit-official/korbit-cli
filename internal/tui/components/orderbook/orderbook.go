@@ -25,15 +25,14 @@ import (
 
 // Key is the comparable cache key: equal Keys render identically. BookRev and
 // TickerRev are the store's section revisions (book/ticker change ⇒ rev change ⇒
-// re-render); Settled (the active-symbol subscription has settled) and Ready (an
-// authoritative book has arrived) gate the loading state; W and H are the OUTER
+// re-render); Status is the book pane's shared classification (loading / no
+// resting orders / present) that gates what the pane shows; W and H are the OUTER
 // panel size; Style is the palette identity.
 type Key struct {
 	BookRev     uint64
 	TickerRev   uint64
 	Symbol      string
-	Settled     bool
-	Ready       bool
+	Status      state.DataStatus
 	TickerReady bool
 	LastTick    state.Direction // colors the last-price mid line
 	CursorPrice string          // order mode's ladder cursor: highlight this level's row ("" = none)
@@ -42,12 +41,13 @@ type Key struct {
 	Style       uikit.StyleID
 }
 
-// Data is what the component renders on a cache miss. HasBook/HasTicker mirror
-// the store's "ok" returns; the book first arriving bumps BookRev, so the Key
-// still decides the hit.
+// Data is what the component renders on a cache miss. HasTicker mirrors the
+// store's "ok" return; the book first arriving bumps BookRev, so the Key still
+// decides the hit. There is no HasBook: whether the book is loading, empty, or
+// present is Key.Status, the shared classification, and a second source for the
+// same question is exactly how two panes come to disagree.
 type Data struct {
 	Book      state.Orderbook
-	HasBook   bool
 	Ticker    state.Ticker
 	HasTicker bool
 }
@@ -73,8 +73,11 @@ func render(k Key, d Data) string {
 		// like order previews) is at this grouping, not the raw tick grid.
 		title += " · " + i18n.T("grp") + " " + uikit.GroupThousands(k.Level)
 	}
-	if !d.HasBook || !k.Settled || !k.Ready {
+	switch k.Status {
+	case state.StatusNotReady:
 		return uikit.Panel(title, []string{uikit.StyDim.Render(i18n.T("loading…"))}, k.W, k.H)
+	case state.StatusEmpty:
+		return uikit.Panel(title, []string{uikit.StyDim.Render(i18n.T("no resting orders"))}, k.W, k.H)
 	}
 	pal := uikit.PaletteFor(uikit.ColorScheme(k.Style.Scheme), k.Style.Profile)
 	w := k.W - 2    // inner content width (panel border)
@@ -83,10 +86,31 @@ func render(k Key, d Data) string {
 	return uikit.Panel(title, lines, k.W, k.H)
 }
 
-// visibleSides slices the book to what a pane of `rows` content rows can show
-// per side. It is the single source of the pane's row layout — depthLines
-// renders from it and RowPrices exposes it — so a cursor/click mapping can
-// never drift from the render.
+// depthHeader renders the column-label row: each label centered over its
+// column (matching depthRow's price/qty widths and the two-space gap). Labels
+// clip (never overflow) on a narrow column.
+func depthHeader(priceW, qtyW int) string {
+	h := uikit.PadCenter(i18n.T("price"), priceW) + "  " + uikit.PadCenter(i18n.T("qty"), qtyW)
+	return uikit.StyDim.Render(h)
+}
+
+// splitHeader reserves the column-header row when the pane is tall enough to
+// afford it, returning whether to draw it and how many rows are left for depth.
+// It is the single place that decision is made: depthLines draws from it and
+// RowPrices skips a row for it, so the render and the cursor/click mapping
+// cannot disagree about which row is which. Making the header conditional on
+// anything further (width, data state) belongs HERE, never at one call site.
+func splitHeader(rows int) (header bool, body int) {
+	if rows >= uikit.MinHeaderRows {
+		return true, rows - 1
+	}
+	return false, rows
+}
+
+// visibleSides slices the book to what `rows` DEPTH rows (the header already
+// deducted by splitHeader) can show per side. It is the single source of the
+// depth slicing — depthLines renders from it and RowPrices exposes it — so a
+// cursor/click mapping can never drift from the render.
 func visibleSides(rows int, book state.Orderbook) (asks, bids []state.PriceLevel, perSide int) {
 	perSide = (rows - 1) / 2
 	if perSide < 1 {
@@ -104,15 +128,20 @@ func visibleSides(rows int, book state.Orderbook) (asks, bids []state.PriceLevel
 }
 
 // RowPrices returns, for a pane of outer height h, the price shown on each
-// content row top to bottom — "" for the ask-side padding and the mid line.
-// It mirrors the render's slicing exactly (see visibleSides).
+// content row top to bottom — "" for the column header (when shown), the
+// ask-side padding, and the mid line. It mirrors the render's slicing exactly:
+// both read the same splitHeader and visibleSides.
 func RowPrices(h int, book state.Orderbook) []string {
 	rows := h - 3
 	if rows < 1 {
 		return nil
 	}
-	asks, bids, perSide := visibleSides(rows, book)
 	out := make([]string, 0, rows)
+	header, body := splitHeader(rows)
+	if header {
+		out = append(out, "") // the column-header row: not a price
+	}
+	asks, bids, perSide := visibleSides(body, book)
 	for i := 0; i < perSide-len(asks); i++ {
 		out = append(out, "")
 	}
@@ -129,12 +158,18 @@ func RowPrices(h int, book state.Orderbook) []string {
 	return out
 }
 
-// depthLines builds the inner rows: worst ask on top → best at the spread, a mid
-// line (last price when a fresh ticker exists), then bids best-first.
+// depthLines builds the inner rows: the column header (dropped on a short pane,
+// see splitHeader), then worst ask on top → best at the spread, a mid line (last
+// price when a fresh ticker exists), then bids best-first.
 func depthLines(w, rows int, d Data, pal uikit.Palette, tickerReady bool, lastTick state.Direction, cursorPrice string) []string {
-	asks, bids, perSide := visibleSides(rows, d.Book)
 	priceW := clamp(w-12, 10, 16)
 	qtyW := w - priceW - 2
+	lines := make([]string, 0, rows)
+	header, body := splitHeader(rows)
+	if header {
+		lines = append(lines, depthHeader(priceW, qtyW))
+	}
+	asks, bids, perSide := visibleSides(body, d.Book)
 	// Scale every depth bar against the largest visible level on either side so
 	// bids and asks are directly comparable. Display-only: the qty parse feeds a
 	// bar width, never an order — the wire string is rendered untouched.
@@ -146,7 +181,6 @@ func depthLines(w, rows int, d Data, pal uikit.Palette, tickerReady bool, lastTi
 		maxQty = maxFloat(maxQty, parseDepthQty(l.Qty))
 	}
 
-	lines := make([]string, 0, rows)
 	for i := 0; i < perSide-len(asks); i++ {
 		lines = append(lines, "")
 	}

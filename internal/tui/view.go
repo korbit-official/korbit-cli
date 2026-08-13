@@ -14,6 +14,7 @@ import (
 
 	"github.com/korbit-official/korbit-cli/internal/accountseq"
 	"github.com/korbit-official/korbit-cli/internal/i18n"
+	"github.com/korbit-official/korbit-cli/internal/stream/state"
 	"github.com/korbit-official/korbit-cli/internal/tui/components/balances"
 	"github.com/korbit-official/korbit-cli/internal/tui/components/fills"
 	"github.com/korbit-official/korbit-cli/internal/tui/components/footer"
@@ -141,6 +142,11 @@ func (m model) renderChart() string {
 	switch {
 	case m.feed.Empty() && m.chartErr != "":
 		title += "  " + uikit.StyErr.Render(i18n.T("load failed: %s", uikit.Truncate(m.chartErr, 50)))
+	case m.feed.Empty() && m.chartSeeded:
+		// The seed returned but the pair has no candles (never traded) — say so
+		// rather than spin "loading…" forever. The first trade triggers a re-fetch
+		// that seeds the first candle (see foldChartTrades), clearing this.
+		title += "  " + uikit.StyDim.Render(i18n.T("no candles yet"))
 	case m.feed.Empty():
 		title += "  " + m.chartSpin.View() + " " + uikit.StyDim.Render(i18n.T("loading…"))
 	case m.chartLoadingOlder:
@@ -321,8 +327,8 @@ func (m model) inlineChartAt(x, y int) bool {
 
 func (m model) renderHeader() string {
 	sym := m.symbol()
-	t, ok := m.store.Ticker(sym)
-	return m.cHeader.View(m.headerKey(), header.Data{Ticker: t, HasTicker: ok, TickerReady: m.store.TickerReady(sym)})
+	t, _ := m.store.Ticker(sym)
+	return m.cHeader.View(m.headerKey(), header.Data{Ticker: t, Status: m.tickerStatus(sym)})
 }
 
 // headerKey builds the header component's cache key (the single source both the
@@ -626,9 +632,9 @@ func (m model) renderBody(bodyH int) string {
 			// open-orders slice beneath it — the accepted order lands (and flashes)
 			// right below where it was placed. Fills/balances yield for the mode
 			// (the panel's preview shows the balances that matter to the order).
-			panelH := m.order.orderPanelHeight(rightW-2, bodyH, m.orderGate())
+			panelH := m.order.orderPanelHeight(rightW-2, bodyH, m.panelGate())
 			right = uikit.VJoin(
-				m.order.renderOrderPanel(rightW, panelH, m.orderGate(), m.styleID()),
+				m.order.renderOrderPanel(rightW, panelH, m.panelGate(), m.styleID()),
 				m.viewOrders(rightW, bodyH-panelH))
 		default:
 			oh, fh, bh := m.rightHeights(bodyH)
@@ -651,7 +657,11 @@ func (m model) viewSidebar(w, h int) string {
 	rows := make([]sidebar.Row, len(m.cfg.Symbols))
 	for i, s := range m.cfg.Symbols {
 		t, _ := m.store.Ticker(s)
-		rows[i] = sidebar.Row{Symbol: s, PriceChangePercent: t.PriceChangePercent, PriceChange: t.PriceChange, Ready: m.store.TickerReady(s)}
+		// Ready drives the "…" marker, which means "no figure to show yet". A
+		// never-traded pair has no ticker and never will until it trades, so it
+		// reads off the classifier like every other pane rather than off the
+		// frame-arrival latch, which would leave it spinning forever.
+		rows[i] = sidebar.Row{Symbol: s, PriceChangePercent: t.PriceChangePercent, PriceChange: t.PriceChange, Ready: m.store.TickerStatus(s) == state.StatusPresent}
 	}
 	searching := m.searching && m.searchPane == focusMarket
 	q := ""
@@ -667,7 +677,7 @@ func (m model) viewSidebar(w, h int) string {
 
 func (m model) viewOrderbook(w, h int) string {
 	sym := m.symbol()
-	book, ok := m.store.Orderbook(sym)
+	book, _ := m.store.Orderbook(sym)
 	t, tok := m.store.Ticker(sym)
 	cursor := ""
 	if m.mode == modeOrder && m.order.view == orderForm && m.order.draft.usesPrice() {
@@ -675,19 +685,20 @@ func (m model) viewOrderbook(w, h int) string {
 	}
 	return m.cOrderbook.View(orderbook.Key{
 		BookRev: m.store.BookRev(), TickerRev: m.store.TickerRev(), Symbol: sym,
-		Settled: m.marketSettled(), Ready: m.store.OrderbookReady(sym), TickerReady: m.store.TickerReady(sym),
+		Status:      m.orderbookStatus(sym),
+		TickerReady: m.store.TickerStatus(sym) == state.StatusPresent,
 		LastTick:    m.store.LastTick(sym),
 		CursorPrice: cursor,
 		Level:       m.bookGrp[sym],
 		W:           w, H: h, Style: m.styleID(),
-	}, orderbook.Data{Book: book, HasBook: ok, Ticker: t, HasTicker: tok})
+	}, orderbook.Data{Book: book, Ticker: t, HasTicker: tok})
 }
 
 func (m model) viewTrades(w, h int) string {
 	sym := m.symbol()
 	return m.cTrades.View(trades.Key{
-		TradeRev: m.store.TradeRev(), Symbol: sym, Settled: m.marketSettled(),
-		Ready: m.store.TradesReady(sym), W: w, H: h, Style: m.styleID(),
+		TradeRev: m.store.TradeRev(), Symbol: sym, Status: m.tradeStatus(sym),
+		W: w, H: h, Style: m.styleID(),
 	}, trades.Data{Trades: m.store.Trades(sym)})
 }
 
@@ -785,9 +796,12 @@ func (m model) renderInlineChart(w, h int) string {
 	title := m.chartTitle()
 	var lines []string
 	if m.feed.Empty() {
-		if m.chartErr != "" {
+		switch {
+		case m.chartErr != "":
 			title += "  " + uikit.StyErr.Render(i18n.T("load failed"))
-		} else {
+		case m.chartSeeded:
+			title += "  " + uikit.StyDim.Render(i18n.T("no candles yet"))
+		default:
 			title += "  " + uikit.StyDim.Render(i18n.T("loading…"))
 		}
 	} else {
@@ -838,7 +852,7 @@ func (m model) ordersPaneTop() int {
 	top := m.bodyTop()
 	if m.mode == modeOrder {
 		_, _, _, rightW := m.colWidths()
-		top += m.order.orderPanelHeight(rightW-2, m.bodyHeight(), m.orderGate())
+		top += m.order.orderPanelHeight(rightW-2, m.bodyHeight(), m.panelGate())
 	}
 	return top
 }
@@ -923,7 +937,7 @@ func (m model) bookPriceAt(x, y int) (string, bool) {
 // panel's outer height, and the column width.
 func (m model) orderColumnGeom() (left, panelH, rightW int) {
 	sideW, bookW, tradesW, w := m.colWidths()
-	panelH = m.order.orderPanelHeight(w-2, m.bodyHeight(), m.orderGate())
+	panelH = m.order.orderPanelHeight(w-2, m.bodyHeight(), m.panelGate())
 	return sideW + bookW + tradesW, panelH, w
 }
 
@@ -953,7 +967,7 @@ func (m model) orderPanelKeyAt(x, y int) (tea.KeyPressMsg, bool) {
 		return tea.KeyPressMsg{}, false
 	}
 	_, _, rightW := m.orderColumnGeom()
-	lines := m.order.panelLines(rightW-2, m.orderGate())
+	lines := m.order.panelLines(rightW-2, m.panelGate())
 	if row < 0 || row >= len(lines) {
 		return tea.KeyPressMsg{}, false
 	}

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -63,16 +64,25 @@ func assertPlacedForm(t *testing.T, got, want OrderForm) {
 	}
 }
 
+// testNow is the clock every test model reads, in ms. testModel resets it so
+// each test starts at the same instant; a helper that needs a store timer to
+// elapse (the subscribe-ack settle delay) advances it. The tui tests never run
+// in parallel, so one variable is enough.
+var testNow int64
+
+const testNowStart = 1_700_000_000_000
+
 func testModel(t *testing.T, private bool, trader Trader) model {
 	t.Helper()
 	stopped := false
+	testNow = testNowStart
 	m := newModel(Config{
 		Symbols:     []string{"btc_krw", "eth_krw"},
 		Private:     private,
 		Trader:      trader,
 		KeyName:     "testkey",
 		BaseURL:     "http://127.0.0.1:9999",
-		Now:         func() int64 { return 1_700_000_000_000 },
+		Now:         func() int64 { return testNow },
 		StopSession: func() { stopped = true },
 	})
 	_ = stopped
@@ -107,6 +117,10 @@ func feed(t *testing.T, m model, ev stream.Event) model {
 	mm, _ := m.Update(streamEventMsg{ev: ev})
 	return mm.(model)
 }
+
+// noGate is an always-clear placement gate for driving ladder sub-model
+// methods directly (the model-level draftGate needs a full model).
+func noGate(orderDraft) string { return "" }
 
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
@@ -678,11 +692,11 @@ func TestOrderLevelsFromConfig(t *testing.T) {
 func TestLadderPresetKeyUsesConfiguredLevel(t *testing.T) {
 	l := newLadderModel(nil, accountseq.Main, []int{5, 10, 20})
 	l.symbol = "btc_krw"
-	l, _ = l.handleBrowseKey(k('2', "2"), "", "", nil, nil, "")
+	l, _ = l.handleBrowseKey(k('2', "2"), noGate, "", nil, nil, "")
 	if l.sizePct() != 10 {
 		t.Fatalf("key 2 armed %d%%, want 10%%", l.sizePct())
 	}
-	l, _ = l.handleBrowseKey(k('4', "4"), "", "", nil, nil, "") // beyond 3 levels
+	l, _ = l.handleBrowseKey(k('4', "4"), noGate, "", nil, nil, "") // beyond 3 levels
 	if l.sizePct() != 10 {
 		t.Fatalf("out-of-range key changed size to %d%%", l.sizePct())
 	}
@@ -833,6 +847,75 @@ func seedOrderMarket(t *testing.T, m model) model {
 	return feed(t, m, dataEvent("myAsset", "", stream.OriginBackfill, 100, "/v2/balance",
 		`[{"currency":"krw","balance":"1000000","available":"1000000","tradeInUse":"0","withdrawalInUse":"0","avgPrice":"0"},
 		  {"currency":"btc","balance":"0.5","available":"0.5","tradeInUse":"0","withdrawalInUse":"0","avgPrice":"0"}]`))
+}
+
+// seedEmptyOrderMarket is seedOrderMarket for a newly listed pair: the
+// orderbook subscribe is acked (settled) but no snapshot ever arrives, so the
+// book reads live-but-EMPTY; balances are available for sizing. The clock is
+// advanced past the settle delay because that is what makes the ack MEAN empty
+// — before it, a snapshot could still be in flight and the book reads NotReady.
+func seedEmptyOrderMarket(t *testing.T, m model) model {
+	t.Helper()
+	m = feed(t, m, stream.Subscribed{Channel: stream.ChannelOrderbook, Symbols: []string{"btc_krw"}})
+	testNow += state.SettleDelayMs
+	return feed(t, m, dataEvent("myAsset", "", stream.OriginBackfill, 100, "/v2/balance",
+		`[{"currency":"krw","balance":"1000000","available":"1000000","tradeInUse":"0","withdrawalInUse":"0","avgPrice":"0"},
+		  {"currency":"btc","balance":"0.5","available":"0.5","tradeInUse":"0","withdrawalInUse":"0","avgPrice":"0"}]`))
+}
+
+// TestDraftGateEmptyBookJudgesActingDraft: on a live-but-empty book the gate's
+// verdict follows the draft it is GIVEN, never the order panel's — each surface
+// (panel, command bar, ladder) passes its own order, so a panel left on limit
+// must not let another surface's market order through, and a panel left on
+// market must not block a valid resting limit.
+func TestDraftGateEmptyBookJudgesActingDraft(t *testing.T) {
+	m := seedEmptyOrderMarket(t, testModel(t, true, &fakeTrader{}))
+
+	lim := newOrderDraft("btc_krw", "buy")
+	lim.price, lim.qty = "9990000", "0.05"
+	mkt := newOrderDraft("btc_krw", "buy")
+	mkt.typ, mkt.amt = "market", "500000"
+
+	// Panel draft on its default (limit): an acting market draft is still refused.
+	if g := m.draftGate(mkt); !strings.Contains(g, "market order can't fill") {
+		t.Fatalf("empty book must refuse a market draft, got %q", g)
+	}
+	if g := m.draftGate(lim); g != "" {
+		t.Fatalf("empty book must accept a resting limit draft, got %q", g)
+	}
+	// Panel draft flipped to market: an acting limit draft still passes.
+	m.order.draft.typ = "market"
+	if g := m.draftGate(lim); g != "" {
+		t.Fatalf("the panel's market draft must not block another surface's limit, got %q", g)
+	}
+	if m.panelGate() == "" {
+		t.Fatal("the panel's own market draft must be refused")
+	}
+	// A limit that cannot rest (ioc here) is refused by tif.
+	ioc := lim
+	ioc.tifIdx = slices.Index(tifOptions, "ioc")
+	if g := m.draftGate(ioc); !strings.Contains(g, "ioc/fok") {
+		t.Fatalf("empty book must refuse a non-resting ioc limit, got %q", g)
+	}
+
+	// End to end through the command bar: a typed market order is refused at
+	// arm with the reason on the echo line, panel draft (limit) notwithstanding.
+	m = seedEmptyOrderMarket(t, testModel(t, true, &fakeTrader{}))
+	m, _ = press(t, m, k(':', ":"))
+	m = typeText(t, m, "b 500k krw @ mkt")
+	m, _ = press(t, m, special(tea.KeyEnter))
+	if m.cmdbar.armed || !strings.Contains(m.cmdbar.errText, "market order can't fill") {
+		t.Fatalf("cmdbar market order on an empty book must be refused: armed=%v err=%q", m.cmdbar.armed, m.cmdbar.errText)
+	}
+
+	// And through the ladder: a market arm carries the refusal to the strip.
+	l := m.ladder
+	l.symbol = "btc_krw"
+	l.sizePcts[l.symbol] = 50
+	l = l.armOrder("buy", "market", m.draftGate, nil)
+	if l.view == ladderConfirm || !strings.Contains(l.stripErr, "market order can't fill") {
+		t.Fatalf("ladder market arm on an empty book must be refused: view=%v err=%q", l.view, l.stripErr)
+	}
 }
 
 // TestPlaceRegistersLocalHold: dispatching an order registers a local balance

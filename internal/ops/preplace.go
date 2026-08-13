@@ -426,17 +426,12 @@ func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, ba
 	// reported for every pair (the fee estimate downstream is gated on it).
 	if notional, ok := orderNotional(req, bestBid); ok {
 		sim.Notional = dec(notional)
-		// The unit is the pair entry's own quote currency wherever the entry
-		// carries one, so a published bound is labelled by the same entry that
-		// published it. It falls back to the symbol's second segment only when
-		// the entry names no currency — the same currency by API contract.
-		unit := strings.ToUpper(quote)
-		if min, ok := bounds.min(); ok && notional.LessThan(min) {
-			add(WarnNotionalBelowMin, "order notional ~%s %s is below the %s %s minimum — it will be rejected.", dec(notional), unit, dec(min), unit)
-		}
-		if max, ok := bounds.max(); ok && notional.GreaterThan(max) {
-			add(WarnNotionalAboveMax, "order notional ~%s %s exceeds the %s %s maximum — it will be rejected.", dec(notional), unit, dec(max), unit)
-		}
+		// Worded and thresholded in NotionalBoundWarnings, shared with the TUI's
+		// empty-book preview so the same order raises the same warning whether or
+		// not there is a book to analyze. The unit is the pair entry's own quote
+		// currency wherever the entry carries one, falling back to the symbol's
+		// second segment — the same currency by API contract.
+		ws = append(ws, NotionalBoundWarnings(notional.String(), bounds, quote)...)
 	}
 
 	// Tick-size alignment (limit only): a price off the policy grid is rejected.

@@ -88,6 +88,13 @@ func TestPadClipDisplayWidth(t *testing.T) {
 		{"padleft wide spare cell", PadLeft("가나다라", 6), "… 다라"},
 		{"mixed ascii wide", PadRight("금액 krw", 9), "금액 krw "},
 		{"padleft wide w1", PadLeft("가나", 1), " "},
+
+		// PadCenter: even split, odd leftover cell to the right, and clip-on-overflow.
+		{"padcenter ascii even", PadCenter("ab", 6), "  ab  "},
+		{"padcenter ascii odd", PadCenter("bid", 10), "   bid    "},
+		{"padcenter wide fits", PadCenter("입출금", 8), " 입출금 "},
+		{"padcenter wide exact", PadCenter("가격", 4), "가격"},
+		{"padcenter wide clips", PadCenter("입출금액", 5), "입출…"},
 	}
 	for _, c := range cases {
 		if c.got != c.want {

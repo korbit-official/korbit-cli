@@ -522,6 +522,31 @@ func TestSynthUnseededScopeIgnoresTradesUntilSeeded(t *testing.T) {
 	}
 }
 
+// A never-traded pair sends no trade snapshot, so the seed is kicked by the
+// pair's FIRST realtime trade instead — otherwise a pair that begins trading
+// after subscribe would never seed and would emit no candles.
+func TestSynthRealtimeTradeKicksSeedWithoutSnapshot(t *testing.T) {
+	clk := &fakeClock{ms: 185_000}
+	fs := &fetchStub{rows: map[string][]Bar{"btc_krw@1": {
+		bar(180_000, "100", "105", "100", "105", "3"),
+	}}}
+	s := newTestSynth(t, clk, fs, 0)
+	s.OnNotice(connected("public")) // first connect; a never-traded pair sends no snapshot
+
+	// The pair's first realtime trade must kick the seed (no snapshot ever came).
+	evs := s.OnData(tradeEvent("btc_krw", 185_500, trow(30, 185_000, "104", "0.5")))
+	if got := len(notices(evs, stream.BackfillStart)); got != 1 {
+		t.Fatalf("a realtime trade on an un-snapshotted scope must kick a seed; BACKFILL_START=%d: %+v", got, evs)
+	}
+	drain(t, s, 1) // the seed lands with rows → scope seeded
+
+	// With the scope now seeded, a newer trade folds and emits a candle line.
+	clk.set(188_000)
+	if ls := lines(t, s.OnData(tradeEvent("btc_krw", 188_000, trow(31, 188_000, "107", "1")))); len(ls) == 0 {
+		t.Fatal("after the realtime-kicked seed landed, a newer trade should fold and emit a candle")
+	}
+}
+
 func TestSynthBackfillOriginTradesFold(t *testing.T) {
 	clk := &fakeClock{ms: 185_000}
 	fs := &fetchStub{rows: map[string][]Bar{"btc_krw@1": {bar(180_000, "100", "100", "100", "100", "1")}}}

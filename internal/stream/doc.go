@@ -18,7 +18,7 @@
 //
 // One Session (see session.go) = up to two managed connections (public
 // /v2/public, private /v2/private) + REST recovery + a single ordered event
-// channel of Data and Notice values. The package is self-contained so the
+// channel of Data, Notice and Subscribed values. The package is self-contained so the
 // command surface above it stays stable as it grows.
 //
 // # The two endpoints, and the recovery matrix that follows
@@ -27,8 +27,12 @@
 // the recovery strategy per channel follows from them.
 //
 // Public is lossy — the server may drop messages under load — but every
-// subscribe is answered with a snapshot, and ticker/orderbook frames each carry
-// complete state. So ticker and orderbook self-heal on resubscribe. Public
+// subscribe is answered with an ack, and ticker/orderbook frames each carry
+// complete state. So ticker and orderbook self-heal on resubscribe. A snapshot
+// is NOT guaranteed: a channel the server has no data for (a pair that has
+// never traded, an orderbook that has never had an order) sends none at all, so
+// the ack — surfaced as a Subscribed event — is what tells a consumer the
+// subscription is live; absence of a first frame means "no data", not "not yet". Public
 // trade has per-symbol monotonic (NOT assumed contiguous) tradeIds: duplicates
 // below the delivered high-water mark are dropped (a resubscribe snapshot of
 // only already-seen trades therefore emits empty — the snapshot boundary is

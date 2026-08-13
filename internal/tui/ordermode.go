@@ -451,8 +451,8 @@ func (o *orderModel) pullInputs() {
 
 // preview is the live analysis of the current draft.
 func (o orderModel) preview() orderPreview {
-	book, hasBook := o.store.Orderbook(o.draft.symbol)
-	return buildPreview(o.draft, book, hasBook, o.store.BalancesFor(o.accountSeq), o.symBands(), o.symBounds(), o.symFees())
+	book, _ := o.store.Orderbook(o.draft.symbol)
+	return buildPreview(o.draft, book, o.store.OrderbookStatus(o.draft.symbol), o.store.BalancesFor(o.accountSeq), o.symBands(), o.symBounds(), o.symFees())
 }
 
 // anchor resolves a price anchor against the live market.
@@ -460,6 +460,25 @@ func (o orderModel) anchor(name string) (string, bool) {
 	book, hasBook := o.store.Orderbook(o.draft.symbol)
 	t, hasTicker := o.store.Ticker(o.draft.symbol)
 	return anchorPrice(name, o.draft.side, book, hasBook, t, hasTicker, o.symBands())
+}
+
+// anchorUnavailableReason explains why an a/m/l anchor could not set a price, so
+// the key reports it instead of doing nothing. "last" needs a traded price (the
+// ticker); "mid"/aggress need a live book to read a two-sided touch from. It
+// distinguishes "still loading" from "live but no such quote" so the hint says
+// whether to wait or to type a price.
+func (o orderModel) anchorUnavailableReason(name string) string {
+	sym := o.draft.symbol
+	if name == "last" {
+		if o.store.TickerStatus(sym) == state.StatusNotReady {
+			return i18n.T("no last price yet — the ticker is still loading")
+		}
+		return i18n.T("no last price — this pair has not traded yet")
+	}
+	if o.store.OrderbookStatus(sym) == state.StatusNotReady {
+		return i18n.T("no price to anchor to — the orderbook is still loading")
+	}
+	return i18n.T("no quote to anchor to — type a limit price (or pick a row with j/k)")
 }
 
 // handleKey routes one key press. gate is the parent's money-action gate
@@ -613,6 +632,11 @@ func (o orderModel) handleFormKey(msg tea.KeyPressMsg, gate string, ladder []str
 			if p, ok := o.anchor(name); ok {
 				o.setPrice(p)
 				o.formErr = ""
+			} else {
+				// The anchor's source is not available (no last price, or no live
+				// book side to read a touch/mid from). Say so instead of silently
+				// ignoring the key.
+				o.formErr = o.anchorUnavailableReason(name)
 			}
 		}
 		return o, nil, orderActNone
@@ -901,17 +925,38 @@ func (o orderModel) placeDone(err error) orderModel {
 	return o
 }
 
-// gateForPlacement is the parent-side gate assembled for this sub-model: the
-// TUI-wide money single-flight, the market freshness latches, and the active
-// {account, symbol} fee policy (fetched async; retried by the clock tick
-// while an order surface is open, so the gate clears on its own). A nil Fees
-// seam disables fee estimates entirely — then there is nothing to wait for
-// and the gate must not block on it.
+// orderGate is the draft-independent half of the placement gate, shared by
+// every order surface: the TUI-wide money single-flight, the orderbook
+// liveness, and the active {account, symbol} fee policy (fetched async;
+// retried by the clock tick while an order surface is open, so the gate clears
+// on its own). A nil Fees seam disables fee estimates entirely — then there is
+// nothing to wait for and the gate must not block on it.
 func (m model) orderGate() string {
 	sym := m.symbol()
 	feesKnown := m.order.fetchFees == nil || m.order.symFeesFor(sym) != nil
-	return placeGateReason(m.moneyActionInFlight(), m.marketSettled(), m.store.OrderbookReady(sym), feesKnown)
+	return placeGateReason(m.moneyActionInFlight(), m.orderbookStatus(sym) != state.StatusNotReady, feesKnown)
 }
+
+// draftGate is the full placement gate for one concrete draft: orderGate plus
+// the empty-book rule, which depends on what the draft IS (a market order
+// can't fill, an ioc/fok limit can't rest — emptyBookRefusal). Every surface
+// must pass ITS OWN draft — the panel its form draft (panelGate), the command
+// bar its resolved/armed order, the ladder its arming/armed order — never
+// another surface's: judging, say, a command-bar market order by the panel's
+// draft would pass refused orders and refuse valid ones.
+func (m model) draftGate(d orderDraft) string {
+	if reason := m.orderGate(); reason != "" {
+		return reason
+	}
+	if m.orderbookStatus(m.symbol()) == state.StatusEmpty {
+		return emptyBookRefusal(d)
+	}
+	return ""
+}
+
+// panelGate is draftGate for the order panel's own draft — the gate every
+// panel render and key route passes down.
+func (m model) panelGate() string { return m.draftGate(m.order.draft) }
 
 // fmtTickHint renders the size of one tick for the hint line ("" unknown).
 func fmtTickHint(bands []ops.TickBand, price string) string {

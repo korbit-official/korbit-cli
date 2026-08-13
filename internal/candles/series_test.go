@@ -89,6 +89,27 @@ func TestFoldExtendsLiveBucketExactly(t *testing.T) {
 	ohlcv(t, live, "100", "105", "98", "98", "0.3")
 }
 
+// A trade must not fold into an unseeded series: the bucket grid is anchored to
+// the server's (KST) calendar and is only known once a Seed lands, so folding
+// before the seed would place the bucket on the wrong grid. A never-traded pair's
+// first candle comes from an authoritative re-fetch, not local synthesis. The
+// high-water mark must also stay put so the trade is re-folded after the seed.
+func TestFoldNoOpBeforeSeed(t *testing.T) {
+	var s Series
+	s.Reset("240") // 4h buckets: epoch grid ≠ the server's KST grid
+	if _, up := s.FoldTrade(1, "100", "0.5", 150_000); up || !s.Empty() {
+		t.Fatal("a trade must not fold into an unseeded series")
+	}
+	if s.LastTradeID() != 0 {
+		t.Fatalf("a no-op fold must not advance the high-water mark, got %d", s.LastTradeID())
+	}
+	// Unconfigured (never Reset) is likewise a no-op.
+	var u Series
+	if _, up := u.FoldTrade(1, "100", "0.5", 150_000); up || !u.Empty() {
+		t.Fatal("an unconfigured series must not fold")
+	}
+}
+
 func TestFoldDedupsByTradeID(t *testing.T) {
 	var s Series
 	s.Reset("1")

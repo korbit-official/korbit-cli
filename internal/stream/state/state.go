@@ -347,6 +347,23 @@ type Store struct {
 	bookReady   map[string]bool
 	tradeReady  map[string]bool
 	tickerReady map[string]bool
+	// subAckedAt records, per public (channel, symbol), WHEN the server acked
+	// that channel's subscribe (a stream.Subscribed event); cleared on a public
+	// DISCONNECTED. It is the "settled" signal that the bookReady/tradeReady/
+	// tickerReady frame-latches above cannot provide: those latch only when a
+	// data frame arrives, but a never-traded pair emits no ticker/trade snapshot
+	// (and an orderless pair may emit no orderbook snapshot), so their frame never
+	// comes. It tells "subscription live, server has no data" apart from "still
+	// loading" — see classify / the *Status readers.
+	//
+	// A TIME, not a flag, because the ack proves the subscription is live but NOT
+	// that the server has nothing to send: the server acks first and sends the
+	// snapshot immediately after, so for a moment the two are indistinguishable.
+	// Reading "empty" in that moment would flash a wrong pane and, worse, open
+	// the place gate against a book that is about to arrive. So the ack only
+	// settles a channel once SettleDelayMs has passed with no frame — long
+	// enough for a snapshot that is coming to have landed.
+	subAckedAt map[subKey]int64
 	// balReady latches per sub-account (keyed by effAccountSeq), set when that
 	// account's /v2/balance snapshot lands and cleared on a private DISCONNECTED.
 	// Readiness is per account, never aggregated here: a session covering several
@@ -465,6 +482,7 @@ func New(cfg Config, now func() int64) *Store {
 		bookReady:        map[string]bool{},
 		tradeReady:       map[string]bool{},
 		tickerReady:      map[string]bool{},
+		subAckedAt:       map[subKey]int64{},
 		balReady:         map[int]bool{},
 		tick:             map[string]tickState{},
 		tradeGapPending:  map[string]int{},
@@ -483,6 +501,8 @@ func (s *Store) Apply(ev stream.Event) {
 	// later than the next thing that could observe a balance.
 	s.sweepLocalHolds()
 	switch e := ev.(type) {
+	case stream.Subscribed:
+		s.applySubscribed(e)
 	case stream.Notice:
 		s.applyNotice(e)
 		// A notice changes connection/freshness state (health, and DISCONNECTED
@@ -523,6 +543,128 @@ func (s *Store) Apply(ev stream.Event) {
 }
 
 // --- reads ---
+
+// subKey identifies a public per-symbol subscription for the settled latch.
+type subKey struct {
+	channel string
+	symbol  string
+}
+
+// DataStatus is the three-way readiness of a public market-data pane, the single
+// classification every consumer (the TUI panes, the ladder, the place gate)
+// shares so loading-vs-empty-vs-present is computed in one place rather than as
+// ad-hoc "has a frame AND is fresh AND len>0" combinations that drift apart pane
+// to pane.
+type DataStatus int
+
+const (
+	// StatusNotReady: the subscription is not yet live for this symbol — still
+	// connecting, mid market-switch, or dropped and not re-acked. Retained data
+	// (if any) is stale. Render "loading…"; block order placement.
+	StatusNotReady DataStatus = iota
+	// StatusEmpty: the subscription is live but the server has no data — a
+	// never-traded pair (no ticker/trades) or an orderless book. NOT an error and
+	// NOT loading. Render the pane's own "no data yet" wording; a limit order may
+	// still be placed against an empty book (you would be the first maker).
+	StatusEmpty
+	// StatusPresent: the subscription is live and carries data. Render normally.
+	StatusPresent
+)
+
+// classify is the one rule behind every *Status reader. frameArrived is the
+// per-symbol freshness latch (a frame landed since the last connect/resubscribe);
+// hasContent is whether that data is non-empty; settled is the subscribe ack,
+// aged past SettleDelayMs (see settled). A frame that arrived wins (its own
+// emptiness is authoritative); absent a frame, a settled ack proves the
+// subscription is live-but-empty; absent both, loading.
+//
+// Backfill/gap state (trades' tradeGapPending/tradeGapLost) is deliberately NOT
+// an input here: a pending or lost backfill never demotes a pane. Backfill only
+// ever ADDS rows, so it can move Empty→Present (which re-renders when the rows
+// land) but never the reverse — so it cannot make a pane wrongly read empty. The
+// gap instead feeds LastTick, which neutralizes the trust-sensitive tick-arrow
+// while a hole is open; the rows themselves stay shown.
+func classify(settled, frameArrived, hasContent bool) DataStatus {
+	switch {
+	case frameArrived:
+		if hasContent {
+			return StatusPresent
+		}
+		return StatusEmpty
+	case settled:
+		return StatusEmpty
+	default:
+		return StatusNotReady
+	}
+}
+
+// SettleDelayMs is how long after a subscribe ack a channel that has sent no
+// frame is taken to have nothing to send. The server acks and then sends the
+// snapshot; the two are separate writes, so an ack on its own never means
+// "empty" — only an ack that has stayed frameless does. The window covers that
+// gap with room to spare: production emits both back to back, and the local
+// sandbox deliberately jitters data frames by up to 200ms while acking
+// immediately. Its only cost is that a genuinely empty pane reads "loading…"
+// for this long first, which is the harmless direction to be wrong in.
+const SettleDelayMs = 750
+
+// settled reports whether a channel's subscribe ack has aged past
+// SettleDelayMs. Callers hold the store's single goroutine (see Store).
+func (s *Store) settled(k subKey) bool {
+	at, acked := s.subAckedAt[k]
+	return acked && s.now()-at >= SettleDelayMs
+}
+
+// TickerStatus classifies the ticker pane for symbol. A close that is not a
+// positive number is treated as no-content: a never-traded pair reports no last
+// price, and a startup-warmed zero snapshot must not render a bogus "last 0".
+func (s *Store) TickerStatus(symbol string) DataStatus {
+	t, arrived := s.tickers[symbol]
+	return classify(s.settled(subKey{stream.ChannelTicker, symbol}), s.tickerReady[symbol], arrived && hasLastPrice(t.Close))
+}
+
+// hasLastPrice reports whether a ticker close is a real traded price. It parses
+// numerically rather than string-matching so any zero form ("0", "0.0",
+// "0.00000000") or an empty/garbage value reads as "no last price", not content.
+func hasLastPrice(close string) bool {
+	if close == "" {
+		return false
+	}
+	d, err := decimal.NewFromString(close)
+	return err == nil && d.IsPositive()
+}
+
+// OrderbookStatus classifies the orderbook pane for symbol. Empty means the book
+// is live but has no resting orders on either side.
+func (s *Store) OrderbookStatus(symbol string) DataStatus {
+	b, arrived := s.books[symbol]
+	hasContent := arrived && (len(b.Bids) > 0 || len(b.Asks) > 0)
+	return classify(s.settled(subKey{stream.ChannelOrderbook, symbol}), s.bookReady[symbol], hasContent)
+}
+
+// TradeStatus classifies the trades pane for symbol. Empty means the feed is
+// live but the pair has no trade history yet.
+func (s *Store) TradeStatus(symbol string) DataStatus {
+	r := s.trades[symbol]
+	hasContent := r != nil && len(r.rows) > 0
+	return classify(s.settled(subKey{stream.ChannelTrade, symbol}), s.tradeReady[symbol], hasContent)
+}
+
+// applySubscribed latches the settled signal for every symbol in an acked public
+// subscribe (a stream.Subscribed control event). Private channels never emit it.
+func (s *Store) applySubscribed(e stream.Subscribed) {
+	for _, sym := range e.Symbols {
+		s.subAckedAt[subKey{e.Channel, sym}] = s.now()
+	}
+	switch e.Channel {
+	case stream.ChannelTicker:
+		s.revTicker++
+	case stream.ChannelOrderbook:
+		s.revBook++
+	case stream.ChannelTrade:
+		s.revTrade++
+	}
+}
 
 // Ticker returns the latest ticker for symbol.
 func (s *Store) Ticker(symbol string) (Ticker, bool) {
@@ -716,6 +858,11 @@ func (s *Store) BalancesReady(accountSeq int) bool { return s.balReady[effAccoun
 func (s *Store) MarkMarketStale(symbol string) {
 	delete(s.bookReady, symbol)
 	delete(s.tradeReady, symbol)
+	// Also drop the settled latches: the new pair's subscribe has not been acked
+	// yet, so its panes must read "loading" (not "no data yet") until the
+	// resubscribe ack re-sets them.
+	delete(s.subAckedAt, subKey{stream.ChannelOrderbook, symbol})
+	delete(s.subAckedAt, subKey{stream.ChannelTrade, symbol})
 	s.revBook++
 	s.revTrade++
 }
@@ -728,6 +875,7 @@ func (s *Store) MarkMarketStale(symbol string) {
 // would strand the trades pane on "loading" with no snapshot coming.
 func (s *Store) MarkBookStale(symbol string) {
 	delete(s.bookReady, symbol)
+	delete(s.subAckedAt, subKey{stream.ChannelOrderbook, symbol})
 	s.revBook++
 }
 
@@ -889,9 +1037,13 @@ func (s *Store) applyNotice(n stream.Notice) {
 			// The public feed dropped: ticker/orderbook/trade frames are no longer
 			// current until the reconnect resubscribe re-snapshots, so a UI should
 			// show those panes as loading rather than present stale prices/depth.
+			// subscribed clears too — after a drop the subscription is not live, so
+			// an empty pane must revert from "no data yet" to "loading" until the
+			// resubscribe is re-acked.
 			s.bookReady = map[string]bool{}
 			s.tradeReady = map[string]bool{}
 			s.tickerReady = map[string]bool{}
+			s.subAckedAt = map[subKey]int64{}
 		}
 	case stream.ConnectFailed:
 		if eh != nil && !eh.Up {

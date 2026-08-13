@@ -733,6 +733,18 @@ func (m *connManager) handleFrame(raw []byte) error {
 			m.mu.Unlock()
 			if known {
 				m.log().Debug("subscribe ack", "requestId", *env.RequestID, "op", string(pr.op), "channel", pr.sub.Channel, "symbols", pr.sub.Symbols)
+				// A subscribe ack is the "settled" signal: the subscription is live
+				// even if the server never sends a snapshot (a never-traded pair emits
+				// no ticker/trade frame). Surface it so state can distinguish a
+				// still-loading pane from a live-but-empty one. Only the public
+				// market-data channels consume it (the private latches key on the
+				// connection's health, not per-subscription acks), so a private ack
+				// emits nothing — keeping the state map to the channels that read it.
+				// Unsubscribe acks carry no such meaning. Emitted outside m.mu — emit
+				// may block on the events channel and must never hold the connection lock.
+				if pr.op == opSubscribe && !IsPrivateChannel(pr.sub.Channel) {
+					m.emit(Subscribed{Channel: pr.sub.Channel, Symbols: pr.sub.Symbols})
+				}
 			}
 		}
 	case "fail":

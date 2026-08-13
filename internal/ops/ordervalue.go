@@ -5,6 +5,7 @@
 package ops
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/shopspring/decimal"
@@ -120,6 +121,40 @@ func BoundsForSymbol(pairs []rawapi.Pair, symbol string) OrderValueBounds {
 		}
 	}
 	return OrderValueBounds{}
+}
+
+// NotionalBoundWarnings raises the below-min / above-max warnings for an order
+// notional (an exact decimal string, in the pair's quote currency) against the
+// bounds that pair publishes. It is the ONE place those two warnings are worded
+// and thresholded, so a caller that cannot run the full AnalyzePlace — the TUI's
+// preview against an EMPTY book, which has no depth to analyze but still knows
+// price × qty — raises exactly the warnings placement would, rather than
+// silently omitting a check the same order gets everywhere else.
+//
+// fallbackQuote names the unit when the pair entry carries no currency of its
+// own (the symbol's second segment). A bound the pair does not publish is
+// skipped, leaving the server as the authority, and an unparseable notional
+// raises nothing — neither can support a rejection claim.
+func NotionalBoundWarnings(notional string, bounds OrderValueBounds, fallbackQuote string) []PlaceWarning {
+	d, err := decimal.NewFromString(notional)
+	if err != nil {
+		return nil
+	}
+	unit := strings.ToUpper(bounds.QuoteCurrency)
+	if unit == "" {
+		unit = strings.ToUpper(fallbackQuote)
+	}
+	var ws []PlaceWarning
+	add := func(code PlaceWarningCode, format string, a ...any) {
+		ws = append(ws, PlaceWarning{Code: code, Message: fmt.Sprintf(format, a...), Format: format, Args: a})
+	}
+	if min, ok := bounds.min(); ok && d.LessThan(min) {
+		add(WarnNotionalBelowMin, "order notional ~%s %s is below the %s %s minimum — it will be rejected.", dec(d), unit, dec(min), unit)
+	}
+	if max, ok := bounds.max(); ok && d.GreaterThan(max) {
+		add(WarnNotionalAboveMax, "order notional ~%s %s exceeds the %s %s maximum — it will be rejected.", dec(d), unit, dec(max), unit)
+	}
+	return ws
 }
 
 // min/max parse a bound. ok=false covers both "the pair publishes none" and an
