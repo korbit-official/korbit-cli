@@ -351,6 +351,19 @@ func TestHumanFormattersPinFieldMapping(t *testing.T) {
 				"btc_krw", "launched", "btc", "krw", "5000", "1000000000"},
 		},
 		{
+			// A server predating these fields publishes none of them, so all four
+			// columns are empty for every pair. Blank cells in a right-aligned
+			// numeric column read as zero, and a reader who takes them as "this
+			// market has no minimum" sizes an order the server then rejects. Each
+			// absent cell must therefore be a dash, and the listing must say the
+			// blanks are unpublished figures rather than absent bounds.
+			"pairs (server publishes no currencies or bounds)",
+			[]string{"pairs"},
+			`{"success":true,"data":[{"symbol":"btc_krw","status":"launched"}]}`,
+			[]string{"minOrderValue", "maxOrderValue", "btc_krw", "launched", "—",
+				"publishes no currency or order value fields", "not a statement that these markets are unbounded"},
+		},
+		{
 			"whoami",
 			[]string{"whoami", "--key", "bot"},
 			`{"success":true,"data":{"apiKey":"K1","type":"ed25519","status":"active","permissions":["readOrders"]}}`,

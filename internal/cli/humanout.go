@@ -241,25 +241,49 @@ func fmtPairs(raw json.RawMessage) (string, bool) {
 	// The bound columns are the reason to read this endpoint before sizing an
 	// order, so the text table carries them too — the agent-facing notes point
 	// at `pairs` for them, and a two-column table would send a reader to --json
-	// with no hint that they were missing. Empty means the pair publishes no
-	// such bound; it is never zero.
+	// with no hint that they were missing. A field the pair does not publish
+	// renders as an em dash, never as a blank: in a right-aligned numeric column
+	// a blank cell reads as zero, and zero is a bound this market would enforce.
 	headers := []string{"symbol", "status", "base", "quote", "minOrderValue", "maxOrderValue"}
 	var rows [][]string
+	anyCurrency := false
 	for _, e := range arr {
 		m, ok := textout.AsObject(e)
 		if !ok {
 			return "", false
 		}
+		quote := textout.Jstr(m, "quoteCurrency")
+		if quote != "" {
+			anyCurrency = true
+		}
 		rows = append(rows, []string{
 			textout.Jstr(m, "symbol"),
 			textout.Jstr(m, "status"),
-			textout.Jstr(m, "baseCurrency"),
-			textout.Jstr(m, "quoteCurrency"),
-			textout.Jstr(m, "minOrderValue"),
-			textout.Jstr(m, "maxOrderValue"),
+			orDash(textout.Jstr(m, "baseCurrency")),
+			orDash(quote),
+			orDash(textout.Jstr(m, "minOrderValue")),
+			orDash(textout.Jstr(m, "maxOrderValue")),
 		})
 	}
-	return textout.Table(headers, rows, []bool{false, false, false, false, true, true}), true
+	table := textout.Table(headers, rows, []bool{false, false, false, false, true, true})
+	// No pair publishing a currency means the server itself predates these
+	// fields, so all four columns are empty for every row. Say so, because the
+	// dashes alone invite the one wrong reading that costs money: that these
+	// markets have no order value bounds. They may well have them — this server
+	// just does not publish the figures, and it still enforces whatever it enforces.
+	if len(rows) > 0 && !anyCurrency {
+		return table + "\n\nnote: this server publishes no currency or order value fields, so those columns are empty for every pair. That is not a statement that these markets are unbounded — size against the server's own rejection, not against these blanks.", true
+	}
+	return table, true
+}
+
+// orDash renders an absent table cell as an em dash, distinguishing "the pair
+// does not publish this" from a zero or an empty string.
+func orDash(s string) string {
+	if s == "" {
+		return "—"
+	}
+	return s
 }
 
 func fmtTicksize(raw json.RawMessage) (string, bool) {

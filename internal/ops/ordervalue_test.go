@@ -43,17 +43,17 @@ func TestBoundsForSymbol(t *testing.T) {
 
 // ResolveBoundsForSymbol adds one thing to the raw listing read: the KRW
 // market's documented figures, and ONLY against a server that does not publish
-// the pair identity fields at all. The four paths below are the whole contract.
+// the pair identity fields at all. The paths below are the whole contract.
 func TestResolveBoundsFallsBackOnlyForAPrePublicationServer(t *testing.T) {
 	newShape := []rawapi.Pair{
 		{Symbol: "btc_krw", Status: "launched", BaseCurrency: "btc", QuoteCurrency: "krw",
 			MinOrderValue: "7000", MaxOrderValue: "900000000"},
-		// Same server, a KRW pair it says has no bounds. "No bound" is the
-		// server's answer, not a gap to paper over.
+		// Same server, a KRW pair for which it publishes no bound. An unpublished
+		// figure is the server's answer, not a gap to paper over.
 		{Symbol: "doge_krw", Status: "launched", BaseCurrency: "doge", QuoteCurrency: "krw"},
 	}
-	// A server that predates the fields: symbol + status only, exactly what
-	// production and an older sandbox bundle serve.
+	// A server that predates the fields: symbol + status only, which is what any
+	// deployment or sandbox bundle older than the fields serves.
 	oldShape := []rawapi.Pair{
 		{Symbol: "btc_krw", Status: "launched"},
 		{Symbol: "btc_" + testQuoteCcy, Status: "launched"},
@@ -64,10 +64,10 @@ func TestResolveBoundsFallsBackOnlyForAPrePublicationServer(t *testing.T) {
 	if got := ResolveBoundsForSymbol(newShape, "btc_krw"); got.Min != "7000" || got.Max != "900000000" {
 		t.Errorf("published bounds must be used verbatim: got %+v", got)
 	}
-	// 2. New shape, bounds omitted -> no bounds. The fallback must NOT override a
-	//    server that is capable of publishing and chose not to.
+	// 2. New shape, bounds omitted -> no figure, so no check. The fallback must NOT
+	//    override a server that is capable of publishing and chose not to.
 	if got := ResolveBoundsForSymbol(newShape, "doge_krw"); got.Min != "" || got.Max != "" {
-		t.Errorf("an omitted bound on a publishing server means none: got %+v", got)
+		t.Errorf("an omitted bound on a publishing server publishes no figure: got %+v", got)
 	}
 	// 3. Old shape, KRW symbol -> the documented KRW figures, so the below-min /
 	//    above-max warnings survive an upgrade that outruns the server.
@@ -180,8 +180,8 @@ func TestPrePlaceRaisesNoBoundWarningWhenTheListingPublishesNone(t *testing.T) {
 	}
 }
 
-// End to end against a server that predates the bound fields — production today,
-// and any sandbox bundle older than the one that publishes them. The KRW market's
+// End to end against a server that predates the bound fields — any deployment or
+// sandbox bundle older than the ones that publish them. The KRW market's
 // below-min warning must still fire: this CLI may be upgraded ahead of the server
 // it talks to, and a warning that quietly stops appearing reads exactly like an
 // order that is fine to send.

@@ -44,10 +44,19 @@ const (
 // that predates the bound fields.
 //
 // A listing that publishes a pair's identity (`quoteCurrency`) is the new shape,
-// and is trusted VERBATIM: a bound it omits is a bound the pair does not have,
-// and the check is skipped. Only when nothing in the listing publishes a
-// currency — an older server, or a listing that never arrived — does the fallback
-// apply, and then only to a KRW-quoted symbol.
+// and is trusted VERBATIM: a bound it omits is a figure the pair does not
+// publish, so that check is skipped and the server decides. Only when nothing in
+// the listing publishes a currency — an older server, or a listing that never
+// arrived — does the fallback apply, and then only to a KRW-quoted symbol.
+//
+// A symbol the listing does not carry at all yields no unit and no bounds, so
+// BOTH checks are skipped and the server decides. That is the contract, not an
+// accident of the caller: such a symbol is one this server does not trade, and a
+// listing that publishes currencies is not a pre-publication server just because
+// it lacks one entry — inventing the KRW figures for it would apply another
+// market's bound to a market that does not exist here. Reachable by a
+// `--symbols` flag naming a pair the server does not list, and by a pair
+// delisted between two listing reads.
 //
 // The fallback exists so upgrading the CLI ahead of the server (or pointing it
 // at an older sandbox) does not silently drop the below-min/above-max warnings
@@ -68,7 +77,10 @@ func ResolveBoundsForSymbol(pairs []rawapi.Pair, symbol string) OrderValueBounds
 		return b
 	}
 	if listingPublishesCurrencies(pairs) {
-		return b
+		// Unlisted symbol on a publishing server: no unit, no bounds, both checks
+		// skipped. Returned explicitly rather than as b, so the empty result reads as
+		// the decision it is instead of a miss falling through.
+		return OrderValueBounds{}
 	}
 	return legacyBoundsForSymbol(symbol)
 }
@@ -76,8 +88,8 @@ func ResolveBoundsForSymbol(pairs []rawapi.Pair, symbol string) OrderValueBounds
 // listingPublishesCurrencies reports whether the listing carries the pair
 // identity fields at all. One entry is enough: they are non-optional on the
 // documented shape, so a server that publishes them anywhere publishes them
-// everywhere. It distinguishes "this server has no bounds to give" from "this
-// pair has no bound" — the fallback must never override the latter.
+// everywhere. It distinguishes "this server cannot publish a bound" from "this
+// pair publishes no figure for one" — the fallback must never override the latter.
 func listingPublishesCurrencies(pairs []rawapi.Pair) bool {
 	for _, p := range pairs {
 		if strings.TrimSpace(p.QuoteCurrency) != "" {

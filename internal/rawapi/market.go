@@ -143,9 +143,10 @@ type PairsRequest struct{}
 
 // Pair is one trading pair: its status, its currencies, and its order value
 // bounds. MinOrderValue/MaxOrderValue are decimal strings denominated in
-// QuoteCurrency, and are empty for a pair that publishes no such bound — the
-// absence means the pair has none, not zero, and never licenses another pair's
-// figure in its place.
+// QuoteCurrency, and are empty for a pair that publishes no such bound — an
+// empty bound is a figure the pair does not publish, not a guarantee of none: the
+// check is skipped and the server decides. Never read as zero, and never filled
+// in from another pair.
 type Pair struct {
 	Symbol        string `json:"symbol"`
 	Status        string `json:"status"`
