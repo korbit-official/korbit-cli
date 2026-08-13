@@ -393,6 +393,7 @@ var Registry = []Command{
 		Summary: "show the copyright, open-source license, and where to read the full terms",
 		Notes: []string{
 			"korbit-cli is under the Apache License 2.0; this points at the full text and terms rather than reproducing them. The Korbit API Sandbox is separately licensed — see `{prog} sandbox license`.",
+			"The binary links open-source Go modules; their notices ship in each release archive (THIRD_PARTY_LICENSES.txt) and are linked from this output.",
 		},
 		Examples: []string{"{prog} license"},
 	},

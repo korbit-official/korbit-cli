@@ -83,9 +83,15 @@ trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/server"
 cp "$bin" "$stage/server/$binname"
 chmod +x "$stage/server/$binname"
-cp "$root/LICENSE" "$stage/LICENSE"
-cp "$root/README.md" "$stage/README.md"
 cp "$root/assets/korbit.png" "$stage/icon.png"
+# The bundle carries a copy of the binary, which statically links open-source
+# modules, so it ships the same license/notice/disclaimer set as the release
+# archives — attribution travels with every distributed copy. These sit at the
+# bundle root alongside manifest.json; the MCPB spec only requires manifest.json
+# there, so extra top-level files are fine.
+for doc in LICENSE NOTICE THIRD_PARTY_LICENSES.txt DISCLAIMER.md DISCLAIMER.ko.md README.md README.ko.md; do
+	cp "$root/$doc" "$stage/$doc"
+done
 
 cat >"$stage/manifest.json" <<EOF
 {

@@ -494,7 +494,17 @@ package; when you touch order placement, cover the sizing-matrix branch you chan
 
 ## License headers
 
-The project is Apache-2.0 (`LICENSE` at the repo root). Every source file begins
-with a short header — a copyright line plus `// SPDX-License-Identifier:
+The project is Apache-2.0 (`LICENSE` + `NOTICE` at the repo root). Every source
+file begins with a short header — a copyright line plus `// SPDX-License-Identifier:
 Apache-2.0` — above any build constraint or package doc comment. Add it to any
 new file; `TestEveryGoFileHasSPDXHeader` fails the build if a Go file is missing it.
+
+## Third-party notices
+
+The binary statically links open-source Go modules whose permissive licenses
+require their notices to accompany every copy. `THIRD_PARTY_LICENSES.txt` (repo
+root) carries them; it ships inside every release archive (the archive `files`
+list in `.goreleaser.yaml`) and `korbit license` links to it in the source repo.
+The file is **generated** — regenerate with `make licenses` (see
+`tools/licensegen`) after any dependency change and commit it;
+`make licenses-check` fails on drift.

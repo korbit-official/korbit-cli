@@ -15,14 +15,15 @@ import (
 )
 
 // repositoryURL is the public source repository — the single place the full
-// license text and disclaimers live. This carries a pointer, never the bodies
-// (see licenseView), so the notice stays short and cannot drift from the repo.
-// licenseURL and disclaimerURL are derived from it so they can never point at a
-// different repo than one another.
+// license text, disclaimers, and third-party notices live. This carries
+// pointers, never the bodies (see licenseView), so the notice stays short and
+// cannot drift from the repo. The derived URLs are built from it so they can
+// never point at a different repo than one another.
 const (
 	repositoryURL = "https://github.com/korbit-official/korbit-cli"
 	licenseURL    = repositoryURL + "/blob/master/LICENSE"
 	disclaimerURL = repositoryURL + "/blob/master/DISCLAIMER.md"
+	thirdPartyURL = repositoryURL + "/blob/master/THIRD_PARTY_LICENSES.txt"
 )
 
 // licenseView is the `license` result: the copyright, the open-source license,
@@ -39,29 +40,34 @@ type licenseView struct {
 	// Sandbox notes that the bundled Korbit API Sandbox is a separate component
 	// under its own terms (not this license) and how to read them.
 	Sandbox string `json:"sandbox"`
+	// ThirdPartyNotices points at the notices for the open-source modules linked
+	// into the binary. They ship in each release archive and are read in the repo.
+	ThirdPartyNotices string `json:"thirdPartyNotices"`
 }
 
 func (v licenseView) FormatText(w io.Writer) {
 	fmt.Fprintf(w, "%s\nLicensed under the %s (SPDX: %s).\n\n", v.Copyright, v.License, v.SpdxId)
-	fmt.Fprintf(w, "Full license text:            %s\nDisclaimer (read before use): %s\nKorbit Open API terms of use: %s\n\n",
-		v.LicenseUrl, v.Disclaimer, v.OpenApiTerms)
+	fmt.Fprintf(w, "Full license text:            %s\nDisclaimer (read before use): %s\nThird-party notices:          %s\nKorbit Open API terms of use: %s\n\n",
+		v.LicenseUrl, v.Disclaimer, v.ThirdPartyNotices, v.OpenApiTerms)
 	fmt.Fprint(w, v.Sandbox)
 }
 
 // runLicense implements the `license` command: print the copyright, the
-// Apache-2.0 license, and pointers to the full license/disclaimers and the
-// Korbit Open API terms. It makes no API call and reads no state.
+// Apache-2.0 license, and pointers to the full license/disclaimers, the
+// third-party notices, and the Korbit Open API terms. It makes no API call and
+// reads no state.
 func (rt *runtime) runLicense(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		return output.Usagef("unexpected argument %q", args[0])
 	}
 	return rt.Emit("license", licenseView{
-		Copyright:    "Copyright (c) 2026 Korbit Inc.",
-		License:      "Apache License, Version 2.0",
-		SpdxId:       "Apache-2.0",
-		LicenseUrl:   licenseURL,
-		Disclaimer:   disclaimerURL,
-		OpenApiTerms: probe.PortalURL,
-		Sandbox:      fmt.Sprintf("The Korbit API Sandbox is a separate component under its own terms, not this license — run `%s sandbox license` to read them.", progname.Name()),
+		Copyright:         "Copyright (c) 2026 Korbit Inc.",
+		License:           "Apache License, Version 2.0",
+		SpdxId:            "Apache-2.0",
+		LicenseUrl:        licenseURL,
+		Disclaimer:        disclaimerURL,
+		OpenApiTerms:      probe.PortalURL,
+		ThirdPartyNotices: thirdPartyURL,
+		Sandbox:           fmt.Sprintf("The Korbit API Sandbox is a separate component under its own terms, not this license — run `%s sandbox license` to read them.", progname.Name()),
 	})
 }

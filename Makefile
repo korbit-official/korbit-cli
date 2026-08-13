@@ -4,10 +4,16 @@
 
 BINARY := korbit
 
-.PHONY: build test vet fmt check dist dist-unsigned release release-unsigned notarize publish clean
+.PHONY: build test vet fmt check licenses licenses-check dist dist-unsigned release release-unsigned notarize publish clean
 
 build: ## Build the binary for the host platform
 	go build -o $(BINARY) .
+
+licenses: ## Regenerate THIRD_PARTY_LICENSES.txt (commit the result)
+	go run ./tools/licensegen
+
+licenses-check: ## Fail if THIRD_PARTY_LICENSES.txt is stale (for CI/release)
+	./scripts/check-licenses.sh
 
 test: ## Run the test suite
 	go test ./...

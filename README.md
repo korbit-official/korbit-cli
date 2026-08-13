@@ -132,7 +132,7 @@ You can add multiple keys; select one per command with `--key` (or set a default
 
 Copyright © 2026 Korbit Inc.
 
-Licensed under the Apache License, Version 2.0 (`SPDX-License-Identifier: Apache-2.0`). See [`LICENSE`](LICENSE) for the full text. `korbit license` prints this notice with links to the license, disclaimer, and Open API terms.
+Licensed under the Apache License, Version 2.0 (`SPDX-License-Identifier: Apache-2.0`). See [`LICENSE`](LICENSE) for the full text.
 
 **Disclaimer** — read [`DISCLAIMER.md`](DISCLAIMER.md) before using this tool.
 

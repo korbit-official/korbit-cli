@@ -16,6 +16,10 @@ project_name: korbit
 before:
   hooks:
     - go mod download
+    # Release gate: refuse to build if THIRD_PARTY_LICENSES.txt is out of date
+    # with the dependency set, so no release ships stale or missing third-party
+    # attribution. Regenerate with `make licenses` when it fails.
+    - ./scripts/check-licenses.sh
 
 builds:
   - id: korbit
@@ -77,7 +81,12 @@ archives:
           - zip
     files:
       - LICENSE
+      - NOTICE
+      - THIRD_PARTY_LICENSES.txt
+      - DISCLAIMER.md
+      - DISCLAIMER.ko.md
       - README.md
+      - README.ko.md
 
 checksum:
   name_template: "checksums.txt"
