@@ -72,8 +72,9 @@ type Config struct {
 	// background poll that detects the registered key, binds it, and runs the
 	// health check without the user pasting anything. The model starts it once
 	// (passing a context canceled when the session ends, so the poll stops on
-	// paste/Esc/Ctrl-C), renders each ClaimUpdate.Status as a live line beneath
-	// the prompt, and on a terminal update either ends the session showing Result
+	// paste/Esc/Ctrl-C), renders each ClaimUpdate.Status as the primary line above
+	// the key-id field while it runs, and on a terminal update either ends the
+	// session showing Result
 	// (Done — the key was found, bound, and checked) or stops the poll and keeps
 	// the prompt open for manual paste (Stop — a conflict or hard error; Status
 	// says why). nil disables auto-claim (a pipe, no TTY, the MCP server).
@@ -143,7 +144,7 @@ type model struct {
 
 	claimCh  <-chan ClaimUpdate // background auto-claim updates; nil when disabled
 	claiming bool               // the auto-claim poll is live (drives the status line + spinner)
-	status   string             // latest auto-claim status line, shown beneath the prompt
+	status   string             // latest auto-claim status line (leads above the field while claiming; a sticky notice below once the poll stops)
 
 	width, height int  // terminal size (from WindowSizeMsg); 0 until the first arrives
 	showQR        bool // the ^R QR overlay is open (renders full-viewport instead of the prompt)
@@ -377,7 +378,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case claimClosedMsg:
+		// The poll ended without a terminal Done/Stop (ctx canceled, or the producer
+		// returned "nothing to show"). Drop claiming AND any lingering non-terminal
+		// status, so the reverted paste prompt never shows a stale "waiting…" notice
+		// while nothing is actually polling. (A Stop stops draining without closing,
+		// so its sticky status is set on that path, not cleared here.)
 		m.claiming = false
+		m.status = ""
 		return m, nil
 
 	case submitResultMsg:
@@ -409,6 +416,11 @@ var (
 	promptStyle = lipgloss.NewStyle().Bold(true)
 	errStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
 	hintStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	// waitStyle accents the auto-claim "you can just wait" line so the effortless
+	// path reads as the primary call to action. Bold carries the emphasis where a
+	// terminal has no color; green signals the active/positive affordance where it
+	// does. Never relied on alone — wording and position carry the meaning too.
+	waitStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("2"))
 )
 
 func (m model) View() tea.View {
@@ -436,6 +448,20 @@ func (m model) View() tea.View {
 	}
 	b.WriteString(header.String())
 
+	// The auto-claim "waiting" block — the accent call-to-action line plus the
+	// demoted paste-fallback label — is built once here so its true rendered height
+	// feeds the inline-QR fit reserve below and it renders identically in the
+	// phaseInput branch. Empty unless auto-claim is live at the prompt.
+	var claimBlock string
+	if m.claiming && m.phase == phaseInput {
+		status := m.status
+		if status == "" {
+			status = i18n.T("Waiting for key registration — finish it at the developers portal and setup completes automatically.")
+		}
+		claimBlock = renderWaiting(m.spin.View(), status, w) + "\n\n" +
+			hintStyle.Render(i18n.T("Rather enter it yourself? Paste the issued key id:"))
+	}
+
 	// On a terminal roomy enough for the whole layout, show the QR inline so it can be
 	// scanned right away without pressing ^R; otherwise the ^R overlay (and its footer
 	// hint) remains the way to see it. Recomputed each frame, so a resize flips it.
@@ -447,10 +473,15 @@ func (m model) View() tea.View {
 		// result term a borderline-height terminal would green-light the QR and then
 		// scroll it off the top once the retry lines pushed past the viewport.
 		contentLines := countLines(header.String()) + linesRendered(m.result)
+		// Plus the extra rows the auto-claim waiting block needs beyond the prompt
+		// region inputChrome already budgets (see claimReserveRows). Derived from the
+		// block's real height, so a long/wrapped status can neither push the QR off a
+		// short terminal nor hide it a row early.
+		contentLines += claimReserveRows(claimBlock)
 		if qr, qrW, qrH := m.qrCode(); m.inlineQRFits(contentLines, qrW, qrH) {
 			inlineQR = true
 			b.WriteByte('\n')
-			b.WriteString(hintStyle.Render(i18n.T("Or scan this QR code with your phone:")))
+			b.WriteString(promptStyle.Render(i18n.T("Or scan this QR code with your phone:")))
 			b.WriteByte('\n')
 			b.WriteString(qr)
 			b.WriteByte('\n')
@@ -474,7 +505,16 @@ func (m model) View() tea.View {
 			b.WriteByte('\n')
 		}
 		b.WriteByte('\n')
-		if m.cfg.Prompt != "" {
+		// While auto-claim is live, WAITING is the primary, effortless path: the
+		// claimBlock (built above) leads with the accent call-to-action and demotes
+		// the key-id field to a dim fallback below — so the user sees they can just
+		// finish in the portal and leave this running. Once the poll has stopped
+		// (conflict/hard error) or was never wired, claimBlock is empty and pasting
+		// is the only way forward, so fall back to the bold paste prompt.
+		if claimBlock != "" {
+			b.WriteString(claimBlock)
+			b.WriteByte('\n')
+		} else if m.cfg.Prompt != "" {
 			b.WriteString(promptStyle.Render(m.cfg.Prompt))
 			b.WriteByte('\n')
 		}
@@ -488,16 +528,9 @@ func (m model) View() tea.View {
 			b.WriteString(hintStyle.Render(i18n.T("✓ Link copied to clipboard")))
 			b.WriteByte('\n')
 		}
-		// Auto-claim status: a spinning live line while the poll runs, or a sticky
-		// notice once it has stopped (conflict/hard error). Empty when no poll.
-		if m.claiming {
-			status := m.status
-			if status == "" {
-				status = i18n.T("Watching for your registered key — it'll bind automatically when you finish.")
-			}
-			b.WriteString(hintStyle.Render(m.spin.View() + " " + status))
-			b.WriteByte('\n')
-		} else if m.status != "" {
+		// A sticky auto-claim notice shown once the poll has STOPPED (conflict/hard
+		// error) — while claiming, that status is the accent line above instead.
+		if !m.claiming && m.status != "" {
 			b.WriteString(hintStyle.Render(m.status))
 			b.WriteByte('\n')
 		}
@@ -572,6 +605,19 @@ func (m model) inlineQRFits(contentLines, qrW, qrH int) bool {
 	return qrW <= m.viewWidth() && contentLines+qrH+inputChrome <= m.viewHeight()
 }
 
+// claimReserveRows is the extra viewport rows the auto-claim waiting block needs
+// beyond the prompt region inputChrome already budgets. The block supplants two
+// already-budgeted rows — the prompt row (base region) and the sticky-status row
+// (headroom), which is not rendered while claiming — so only the rows beyond those
+// two are extra: rows(claimBlock) − 2 == countLines(claimBlock) − 1. Zero when the
+// block is empty (not claiming), so the non-claiming fit is unaffected.
+func claimReserveRows(claimBlock string) int {
+	if claimBlock == "" {
+		return 0
+	}
+	return countLines(claimBlock) - 1
+}
+
 // countLines returns the number of terminal rows a rendered block occupies (each
 // line is newline-terminated, so this counts the trailing newlines).
 func countLines(s string) int { return strings.Count(s, "\n") }
@@ -597,6 +643,30 @@ func wrapProse(s string, width int) string {
 		out = append(out, ansi.Wrap(ln, width, " -"))
 	}
 	return strings.Join(out, "\n")
+}
+
+// renderWaiting renders the auto-claim status as the primary "you can just wait"
+// call to action: a spinner gutter followed by the accent-styled status text,
+// word-wrapped to width with continuation lines hanging-indented under the text
+// (past the two-cell spinner gutter) so a long message never clips on a narrow
+// terminal. The accent is re-applied per visual line so it survives the wrap.
+func renderWaiting(spin, text string, width int) string {
+	const gutter = 2 // the spinner cell plus its trailing space
+	wrapW := width - gutter
+	if wrapW < 1 {
+		wrapW = fallbackWidth - gutter
+	}
+	var b strings.Builder
+	for i, ln := range strings.Split(wrapProse(text, wrapW), "\n") {
+		if i == 0 {
+			b.WriteString(spin + " ")
+		} else {
+			b.WriteByte('\n')
+			b.WriteString(strings.Repeat(" ", gutter))
+		}
+		b.WriteString(waitStyle.Render(ln))
+	}
+	return b.String()
 }
 
 // renderLink renders the registration URL as a width-wrapped, OSC 8 hyperlinked

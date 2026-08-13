@@ -163,6 +163,85 @@ func TestSignersRedactUnderFmt(t *testing.T) {
 	}
 }
 
+// TestLooksLikeEd25519PublicKey covers the guard that stops a public key from
+// being pasted where the portal-issued api-key id belongs. The positive cases
+// are the encodings a user could plausibly copy; the negatives are the shapes a
+// real api-key id takes.
+func TestLooksLikeEd25519PublicKey(t *testing.T) {
+	kp, err := GenerateKeypair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	block, _ := pem.Decode([]byte(kp.PublicPEM))
+	der := block.Bytes // 44-byte SPKI
+
+	positive := map[string]string{
+		"full PEM":            kp.PublicPEM,
+		"PEM body std base64": base64.StdEncoding.EncodeToString(der),
+		// A wrapped PEM body: der[:21] is a whole number of base64 groups (21 is a
+		// multiple of 3), so the two encoded halves concatenate back to the full
+		// SPKI once whitespace is stripped.
+		"PEM body with newlines":    base64.StdEncoding.EncodeToString(der[:21]) + "\n" + base64.StdEncoding.EncodeToString(der[21:]),
+		"base64url no padding":      base64.RawURLEncoding.EncodeToString(der),
+		"base64url with padding":    base64.URLEncoding.EncodeToString(der),
+		"raw std base64 no padding": base64.RawStdEncoding.EncodeToString(der),
+	}
+	for name, in := range positive {
+		if !LooksLikeEd25519PublicKey(in) {
+			t.Errorf("%s: expected a public key to be detected", name)
+		}
+	}
+
+	negative := map[string]string{
+		"empty":                "",
+		"portal-style id":      "korbit-ak-9f3c2b7e",
+		"sandbox id":           "SANDBOX_ED25519_KEY_00000001_0000002",
+		"uuid":                 "018f1a2b-3c4d-7e5f-8a9b-0c1d2e3f4a5b",
+		"short base64":         base64.StdEncoding.EncodeToString([]byte("hello")),
+		"32-byte raw key only": base64.StdEncoding.EncodeToString(der[len(der)-32:]),
+	}
+	for name, in := range negative {
+		if LooksLikeEd25519PublicKey(in) {
+			t.Errorf("%s: %q must not be flagged as a public key", name, in)
+		}
+	}
+	// The public and private detectors must not cross-fire: a public key is not a
+	// private key, and vice versa (different DER prefixes and lengths).
+	if LooksLikeEd25519PrivateKey(kp.PublicPEM) {
+		t.Error("a public key PEM must not be flagged as a private key")
+	}
+	if LooksLikeEd25519PublicKey(kp.PrivatePEM) {
+		t.Error("a private key PEM must not be flagged as a public key")
+	}
+}
+
+// TestLooksLikeEd25519PrivateKey covers the guard against pasting private key
+// material where an api-key id belongs.
+func TestLooksLikeEd25519PrivateKey(t *testing.T) {
+	kp, err := GenerateKeypair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	block, _ := pem.Decode([]byte(kp.PrivatePEM))
+	der := block.Bytes // 48-byte PKCS#8
+
+	positive := map[string]string{
+		"full PEM":               kp.PrivatePEM,
+		"PKCS#8 body std base64": base64.StdEncoding.EncodeToString(der),
+		"base64url no padding":   base64.RawURLEncoding.EncodeToString(der),
+	}
+	for name, in := range positive {
+		if !LooksLikeEd25519PrivateKey(in) {
+			t.Errorf("%s: expected a private key to be detected", name)
+		}
+	}
+	for _, in := range []string{"", "korbit-ak-9f3c2b7e", "SANDBOX_ED25519_KEY_00000001_0000002"} {
+		if LooksLikeEd25519PrivateKey(in) {
+			t.Errorf("%q must not be flagged as a private key", in)
+		}
+	}
+}
+
 func publicKeyFromPEM(t *testing.T, pemStr string) ed25519.PublicKey {
 	t.Helper()
 	block, _ := pem.Decode([]byte(pemStr))

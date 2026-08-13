@@ -102,6 +102,25 @@ func assertSandboxNaming(name, apiKeyID string) error {
 	return nil
 }
 
+// assertNotKeyMaterial refuses an api-key id that is actually ED25519 key
+// material rather than the opaque id the portal issues. Both mistakes are easy to
+// make because the CLI prints the keypair right beside the registration step:
+//   - A public key binds a value the server rejects on every signed call with
+//     KEY_NOT_FOUND. Catch it here with the fix rather than at use time.
+//   - A private key is worse — it would write a secret into non-secret metadata
+//     (keys.json). The message must never echo the pasted value.
+func assertNotKeyMaterial(apiKeyID string) error {
+	if korbit.LooksLikeEd25519PrivateKey(apiKeyID) {
+		return output.Usagef(
+			"that value is an ED25519 PRIVATE key — never use private key material as an API key id (it is secret). Register the corresponding public key at https://developers.korbit.co.kr, then paste the KEY ID the portal issues")
+	}
+	if korbit.LooksLikeEd25519PublicKey(apiKeyID) {
+		return output.Usagef(
+			"that value is an ED25519 public key, not an API key id — after you register the public key at https://developers.korbit.co.kr, paste the KEY ID the portal issues, not the public key itself")
+	}
+	return nil
+}
+
 // Record is the persisted metadata for one key. Type and Keystore are
 // mandatory — a record without them fails to load (see doc.go for the two-axis
 // model they encode).
@@ -608,6 +627,9 @@ func (m *Manager) AddBound(name, privatePEM, apiKeyID, backend string) (NewKey, 
 	if id == "" {
 		return NewKey{}, output.Usagef("--api-key must not be empty")
 	}
+	if err := assertNotKeyMaterial(id); err != nil {
+		return NewKey{}, err
+	}
 	if err := assertSandboxNaming(name, id); err != nil {
 		return NewKey{}, err
 	}
@@ -679,6 +701,9 @@ func (m *Manager) AddHMAC(name, secret, apiKeyID, backend string) (NewKey, error
 	if id == "" {
 		return NewKey{}, output.Usagef("--api-key must not be empty")
 	}
+	if err := assertNotKeyMaterial(id); err != nil {
+		return NewKey{}, err
+	}
 	if err := assertSandboxNaming(name, id); err != nil {
 		return NewKey{}, err
 	}
@@ -729,6 +754,9 @@ func (m *Manager) Bind(name, apiKeyID string) error {
 	id := strings.TrimSpace(apiKeyID)
 	if id == "" {
 		return output.Usagef("--api-key must not be empty")
+	}
+	if err := assertNotKeyMaterial(id); err != nil {
+		return err
 	}
 	if err := assertSandboxNaming(name, id); err != nil {
 		return err

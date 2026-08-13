@@ -38,6 +38,7 @@
   "Prefer to register manually? Paste this public key (ED25519) at the portal instead:": "직접 등록하시겠어요? 대신 이 공개 키(ED25519)를 코빗 개발자센터에 붙여넣으세요:",
   "Public key (ED25519) to paste into the developers portal:": "코빗 개발자센터에 붙여넣을 공개 키(ED25519):",
   "Public key (paste this into the developers portal):": "공개 키 (코빗 개발자센터에 붙여넣으세요):",
+  "Rather enter it yourself? Paste the issued key id:": "직접 입력하시겠어요? 발급된 키 ID를 붙여넣으세요:",
   "Register the public key at %s as a new API key (type: ED25519). Grant only the permissions you need (%s) and set an IP allowlist to: %s.": "%s 에서 공개 키를 새 API 키(유형: ED25519)로 등록하세요. 필요한 권한(%s)만 부여하고 IP 화이트리스트를 다음으로 설정하세요: %s.",
   "Register the public key at %s as a new API key (type: ED25519). Grant only the permissions you need (%s) and set an IP allowlist.": "%s 에서 공개 키를 새 API 키(유형: ED25519)로 등록하세요. 필요한 권한(%s)만 부여하고 IP 화이트리스트를 설정하세요.",
   "Replace it: %s, then %s": "교체: %s 후 %s",
@@ -47,9 +48,9 @@
   "Then paste the issued key id below — setup binds it and runs a health check.": "그런 다음 발급된 키 ID를 아래에 붙여넣으세요 — setup이 키를 바인딩하고 상태 점검을 실행합니다.",
   "This API key has been deactivated — auto-claim can't use it.": "이 API 키는 비활성화되었습니다 — 자동 감지로 사용할 수 없습니다.",
   "This API key has expired.": "이 API 키는 만료되었습니다.",
-  "To register this key, open the link below — review the permissions and IP allowlist, confirm with MFA, then paste the issued key id here:": "이 키를 등록하려면 아래 링크를 여세요 — 권한과 IP 화이트리스트를 확인하고 MFA로 승인한 뒤, 발급된 키 ID를 여기에 붙여넣으세요:",
+  "To register this key, open the link below — review the permissions and IP allowlist, then confirm with MFA:": "이 키를 등록하려면 아래 링크를 여세요 — 권한과 IP 화이트리스트를 확인하고 MFA로 승인하세요:",
+  "Waiting for key registration — finish it at the developers portal and setup completes automatically.": "키 등록 대기중 - 코빗 개발자센터에서 키 등록을 마치면 자동으로 설정이 완료됩니다.",
   "Warning: the health check found %d blocking issue(s) above. Setup completed, but fix these before trading, then re-check with `%s`.": "경고: 위 상태 점검에서 문제 %d건이 발견되었습니다. 설정은 완료되었지만 거래 전에 이를 해결한 뒤 `%s` 로 다시 확인하세요.",
-  "Watching for your registered key — it'll bind automatically when you finish.": "등록한 키를 기다리는 중 — 완료하면 자동으로 바인딩됩니다.",
   "Your terminal is too small to show the QR code (it needs about %d×%d; this window is %d×%d).": "터미널이 너무 작아 QR 코드를 표시할 수 없습니다 (약 %d×%d 필요; 현재 창은 %d×%d).",
   "^Y copy link · Enter/Esc/^R to close": "^Y 링크 복사 · Enter/Esc/^R 닫기",
   "could not verify the key id (%s) — check connectivity and retry, or press Ctrl-C and bind with `%s`": "키 ID를 확인할 수 없습니다 (%s) — 연결을 확인하고 다시 시도하거나, Ctrl-C를 누른 뒤 `%s` 로 바인딩하세요",
@@ -57,5 +58,7 @@
   "read + orders + deposit/withdrawal": "조회 + 주문 + 입출금",
   "read + orders for trading, not withdrawal": "거래용 조회 + 주문 (출금 제외)",
   "that looks like a sandbox key id — setup does not create sandbox keys": "샌드박스 키 ID로 보입니다 — setup은 샌드박스 키를 생성하지 않습니다",
+  "that looks like your public key, not the issued key id — paste the key id the portal gave you": "발급된 키 ID가 아니라 공개 키로 보입니다 — 포털에서 발급한 키 ID를 붙여넣으세요",
+  "that's your private key — never paste private key material; paste the key id the portal issued instead": "개인 키입니다 — 개인 키는 절대 붙여넣지 말고, 포털에서 발급한 키 ID를 붙여넣으세요",
   "✓ Link copied to clipboard": "✓ 링크를 클립보드에 복사했습니다"
 }

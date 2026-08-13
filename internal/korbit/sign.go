@@ -5,6 +5,7 @@
 package korbit
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"crypto/hmac"
 	"crypto/rand"
@@ -13,6 +14,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/pem"
+	"strings"
 
 	"github.com/korbit-official/korbit-cli/internal/output"
 )
@@ -96,6 +98,76 @@ func PublicSPKIBase64URL(publicPEM string) (string, error) {
 	}
 	return base64.RawURLEncoding.EncodeToString(block.Bytes), nil
 }
+
+// ed25519SPKIPrefix is the fixed 12-byte ASN.1 DER header of the X.509
+// SubjectPublicKeyInfo that wraps an Ed25519 public key (RFC 8410): the
+// AlgorithmIdentifier for id-Ed25519 (OID 1.3.101.112) then the 32-byte key
+// BIT STRING. A complete Ed25519 SPKI is therefore exactly 44 bytes.
+var ed25519SPKIPrefix = []byte{0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00}
+
+// ed25519PKCS8Prefix is the fixed 16-byte ASN.1 DER header of the PKCS#8
+// PrivateKeyInfo that wraps an Ed25519 private key (RFC 8410): version 0, the
+// id-Ed25519 AlgorithmIdentifier, then the 32-byte seed as an OCTET STRING inside
+// an OCTET STRING. A complete Ed25519 PKCS#8 key is therefore exactly 48 bytes.
+var ed25519PKCS8Prefix = []byte{0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20}
+
+func isEd25519SPKI(der []byte) bool {
+	return len(der) == len(ed25519SPKIPrefix)+ed25519.PublicKeySize &&
+		bytes.Equal(der[:len(ed25519SPKIPrefix)], ed25519SPKIPrefix)
+}
+
+func isEd25519PKCS8(der []byte) bool {
+	return len(der) == len(ed25519PKCS8Prefix)+ed25519.SeedSize &&
+		bytes.Equal(der[:len(ed25519PKCS8Prefix)], ed25519PKCS8Prefix)
+}
+
+// derFromKeyMaterial decodes s as a PEM block or as the bare base64 body of a DER
+// blob — either alphabet (standard or URL-safe), padded or not, embedded
+// whitespace/newlines tolerated — and returns the raw DER, or nil if s is not
+// decodable as key material. The alphabets only disagree on the special
+// characters (+/ vs -_), and a given special character is accepted by exactly one
+// of them, so the first successful decode is the intended bytes.
+func derFromKeyMaterial(s string) []byte {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	if block, _ := pem.Decode([]byte(s)); block != nil {
+		return block.Bytes
+	}
+	compact := strings.Map(func(r rune) rune {
+		switch r {
+		case ' ', '\t', '\n', '\r':
+			return -1
+		}
+		return r
+	}, s)
+	for _, enc := range []*base64.Encoding{
+		base64.StdEncoding, base64.RawStdEncoding,
+		base64.URLEncoding, base64.RawURLEncoding,
+	} {
+		if der, err := enc.DecodeString(compact); err == nil {
+			return der
+		}
+	}
+	return nil
+}
+
+// LooksLikeEd25519PublicKey reports whether s is, or encodes, an Ed25519 public
+// key rather than an opaque identifier. It recognizes a PUBLIC KEY PEM block and
+// the bare base64 body of an Ed25519 SPKI DER (see derFromKeyMaterial for the
+// accepted encodings). It exists so a key-binding path can reject a public key
+// pasted where the portal-issued api-key id belongs — the two are easy to
+// confuse because the CLI prints the public key right beside the registration
+// step.
+func LooksLikeEd25519PublicKey(s string) bool { return isEd25519SPKI(derFromKeyMaterial(s)) }
+
+// LooksLikeEd25519PrivateKey reports whether s is, or encodes, an Ed25519 private
+// key (a PRIVATE KEY PEM block or the bare base64 body of its PKCS#8 DER). It
+// lets a key-binding path reject private key material pasted where an api-key id
+// belongs — a worse mistake than a public key, since it would write a secret into
+// non-secret metadata.
+func LooksLikeEd25519PrivateKey(s string) bool { return isEd25519PKCS8(derFromKeyMaterial(s)) }
 
 // SignParams signs the exact encoded parameter string (with `signature`
 // excluded) and returns the base64 signature to append last. Korbit verifies

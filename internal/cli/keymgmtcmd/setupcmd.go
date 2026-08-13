@@ -17,6 +17,7 @@ import (
 	"github.com/korbit-official/korbit-cli/internal/cli/probe"
 	"github.com/korbit-official/korbit-cli/internal/i18n"
 	"github.com/korbit-official/korbit-cli/internal/keys"
+	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/output"
 	"github.com/korbit-official/korbit-cli/internal/progname"
 )
@@ -488,6 +489,10 @@ func awaitingInteractive(ctx KeyContext, name, publicPEM, headline string, emitA
 			return nil, false, errors.New(i18n.T("enter the issued key id"))
 		case strings.HasPrefix(token, keys.SandboxAPIKeyPrefix):
 			return nil, false, errors.New(i18n.T("that looks like a sandbox key id — setup does not create sandbox keys"))
+		case korbit.LooksLikeEd25519PrivateKey(token):
+			return nil, false, errors.New(i18n.T("that's your private key — never paste private key material; paste the key id the portal issued instead"))
+		case korbit.LooksLikeEd25519PublicKey(token):
+			return nil, false, errors.New(i18n.T("that looks like your public key, not the issued key id — paste the key id the portal gave you"))
 		}
 		// Validate the candidate id with a signed whoami BEFORE persisting it, so an
 		// id the server rejects (KEY_NOT_FOUND, signature mismatch) is never written
@@ -633,7 +638,7 @@ func verifyError(err error) error {
 func interactiveIntro(headline, publicPEM, link string, steps []string) []string {
 	lines := []string{"", headline, ""}
 	if link != "" {
-		return append(lines, i18n.T("To register this key, open the link below — review the permissions and IP allowlist, confirm with MFA, then paste the issued key id here:"))
+		return append(lines, i18n.T("To register this key, open the link below — review the permissions and IP allowlist, then confirm with MFA:"))
 	}
 	if len(steps) > 0 {
 		lines = append(lines, steps[0])

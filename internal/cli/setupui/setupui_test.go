@@ -274,6 +274,173 @@ func TestClaimStatusRendersWhileClaiming(t *testing.T) {
 	}
 }
 
+// TestWaitingLeadsWhileClaiming: with auto-claim live, the waiting line is the
+// primary call to action (rendered above the field), the key-id field is demoted
+// to the dim fallback label, and the bold "paste this" prompt is NOT shown — so
+// the user sees that waiting is the default and pasting the fallback.
+func TestWaitingLeadsWhileClaiming(t *testing.T) {
+	m := newModel(Config{Prompt: "Paste the issued API key id"})
+	m.claiming = true
+	m.input.SetValue("TESTID")
+	v := withSize(m, 200, 40).View().Content // wide, so the waiting line stays one row
+	const (
+		waiting  = "Waiting for key registration"
+		fallback = "Rather enter it yourself?"
+	)
+	if !strings.Contains(v, waiting) {
+		t.Fatalf("expected the waiting line in the view, got:\n%s", v)
+	}
+	if !strings.Contains(v, fallback) {
+		t.Fatalf("expected the demoted paste fallback label, got:\n%s", v)
+	}
+	if strings.Contains(v, "Paste the issued API key id") {
+		t.Fatal("the bold paste prompt must be replaced by the fallback label while claiming")
+	}
+	// The waiting line leads: it precedes the fallback label, which precedes the field.
+	iw, ifb, iin := strings.Index(v, waiting), strings.Index(v, fallback), strings.Index(v, "TESTID")
+	if !(iw >= 0 && iw < ifb && ifb < iin) {
+		t.Fatalf("expected waiting < fallback < input order, got %d, %d, %d", iw, ifb, iin)
+	}
+}
+
+// TestPastePrimaryWhenNotClaiming: with no auto-claim poll, the screen keeps the
+// paste-primary framing — the bold prompt, no waiting line, no fallback label.
+func TestPastePrimaryWhenNotClaiming(t *testing.T) {
+	v := withSize(newModel(Config{Prompt: "Paste the issued API key id"}), 200, 40).View().Content
+	if !strings.Contains(v, "Paste the issued API key id") {
+		t.Fatal("with no auto-claim, the bold paste prompt must be shown")
+	}
+	if strings.Contains(v, "Rather enter it yourself?") || strings.Contains(v, "Waiting for key registration") {
+		t.Fatal("no waiting/fallback framing when not claiming")
+	}
+}
+
+// TestStoppedClaimRevertsToPastePrompt: once the poll STOPS (conflict/hard error)
+// the "just wait" path is dead, so the view reverts to the bold paste prompt —
+// pasting is now the only way forward — and keeps the stop notice visible.
+func TestStoppedClaimRevertsToPastePrompt(t *testing.T) {
+	m := newModel(Config{Prompt: "Paste the issued API key id"})
+	// The Stop handler clears claiming and sets a sticky status; mirror that state.
+	m.claiming = false
+	m.status = "collision — paste it"
+	v := withSize(m, 200, 40).View().Content
+	if !strings.Contains(v, "Paste the issued API key id") {
+		t.Fatal("after a stop, the bold paste prompt must return")
+	}
+	if !strings.Contains(v, "collision — paste it") {
+		t.Fatal("the stop notice must stay visible")
+	}
+	if strings.Contains(v, "Rather enter it yourself?") || strings.Contains(v, "Waiting for key registration") {
+		t.Fatal("no waiting/fallback framing after the poll stops")
+	}
+}
+
+// TestWaitingLineIsAccentStyled: the waiting line must render with the accent
+// style (bold+green), not the dim hint tier. The presence/ordering assertions
+// above would still pass if it were swapped back to the dim tier, so this pins the
+// styling itself as the invariant.
+func TestWaitingLineIsAccentStyled(t *testing.T) {
+	const sentinel = "SENTINEL_STATUS"
+	if waitStyle.Render(sentinel) == sentinel {
+		t.Skip("terminal color disabled in this environment; styling not observable")
+	}
+	m := newModel(Config{Prompt: "Paste the issued API key id"})
+	m.claiming = true
+	m.status = sentinel // a custom status, so the assertion isn't coupled to the shipped copy
+	v := withSize(m, 200, 40).View().Content
+	if !strings.Contains(v, waitStyle.Render(sentinel)) {
+		t.Fatalf("waiting line must be accent-styled (bold+green); view:\n%s", v)
+	}
+	if strings.Contains(v, hintStyle.Render(sentinel)) {
+		t.Fatal("waiting line must not use the dim hint style")
+	}
+}
+
+// TestWaitingWrapsAndIsNotClipped: a long auto-claim status wraps to width with a
+// hanging indent under the spinner gutter, no visible line exceeds width, and the
+// whole message survives the wrap — so it never clips on a narrow terminal.
+func TestWaitingWrapsAndIsNotClipped(t *testing.T) {
+	const width = 30
+	const msg = "Waiting for key registration — finish it at the developers portal and setup completes automatically."
+	block := renderWaiting("⠋", msg, width)
+	lines := strings.Split(block, "\n")
+	if len(lines) < 2 {
+		t.Fatalf("a long status must wrap at width %d, got %d line(s)", width, len(lines))
+	}
+	for _, ln := range lines {
+		if w := ansi.StringWidth(ansi.Strip(ln)); w > width {
+			t.Fatalf("wrapped line exceeds width %d (=%d): %q", width, w, ansi.Strip(ln))
+		}
+	}
+	// Continuation lines hang-indent by exactly the two-cell spinner gutter (not 0,
+	// not more), so wrapped text aligns under the first line's content rather than
+	// under the spinner; the first line carries the spinner glyph.
+	for i, ln := range lines {
+		s := ansi.Strip(ln)
+		if i == 0 {
+			if !strings.HasPrefix(s, "⠋ ") {
+				t.Fatalf("first line must start with the spinner gutter, got %q", s)
+			}
+			continue
+		}
+		if !strings.HasPrefix(s, "  ") || strings.HasPrefix(s, "   ") {
+			t.Fatalf("continuation line must indent by exactly two spaces, got %q", s)
+		}
+	}
+	// Strip the styling, collapse the gutter/indent whitespace, and drop the spinner:
+	// the words must reconstruct the original message exactly.
+	got := strings.TrimPrefix(strings.Join(strings.Fields(ansi.Strip(block)), " "), "⠋ ")
+	if got != msg {
+		t.Fatalf("wrapped status must reconstruct:\n got %q\nwant %q", got, msg)
+	}
+}
+
+// TestFailedPasteWhileClaimingShowsBoth: a paste that fails (submitResultMsg err)
+// returns to the prompt while the poll is still live, so the view coherently shows
+// BOTH the accent waiting line and the red retry error — neither path is dropped.
+func TestFailedPasteWhileClaimingShowsBoth(t *testing.T) {
+	m := newModel(Config{Prompt: "Paste the issued API key id"})
+	m.claiming = true
+	mm, _ := m.Update(submitResultMsg{err: errors.New("bad key id")})
+	got := mm.(model)
+	if got.phase != phaseInput {
+		t.Fatalf("a failed submit must return to the input phase, got %v", got.phase)
+	}
+	if !got.claiming {
+		t.Fatal("the background poll must stay live after a failed paste")
+	}
+	v := withSize(got, 200, 40).View().Content
+	if !strings.Contains(v, "Rather enter it yourself?") {
+		t.Fatal("the waiting/fallback framing must remain while claiming")
+	}
+	if !strings.Contains(v, "bad key id") {
+		t.Fatal("the retry error must be shown")
+	}
+}
+
+// TestClaimReserveRows: the inline-QR height reserve for the auto-claim waiting
+// block is rows(block) − 2 — the block supplants the prompt row AND the sticky-
+// status row that inputChrome already budgets, so only rows beyond those two are
+// extra. An empty block (not claiming) reserves nothing. Reserving the full block
+// height instead would hide the QR one row too early.
+func TestClaimReserveRows(t *testing.T) {
+	cases := []struct {
+		name  string
+		block string // hand-counted rows: an "⠋ …" waiting line, a blank, then the label
+		want  int
+	}{
+		{"empty / not claiming", "", 0},
+		{"one-row waiting (3 rows)", "⠋ status\n\nlabel", 1},
+		{"two-row waiting (4 rows)", "⠋ status line one\n  line two\n\nlabel", 2},
+		{"three-row waiting (5 rows)", "⠋ one\n  two\n  three\n\nlabel", 3},
+	}
+	for _, tc := range cases {
+		if got := claimReserveRows(tc.block); got != tc.want {
+			t.Errorf("%s: claimReserveRows = %d, want %d", tc.name, got, tc.want)
+		}
+	}
+}
+
 // inputModel returns a sized, link-carrying model in the input phase — the state in
 // which the link block, copy, and QR shortcuts are live.
 func inputModel() model {

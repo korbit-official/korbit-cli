@@ -19,6 +19,7 @@ import (
 
 	"github.com/korbit-official/korbit-cli/internal/keystore"
 	"github.com/korbit-official/korbit-cli/internal/keystore/keystoretest"
+	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/output"
 )
 
@@ -299,6 +300,62 @@ func TestResolveRequiresBindingAndKey(t *testing.T) {
 	}
 	if got.Type != TypeEd25519 || got.Keystore != "file" {
 		t.Fatalf("resolved should carry type/keystore: %+v", got)
+	}
+}
+
+// TestBindRejectsPublicKey reproduces the field bug where a user, at the
+// registration step, pastes the key's own public key into --api-key instead of
+// the id the portal issues. That value is not a valid api-key id and every
+// signed call would fail with KEY_NOT_FOUND, so the bind must be refused up
+// front, whichever encoding was pasted.
+func TestBindRejectsPublicKey(t *testing.T) {
+	m := newManager(t)
+	if _, err := m.Add("a", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	show, err := m.Show("a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	block, _ := pem.Decode([]byte(show.PublicKey))
+	if block == nil {
+		t.Fatal("no public key PEM for the new key")
+	}
+	pasted := map[string]string{
+		"full PEM":  show.PublicKey,
+		"PEM body":  base64.StdEncoding.EncodeToString(block.Bytes),
+		"base64url": base64.RawURLEncoding.EncodeToString(block.Bytes),
+	}
+	for name, v := range pasted {
+		err := m.Bind("a", v)
+		if err == nil || !strings.Contains(err.Error(), "public key") {
+			t.Errorf("%s: expected bind to reject a pasted public key, got %v", name, err)
+		}
+	}
+
+	// The worse mistake: pasting a private key. Rejected with a secret-aware
+	// message that never echoes the pasted material.
+	kp, err := korbit.GenerateKeypair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	privBlock, _ := pem.Decode([]byte(kp.PrivatePEM))
+	for name, v := range map[string]string{
+		"full PEM":    kp.PrivatePEM,
+		"PKCS#8 body": base64.StdEncoding.EncodeToString(privBlock.Bytes),
+	} {
+		err := m.Bind("a", v)
+		if err == nil || !strings.Contains(err.Error(), "PRIVATE key") {
+			t.Errorf("%s: expected bind to reject a pasted private key, got %v", name, err)
+		}
+		if err != nil && strings.Contains(err.Error(), v) {
+			t.Errorf("%s: error must not echo the pasted private key material", name)
+		}
+	}
+
+	// A real id still binds.
+	if err := m.Bind("a", "KEYID-1"); err != nil {
+		t.Fatalf("a genuine api-key id must still bind: %v", err)
 	}
 }
 
