@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Korbit Inc.
+// Copyright (c) 2026 Digital X Co., Ltd.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -61,7 +61,7 @@ func (rt *runtime) runLicense(cmd *cobra.Command, args []string) error {
 		return output.Usagef("unexpected argument %q", args[0])
 	}
 	return rt.Emit("license", licenseView{
-		Copyright:         "Copyright (c) 2026 Korbit Inc.",
+		Copyright:         "Copyright (c) 2026 Digital X Co., Ltd.",
 		License:           "Apache License, Version 2.0",
 		SpdxId:            "Apache-2.0",
 		LicenseUrl:        licenseURL,

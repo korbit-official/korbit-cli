@@ -129,10 +129,10 @@ korbit sandbox stop
 
 ## 라이선스
 
-Copyright © 2026 Korbit Inc.
+Copyright © 2026 Digital X Co., Ltd.
 
 Apache License, Version 2.0(`SPDX-License-Identifier: Apache-2.0`)에 따라 배포됩니다. 전문은 [`LICENSE`](LICENSE)를 참고하세요.
 
 **면책 조항** — 본 도구를 사용하기 전에 [`DISCLAIMER.ko.md`](DISCLAIMER.ko.md)를 읽어주세요.
 
-로컬 샌드박스 번들(`korbit sandbox …`)은 이 라이선스의 적용을 받지 **않습니다** — 코빗의 독점 소프트웨어로 별도의 약관이 적용됩니다. CLI는 공식 출처(Official Source)에서만 내려받아 실행하며, 약관은 `korbit sandbox license`로 확인할 수 있습니다.
+로컬 샌드박스 번들(`korbit sandbox …`)은 이 라이선스의 적용을 받지 **않습니다** — 디지털엑스 주식회사의 독점 소프트웨어로 별도의 약관이 적용됩니다. CLI는 공식 출처(Official Source)에서만 내려받아 실행하며, 약관은 `korbit sandbox license`로 확인할 수 있습니다.

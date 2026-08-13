@@ -116,7 +116,7 @@ korbit sandbox stop
 
 Add `--paper --fresh` to `sandbox start` for **paper trading**: market data is mirrored live from production Korbit while fills stay simulated — real prices, no real money. By default only the bundle's built-in fixture pairs are seeded; add `--all-pairs` (`korbit sandbox start --paper --all-pairs --fresh`) to seed **every launched production pair** from a live snapshot, so the sandbox carries production's tradable pair set. The first such start takes a few seconds longer; the snapshot is then cached beside the database, so repeated starts (including `--fresh`) reseed in well under a second. `--fresh` recreates the disposable sandbox database, which is also how you switch back; to **restart** an existing paper sandbox keeping its balances and orders, run `korbit sandbox start --paper` without `--fresh` (`korbit sandbox start --help` has the detail).
 
-The sandbox bundle is separately licensed (Korbit's own software) — `korbit sandbox license` prints the terms; use it for local development and testing only.
+The sandbox bundle is separately licensed (software of Digital X Co., Ltd.) — `korbit sandbox license` prints the terms; use it for local development and testing only.
 
 ## Safety
 
@@ -130,10 +130,10 @@ You can add multiple keys; select one per command with `--key` (or set a default
 
 ## License
 
-Copyright © 2026 Korbit Inc.
+Copyright © 2026 Digital X Co., Ltd.
 
 Licensed under the Apache License, Version 2.0 (`SPDX-License-Identifier: Apache-2.0`). See [`LICENSE`](LICENSE) for the full text.
 
 **Disclaimer** — read [`DISCLAIMER.md`](DISCLAIMER.md) before using this tool.
 
-The local sandbox bundle (`korbit sandbox …`) is **not** covered by this license — it is Korbit's proprietary software under its own separate terms. The CLI only downloads and runs it from the Official Source; read its terms with `korbit sandbox license`.
+The local sandbox bundle (`korbit sandbox …`) is **not** covered by this license — it is proprietary software of Digital X Co., Ltd. under its own separate terms. The CLI only downloads and runs it from the Official Source; read its terms with `korbit sandbox license`.

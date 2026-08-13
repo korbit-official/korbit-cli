@@ -455,7 +455,7 @@ its symbols across `sandbox/sandbox.go`, `lifecycle.go`, `runtime.go`,
 `cache.go`, and `sandbox/deno/deno.go`. The sandbox-key safety predicates
 (`IsSandbox`/`SandboxAPIKeyPrefix`/`AssertSandboxKeyName`/`SandboxNameToken`,
 loopback-only, never-write-`config.json`) live in `keys/keys.go`. **License
-conformance:** the bundle is **separately licensed** (Korbit proprietary, not
+conformance:** the bundle is **separately licensed** (Digital X Co., Ltd. proprietary, not
 covered by this CLI's open-source license) — the CLI keeps use conformant by
 fetching only from the Official Source, binding loopback-only, and never
 redistributing it. Carry a pointer, never the license body; `sandbox license`

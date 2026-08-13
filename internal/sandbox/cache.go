@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Korbit Inc.
+// Copyright (c) 2026 Digital X Co., Ltd.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -85,7 +85,7 @@ The sandbox runs under Deno, which fetches the bundle from the Official Source
 - ` + "`deno-modules/`" + ` — Deno's own cache of the bundle (` + "`korbit-sandbox.mjs`" + `) and
   any dependencies.
 
-Terms: the bundle (korbit-sandbox.mjs) is Korbit's proprietary software under its
+Terms: the bundle (korbit-sandbox.mjs) is proprietary software of Digital X Co., Ltd. under its
 OWN terms — it is NOT covered by korbit-cli's open-source license. Read those
 terms with ` + "`korbit sandbox license`" + `, obtain the bundle only from the
 Official Source, and keep use conformant (local development and testing only).

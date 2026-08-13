@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright (c) 2026 Korbit Inc.
+# Copyright (c) 2026 Digital X Co., Ltd.
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -101,7 +101,7 @@ cat >"$stage/manifest.json" <<EOF
   "version": "$version",
   "description": "Operate the Korbit cryptocurrency exchange over MCP — every REST endpoint as a tool, with the same validation, signing, journaling, and retries as the CLI.",
   "long_description": "Exposes the Korbit Open API v2 as MCP tools backed by the korbit binary running locally on your machine, so your API keys never leave it. Read market data, manage orders, and check balances; the order-placement tool supports a dry-run that simulates the fill against the live order book before anything is sent. First-time users with no key yet can complete setup entirely in chat via the setup and doctor tools.",
-  "author": { "name": "Korbit Inc.", "url": "https://www.korbit.co.kr" },
+  "author": { "name": "Digital X Co., Ltd.", "url": "https://www.korbit.co.kr" },
   "homepage": "https://developers.korbit.co.kr/",
   "documentation": "https://developers.korbit.co.kr/",
   "repository": { "type": "git", "url": "https://github.com/korbit-official/korbit-cli.git" },

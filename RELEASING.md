@@ -1,5 +1,5 @@
 <!--
-Copyright (c) 2026 Korbit Inc.
+Copyright (c) 2026 Digital X Co., Ltd.
 SPDX-License-Identifier: Apache-2.0
 -->
 

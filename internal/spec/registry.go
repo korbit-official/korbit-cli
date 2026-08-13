@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Korbit Inc.
+// Copyright (c) 2026 Digital X Co., Ltd.
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -566,7 +566,7 @@ var Registry = []Command{
 		ID: []string{"sandbox", "license"}, Section: cmdmeta.SectionMeta,
 		Summary: "show the sandbox's own license / terms of use",
 		Notes: []string{
-			"The Korbit API Sandbox is separately licensed: it is Korbit's proprietary software under its own terms, NOT covered by korbit-cli's open-source license. This prints those terms straight from the bundle (a shortcut for `sandbox exec license`). korbit-cli only fetches and runs the bundle from the Official Source for local development and testing — any fork or downstream use must keep that use conformant.",
+			"The Korbit API Sandbox is separately licensed: it is proprietary software of Digital X Co., Ltd. under its own terms, NOT covered by korbit-cli's open-source license. This prints those terms straight from the bundle (a shortcut for `sandbox exec license`). korbit-cli only fetches and runs the bundle from the Official Source for local development and testing — any fork or downstream use must keep that use conformant.",
 			"The global --lang selects the language when the bundle offers the terms in more than one; with none it follows your locale.",
 		},
 		Examples: []string{"{prog} sandbox license", "{prog} sandbox license --lang ko"},

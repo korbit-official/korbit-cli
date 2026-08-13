@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright (c) 2026 Korbit Inc.
+# Copyright (c) 2026 Digital X Co., Ltd.
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -55,7 +55,7 @@ digest_for() { # asset-name -> bare sha256 hex (empty if missing)
 
 tmp="$(mktemp)"
 {
-	echo "// Copyright (c) 2026 Korbit Inc."
+	echo "// Copyright (c) 2026 Digital X Co., Ltd."
 	echo "//"
 	echo "// SPDX-License-Identifier: Apache-2.0"
 	echo
