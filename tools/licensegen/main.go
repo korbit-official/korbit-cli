@@ -26,6 +26,10 @@
 // so a module that carries extra per-directory notices (e.g. a vendored
 // third-party license inside one subpackage) contributes all of them exactly
 // once.
+//
+// The listing runs once per release target and the results are unioned — see
+// releaseTargets and listPackages — because build constraints make the linked
+// dependency set platform-specific.
 package main
 
 import (
@@ -49,6 +53,28 @@ const mainModule = "github.com/korbit-official/korbit-cli"
 // repo root so it is easy to include in release archives and to link to in the
 // source repository.
 const defaultOut = "THIRD_PARTY_LICENSES.txt"
+
+// target is one platform the release builds a binary for.
+type target struct{ goos, goarch string }
+
+func (t target) String() string { return t.goos + "/" + t.goarch }
+
+// releaseTargets is the platform matrix the release ships binaries for, and so
+// the set of build configurations whose linked dependencies must be credited.
+// `go list` resolves build constraints for one platform at a time, so listing
+// only the host's dependencies would omit whole modules from the other
+// platforms' binaries — most visibly the Linux and Windows keyring backends,
+// which a darwin-only listing never sees.
+//
+// Keep in sync with the `builds` matrix in .goreleaser.yaml; pinned by
+// TestReleaseTargetsMatchGoreleaser.
+var releaseTargets = []target{
+	{"darwin", "arm64"},
+	{"linux", "amd64"},
+	{"linux", "arm64"},
+	{"windows", "amd64"},
+	{"windows", "arm64"},
+}
 
 // licenseStem matches the name (with any extension removed) of a file that
 // carries a license, copyright, or notice: LICENSE, LICENCE, COPYING,
@@ -189,7 +215,8 @@ func run(out string) error {
 	if err := os.WriteFile(out, buf.Bytes(), 0o644); err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stderr, "licensegen: wrote %s (%d modules, %d license texts)\n", out, len(collected), len(groups))
+	fmt.Fprintf(os.Stderr, "licensegen: wrote %s (%d modules, %d license texts, %d release targets)\n",
+		out, len(collected), len(groups), len(releaseTargets))
 	return nil
 }
 
@@ -292,15 +319,43 @@ type pkg struct {
 	dir, modPath, modVersion, modDir string
 }
 
-// listPackages runs `go list -deps` on the main package and returns one entry
-// per non-standard-library package linked into it.
+// listPackages returns one entry per non-standard-library package linked into
+// the binary on *any* release target, de-duplicated by package directory.
+//
+// The union is deliberate: one notices file ships in every archive, so it has to
+// cover every platform. Crediting a module a given binary does not link is
+// harmless; omitting one it does link is a license violation.
 func listPackages() ([]pkg, error) {
+	var pkgs []pkg
+	seen := map[string]bool{}
+	for _, t := range releaseTargets {
+		found, err := listPackagesFor(t)
+		if err != nil {
+			return nil, err
+		}
+		for _, p := range found {
+			if seen[p.dir] {
+				continue
+			}
+			seen[p.dir] = true
+			pkgs = append(pkgs, p)
+		}
+	}
+	return pkgs, nil
+}
+
+// listPackagesFor runs `go list -deps` on the main package for one target and
+// returns its non-standard-library packages.
+func listPackagesFor(t target) ([]pkg, error) {
 	const tmpl = `{{if not .Standard}}{{if .Module}}{{.Dir}}::{{.Module.Path}}::{{.Module.Version}}::{{.Module.Dir}}{{end}}{{end}}`
 	cmd := exec.Command("go", "list", "-deps", "-f", tmpl, mainModule)
+	// CGO_ENABLED=0 is what the release builds with (.goreleaser.yaml), and
+	// pinning it here also keeps the output independent of the host toolchain.
+	cmd.Env = append(os.Environ(), "GOOS="+t.goos, "GOARCH="+t.goarch, "CGO_ENABLED=0")
 	cmd.Stderr = os.Stderr
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("go list: %w", err)
+		return nil, fmt.Errorf("go list (%s): %w", t, err)
 	}
 	var pkgs []pkg
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
@@ -309,7 +364,7 @@ func listPackages() ([]pkg, error) {
 		}
 		parts := strings.Split(line, "::")
 		if len(parts) != 4 {
-			return nil, fmt.Errorf("unexpected go list line: %q", line)
+			return nil, fmt.Errorf("unexpected go list line (%s): %q", t, line)
 		}
 		pkgs = append(pkgs, pkg{dir: parts[0], modPath: parts[1], modVersion: parts[2], modDir: parts[3]})
 	}
