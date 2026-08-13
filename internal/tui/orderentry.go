@@ -57,6 +57,20 @@ func (d orderDraft) usesAmt() bool   { return d.typ == "market" && d.side == "bu
 // selects among tifOptions, a market order is ioc-only (fixed by tif).
 func (d orderDraft) tifCyclable() bool { return d.typ != "market" }
 
+// canRest reports whether the draft would REST on the book as a maker instead of
+// taking from it: a limit order whose time-in-force lets it sit. A market order
+// always takes, and an ioc/fok limit is canceled unfilled rather than resting.
+// This is the one definition of that rule, read by the placement gate
+// (fillSideRefusal) to decide which orders an empty fill side refuses.
+//
+// It is a property of the DRAFT, so it says only what the tif allows, never what
+// the book does. The preview's fee estimate needs the latter and reads the
+// simulation's own outcome instead (see feeEstimate).
+func (d orderDraft) canRest() bool {
+	tif := d.tif()
+	return d.typ == "limit" && tif != "ioc" && tif != "fok"
+}
+
 // notionalIsEstimate reports whether the order's quote-currency notional is valued against
 // the live book rather than fixed by the frozen wire fields — true only for a
 // market sell, whose notional is qty × best bid and so moves with the market. A
@@ -224,23 +238,26 @@ type TickPolicy struct {
 // display-ready derived figures. Rebuilt whenever the draft or the book
 // changes; strings stay wire strings (rendering formats them).
 type orderPreview struct {
-	OK  bool   // the draft was previewable (see buildPreview for the three cases)
+	OK  bool   // the draft was previewable (see buildPreview for the two cases)
 	Err string // why not, when !OK
 
-	// Sim is the full book simulation — the ZERO VALUE on the empty-book path,
-	// which has no depth to simulate. Read it only through fields whose zero is
-	// meaningful (Marketable false, Mid ""), never as proof a simulation ran.
+	// Sim is the book simulation — the zero value only when !OK (nothing was
+	// analyzed). Otherwise it is ops.AnalyzePlace's own answer for this book,
+	// whatever shape it had: a side with no resting orders yields an EMPTY
+	// reference price (BestBid/BestAsk/Mid), never a fabricated "0", so read
+	// those for presence before deriving anything from them.
 	Sim ops.PlaceSimulation
-	// Warnings are the analysis warnings. On the empty-book path only the
-	// order-value bound warnings can be raised (the rest need depth).
+	// Warnings are the analysis warnings — book-independent ones (the order-value
+	// bounds, tick alignment) on any book, the depth-derived ones where there is
+	// depth to derive them from.
 	Warnings []ops.PlaceWarning
 
 	Notional   string // estimated notional in QuoteCcy ("" when the size is not set yet)
 	PctFromMid string // a limit price's signed distance from mid, e.g. "-0.02%"
 	TickSize   string // tick size at the draft price ("" when unknown / not limit)
-	FeeEst     string // estimated fee in quote terms ("" when rates unknown)
+	FeeEst     string // estimated fee in quote terms ("" when the rates are unknown, or the order would pay no fee)
 	FeeRate    string // the rate fraction used for FeeEst
-	FeeKind    string // "taker" | "maker"
+	FeeKind    string // "taker" | "maker"; "" alongside an empty FeeEst
 
 	BaseCcy    string
 	QuoteCcy   string
@@ -248,13 +265,17 @@ type orderPreview struct {
 	AvailQuote string // available quote balance ("" when unknown)
 }
 
-// buildPreview computes the preview for a draft against the live inputs. Three
-// outcomes, keyed on the book's status: a NOT-READY book (or an analysis error)
-// yields OK=false with the reason; a live-but-EMPTY book takes the
-// emptyBookPreview path, which values the order directly and leaves Sim zero;
-// a live book runs the full ops.AnalyzePlace. Missing bands/bounds/fees/
-// balances just leave their derived fields empty or their checks unrun (each is
-// optional and best-effort).
+// buildPreview computes the preview for a draft against the live inputs. Two
+// outcomes, keyed on the book's status: a NOT-READY book (still loading, or
+// mid-switch) yields OK=false with the reason, because its figures are not
+// something the store stands behind; every LIVE book — two-sided, one-sided, or
+// wholly orderless — runs the full ops.AnalyzePlace. That analysis handles each
+// shape itself, gating each check on the price it needs and reporting an absent
+// one as EMPTY rather than zero, so there is exactly ONE implementation of the
+// money math behind the panel, the ladder and the command bar — the same one
+// `order place --dry-run` prints. Missing bands/bounds/fees/balances just leave
+// their derived fields empty or their checks unrun (each is optional and
+// best-effort).
 func buildPreview(d orderDraft, book state.Orderbook, bookStatus state.DataStatus, bals []state.Balance, bands []ops.TickBand, bounds ops.OrderValueBounds, fees *FeeRates) orderPreview {
 	base, quote := splitSymbol(d.symbol)
 	p := orderPreview{
@@ -262,22 +283,12 @@ func buildPreview(d orderDraft, book state.Orderbook, bookStatus state.DataStatu
 		AvailBase:  availableOf(bals, base),
 		AvailQuote: availableOf(bals, quote),
 	}
-	switch bookStatus {
-	case state.StatusNotReady:
+	if bookStatus == state.StatusNotReady {
 		// The book is still loading (or mid-switch) — the numbers can't be trusted.
 		p.Err = i18n.T("waiting for a live orderbook")
 		return p
-	case state.StatusEmpty:
-		// The book is live but has no resting orders (a newly listed pair). There
-		// is nothing to sweep or measure a mid against, so preview a resting limit
-		// directly (it would be the first maker) and refuse what can't rest.
-		return emptyBookPreview(d, p, bands, bounds, fees)
 	}
-	sim, ws, err := ops.AnalyzePlace(d.values(), opsLevels(book.Bids), opsLevels(book.Asks), bands, bounds)
-	if err != nil {
-		p.Err = err.Error()
-		return p
-	}
+	sim, ws := ops.AnalyzePlace(d.values(), opsLevels(book.Bids), opsLevels(book.Asks), bands, bounds)
 	p.OK = true
 	p.Sim = sim
 	p.Warnings = ws
@@ -289,86 +300,165 @@ func buildPreview(d orderDraft, book state.Orderbook, bookStatus state.DataStatu
 		}
 		p.PctFromMid = pctFromMid(d.price, sim.Mid)
 	}
-	if fees != nil && p.Notional != "" {
-		rate, kind := fees.MakerRate, "maker"
-		if sim.Marketable {
-			rate, kind = fees.TakerRate, "taker"
-		}
-		if est, ok := mulDec(p.Notional, rate); ok {
-			p.FeeEst = roundSigFigs(est, feeSigFigs).String()
-			p.FeeRate = rate
-			p.FeeKind = kind
-		}
-	}
+	p.FeeEst, p.FeeRate, p.FeeKind = feeEstimate(sim, p.Notional, fees)
 	return p
 }
 
-// emptyBookRefusal is the single rule for what may be placed on a live-but-empty
-// orderbook (StatusEmpty): only a limit order that can REST — gtc or po. A market
-// order has nothing to fill against, and an ioc/fok limit cannot rest, so the
-// server would accept it and immediately cancel it unfilled. Both the placement
-// gate (draftGate) and the preview (emptyBookPreview) apply this rule, so what
-// the preview refuses can never arm. "" = placeable (rests as the first maker).
-func emptyBookRefusal(d orderDraft) string {
-	if d.typ != "limit" {
-		return i18n.T("the orderbook is empty — a market order can't fill; place a limit order to rest as the first maker")
-	}
-	switch d.tif() {
-	case "ioc", "fok":
-		return i18n.T("the orderbook is empty — an ioc/fok limit can't fill and would cancel; use gtc or po to rest as the first maker")
-	}
-	return ""
-}
-
-// emptyBookPreview is the preview for a live-but-empty orderbook (a newly listed
-// pair with no resting orders). An order the empty-book rule refuses (a market
-// order, an ioc/fok limit — see emptyBookRefusal) carries the refusal as its
-// error; a gtc/po limit rests as the first maker, so its notional (price × qty)
-// and maker-fee estimate are previewed even though there is no book to sweep or
-// a mid to measure the price against. p already carries the currencies and
-// available balances.
+// feeEstimate resolves the fee the draft's SIMULATED OUTCOME would pay, and the
+// value that fee is charged on — which is NOT the same amount in both cases:
 //
-// The book-dependent checks AnalyzePlace runs (marketability, sweep/slippage,
-// post-only-would-cross) have no meaning without depth and are simply absent.
-// The order-value bounds do NOT depend on the book, so they ARE checked here,
-// through the same ops.NotionalBoundWarnings placement uses: a below-min order
-// is the one mistake an empty book makes MORE likely (a first maker sizing
-// small to test a new listing), and it renders as an error, so losing it would
-// be the costly omission.
-func emptyBookPreview(d orderDraft, p orderPreview, bands []ops.TickBand, bounds ops.OrderValueBounds, fees *FeeRates) orderPreview {
-	if reason := emptyBookRefusal(d); reason != "" {
-		p.Err = reason
-		return p
+//   - fills: the taker rate on the quote value that actually executes
+//     (sim.EstFilledQuote). Only the executing portion is charged a taker fee, so
+//     billing the whole request overstates the estimate on any partial fill — most
+//     visibly where the rest is definitively gone (a price-protected order that
+//     cancels its remainder, a market order that exhausts the book). The fallback
+//     to the full notional is unreachable in practice: this outcome is derived from
+//     a positive fill, which sets the executed value alongside it.
+//   - rests: the maker rate on the full notional — the whole order rests, and the
+//     maker fee on all of it is the meaningful forecast.
+//   - anything else: no estimate at all.
+//
+// So the figure means exactly "the fee on what this order executes now". A
+// partially crossing limit's resting remainder is deliberately NOT folded in: it
+// pays a maker fee only if it later fills, a contingent event this simulation does
+// not predict, and a single number blending a committed cost with a speculative one
+// is trustworthy as neither. The preview shows the estimated fill beside it, so
+// what the figure covers stays visible.
+//
+// All three returns are empty when there is nothing to charge, no rates loaded, or
+// no notional to charge against.
+//
+// The outcome token is the only sound signal here, and the two obvious substitutes
+// are both wrong on a money path. sim.Marketable says the order WOULD take
+// liquidity, which is equally true of a crossing post-only (rejected) and an
+// unfillable fill-or-kill (killed) — each executes nothing and is charged nothing,
+// so a taker fee on either invents a cost. And the draft's own canRest cannot see
+// the book: a limit that price protection cancels in full never reaches the book,
+// yet its tif says it would rest there. Anything that pays nothing gets no
+// estimate — including a market order, which must never be labelled a maker.
+func feeEstimate(sim ops.PlaceSimulation, notional string, fees *FeeRates) (est, rate, kind string) {
+	if fees == nil || notional == "" {
+		return "", "", ""
 	}
-	qty := d.wireQty()
-	if d.price == "" || qty == "" {
-		p.Err = i18n.T("no resting orders — set a limit price to rest as the first maker")
-		return p
-	}
-	p.OK = true
-	if notional, ok := mulDec(d.price, qty); ok {
-		// Rounded to the same 8 places ops renders its own notional at, so the two
-		// preview paths read alike whatever the pair's quote currency. The bound
-		// check takes the EXACT product, as AnalyzePlace does.
-		p.Notional = notional.Round(8).String()
-		p.Warnings = ops.NotionalBoundWarnings(notional.String(), bounds, p.QuoteCcy)
-	}
-	if tick, ok := ops.TickSizeAt(bands, d.price); ok {
-		p.TickSize = tick
-	}
-	// A resting limit is always a maker, so the estimate uses the maker rate.
-	if fees != nil && p.Notional != "" {
-		if est, ok := mulDec(p.Notional, fees.MakerRate); ok {
-			p.FeeEst = roundSigFigs(est, feeSigFigs).String()
-			p.FeeRate = fees.MakerRate
-			p.FeeKind = "maker"
+	charged := notional
+	switch sim.Outcome {
+	case ops.OutcomeFills:
+		rate, kind = fees.TakerRate, "taker"
+		if sim.EstFilledQuote != "" {
+			charged = sim.EstFilledQuote
 		}
+	case ops.OutcomeRests:
+		rate, kind = fees.MakerRate, "maker"
+	default:
+		return "", "", ""
 	}
-	return p
+	v, ok := mulDec(charged, rate)
+	if !ok {
+		return "", "", ""
+	}
+	return roundSigFigs(v, feeSigFigs).String(), rate, kind
+}
+
+// fillSideRefusal is the single rule for what the TUI refuses to place against a
+// LIVE book. It turns on the ONE side the draft depends on, not on the book as a
+// whole: an order that cannot rest needs resting orders on the side it would take
+// from (asks for a buy, bids for a sell), and a best (BBO) order needs a level on
+// the side it pegs to. So a one-sided book is not uniformly refused — a market
+// SELL sweeps a bids-only book normally while the market BUY beside it has
+// nothing to fill against — and a wholly orderless book is just the case where
+// both sides are missing. "" = placeable (a gtc/po limit rests as the first
+// maker). book must be the live book of the draft's own market.
+//
+// This is the refusing twin of ops.WarnNoOpposingLiquidity
+// (internal/ops/preplace.go), which reports the same finding as advice — with one
+// case more here: the post-only best order below, which that layer reports as
+// BEST_PEG_UNAVAILABLE, so this refusal set is a strict superset of that warning's.
+// The duplication is deliberate — a warning is advice an agent may act on or
+// override, a gate is a decision this terminal makes for its user — so keep the
+// two in step: change one, change the other.
+//
+// Only the placement gate (model.draftGate) applies it; the preview does not.
+// ops.AnalyzePlace already states the same outcome there (an error-styled
+// NO_OPPOSING_LIQUIDITY warning, plus a disposition saying nothing would
+// execute), and routing the whole preview through one implementation is the
+// point.
+func fillSideRefusal(d orderDraft, book state.Orderbook) string {
+	switch d.typ {
+	case "limit":
+		// A limit carries its own price, so gtc/po simply rests — on a side with no
+		// resting orders it becomes the first maker there, which is unremarkable.
+		// ioc/fok cannot rest: the server accepts it and cancels it unfilled.
+		if d.canRest() {
+			return ""
+		}
+		if bookSideFilled(fillSideName(d.side), book) {
+			return ""
+		}
+		return i18n.T("the %s side of the book is empty — an ioc/fok limit can't fill and would cancel; use gtc or po to rest as the first maker",
+			fillSideName(d.side))
+
+	case "best":
+		// A best (BBO) order takes its PRICE from a book level, so an empty peg side
+		// leaves it with no price at all — and the peg side is not the tif's to
+		// decide alone: a taker tif (gtc/ioc/fok) pegs to the opposing side, while
+		// post-only pegs to its OWN queue side. The two po sides of a one-sided book
+		// therefore land oppositely: on a bids-only book a po best BUY pegs to the
+		// best bid and rests, while the po best SELL beside it dies, its queue side
+		// being the empty one.
+		peg := fillSideName(d.side)
+		if d.tif() == "po" {
+			peg = ownSideName(d.side)
+		}
+		if bookSideFilled(peg, book) {
+			return ""
+		}
+		return i18n.T("the %s side of the book is empty — a best order has no level there to peg to; place a limit order to rest as the first maker", peg)
+
+	default:
+		// A market order — and, defensively, any type this file does not know: assume
+		// it takes rather than rests, so an unrecognized shape is refused on an empty
+		// fill side rather than waved through. (validate() rejects such a shape
+		// before any arm, so the wording below only ever describes a market order.)
+		if bookSideFilled(fillSideName(d.side), book) {
+			return ""
+		}
+		return i18n.T("the %s side of the book is empty — a market order can't fill; place a limit order to rest as the first maker",
+			fillSideName(d.side))
+	}
+}
+
+// fillSideName and ownSideName name the two book sides from the ORDER's side, in
+// the bid/ask vocabulary ops words its own warnings in (trading vocabulary stays
+// English — see the localization rules in README.md): a marketable order consumes
+// the opposing side (a buy takes asks), while a resting one joins its own side (a
+// buy queues among the bids).
+func fillSideName(side string) string {
+	if side == "sell" {
+		return "bid"
+	}
+	return "ask"
+}
+
+func ownSideName(side string) string {
+	if side == "sell" {
+		return "ask"
+	}
+	return "bid"
+}
+
+// bookSideFilled reports whether the named side ("bid"/"ask") of the book holds
+// any resting orders.
+func bookSideFilled(name string, book state.Orderbook) bool {
+	if name == "bid" {
+		return len(book.Bids) > 0
+	}
+	return len(book.Asks) > 0
 }
 
 // pctFromMid renders a limit price's signed distance from the mid ("+0.02%" is
-// above the mid, "-0.02%" below); "" when either input is unparseable.
+// above the mid, "-0.02%" below); "" when either input is unparseable — which
+// includes the EMPTY mid a one-sided book yields, so a book with no two-sided
+// touch drops the line instead of showing a fabricated "0%".
 func pctFromMid(price, mid string) string {
 	pd, err1 := decimal.NewFromString(price)
 	md, err2 := decimal.NewFromString(mid)
@@ -595,10 +685,10 @@ func anchorPrice(anchor, side string, book state.Orderbook, hasBook bool, t stat
 // placement must refuse to run against a stale or still-loading book — the
 // preview's numbers and the user's intent were formed against data the store
 // no longer stands behind. bookLive is true once the orderbook subscription is
-// settled, whether or not it has resting orders: an empty book is a valid place
-// target for a resting limit (the first maker), so only a NOT-ready book gates
-// here — what an EMPTY book refuses depends on the draft and is draftGate's
-// half (emptyBookRefusal). The fee policy is part of the gate for the same
+// settled, whether or not it has resting orders: a book missing a side is a valid
+// place target for a resting limit (the first maker there), so only a NOT-ready
+// book gates here — which orders a missing side refuses depends on the draft and
+// is draftGate's half (fillSideRefusal). The fee policy is part of the gate for the same
 // reason: the review's fee estimate and the order's local balance hold both
 // size from it, so arming waits for the (async, retried) fetch rather than
 // reviewing against unknown fees.

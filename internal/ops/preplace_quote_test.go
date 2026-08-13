@@ -24,13 +24,10 @@ func TestAnalyzePlaceReportsNotionalForAnyQuoteCurrency(t *testing.T) {
 	bands := []TickBand{{PriceGte: "0", TickSize: "0.01"}}
 	symbol := "btc_" + testQuoteCcy
 
-	sim, ws, err := AnalyzePlace(map[string]string{
+	sim, ws := AnalyzePlace(map[string]string{
 		"symbol": symbol, "side": "buy", "orderType": "limit",
 		"price": "93800.00", "qty": "0.001",
 	}, bids, asks, bands, OrderValueBounds{})
-	if err != nil {
-		t.Fatalf("AnalyzePlace: %v", err)
-	}
 	if sim.QuoteCurrency != testQuoteCcy {
 		t.Fatalf("quote currency: got %q, want %q", sim.QuoteCurrency, testQuoteCcy)
 	}
@@ -58,13 +55,10 @@ func TestAnalyzePlaceMarketBuyNotionalIsAmtForAnyQuoteCurrency(t *testing.T) {
 	bids := []BookLevel{{Price: "93900.00", Qty: "2"}}
 	asks := []BookLevel{{Price: "94100.00", Qty: "2"}}
 
-	sim, _, err := AnalyzePlace(map[string]string{
+	sim, _ := AnalyzePlace(map[string]string{
 		"symbol": "btc_" + testQuoteCcy, "side": "buy", "orderType": "market",
 		"timeInForce": "ioc", "amt": "150.75",
 	}, bids, asks, nil, OrderValueBounds{})
-	if err != nil {
-		t.Fatalf("AnalyzePlace: %v", err)
-	}
 	if sim.Notional != "150.75" || sim.QuoteCurrency != testQuoteCcy {
 		t.Fatalf("market buy: notional %q in %q", sim.Notional, sim.QuoteCurrency)
 	}
@@ -87,13 +81,10 @@ func TestAnalyzePlaceWarnsFromThePairsPublishedBounds(t *testing.T) {
 		{"below the published minimum", "0.0001", WarnNotionalBelowMin}, // 9.39
 		{"above the published maximum", "0.5", WarnNotionalAboveMax},    // 46950
 	} {
-		_, ws, err := AnalyzePlace(map[string]string{
+		_, ws := AnalyzePlace(map[string]string{
 			"symbol": symbol, "side": "buy", "orderType": "limit",
 			"price": "93900.00", "qty": c.qty,
 		}, bids, asks, bands, bounds)
-		if err != nil {
-			t.Fatalf("%s: AnalyzePlace: %v", c.name, err)
-		}
 		var found bool
 		for _, w := range ws {
 			if w.Code != c.want {
@@ -123,13 +114,10 @@ func TestAnalyzePlaceSkipsBoundsThePairDoesNotPublish(t *testing.T) {
 	bands := []TickBand{{PriceGte: "0", TickSize: "1000"}}
 
 	// A minimum, but no maximum: a huge order value must warn on neither end.
-	_, ws, err := AnalyzePlace(map[string]string{
+	_, ws := AnalyzePlace(map[string]string{
 		"symbol": "btc_krw", "side": "buy", "orderType": "limit",
 		"price": "9999000", "qty": "1000", // notional ~10 billion
 	}, bids, asks, bands, OrderValueBounds{QuoteCurrency: "krw", Min: "5000"})
-	if err != nil {
-		t.Fatalf("AnalyzePlace: %v", err)
-	}
 	for _, w := range ws {
 		if w.Code == WarnNotionalAboveMax {
 			t.Fatalf("warned above a maximum the pair does not publish: %s", w.Message)

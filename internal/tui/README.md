@@ -612,6 +612,16 @@ the error inline and the inputs preserved. Facts to preserve:
   `Config.TickSizePolicy`, fee rates via `Config.Fees`) are cached per symbol
   on the sub-model, best-effort: missing metadata degrades features (no grid,
   no fee estimate), never blocks entry.
+  **One preview implementation covers every book shape.** `buildPreview` sends a
+  two-sided, a one-sided and a wholly orderless book alike through
+  `ops.AnalyzePlace`; only a NOT-ready book short-circuits (with the reason, since
+  its figures are not something the store stands behind). The analysis gates each
+  check on the price it needs and reports an absent best/mid as the EMPTY string
+  rather than a fabricated `0`, so the derived figures degrade honestly — a
+  missing mid drops the `vs mid` line instead of printing `0%`, and the
+  book-independent checks (order-value bounds, tick alignment) still run. A second
+  hand-rolled preview for the orderless case is exactly the money-path drift
+  `AGENTS.md` warns about, and it could not handle a one-sided book at all.
 - **A limit order can be entered by quantity OR amount** (`sizeInAmt`, toggled
   with `u`). Amount is a limit-only *input*: the wire always carries a quantity,
   derived at the price by `wireQty`/`qtyFromAmt` (the API has no limit-amount
@@ -665,12 +675,23 @@ the error inline and the inputs preserved. Facts to preserve:
   `orderGate`/`placeGateReason` is draft-independent: no money action in flight,
   the fee policy loaded, and the book **live** — `orderbookStatus != NotReady`,
   which a settled-but-EMPTY book satisfies. `draftGate(d)` adds what depends on
-  the order itself: on an empty book only a limit that can REST (gtc/po) is
-  allowed — it would be the first maker — while a market order (nothing to fill)
-  and an ioc/fok limit (cannot rest, would cancel unfilled) are refused by the
-  one shared `emptyBookRefusal`. Every surface passes **its own** draft: the
+  the order itself **and on the one side of the book it needs** — the shared
+  `fillSideRefusal`, keyed on the draft's *fill side* (asks for a buy, bids for a
+  sell), not on the book as a whole. A limit that can REST (gtc/po) is always
+  allowed: on an empty side it is simply the first maker there. Refused are the
+  orders that would not execute — a market order and an ioc/fok limit whose fill
+  side holds nothing — and a best (BBO) order whose **peg** side does: a taker tif
+  pegs to the opposing side, post-only to its own queue side, so on a bids-only
+  book a `po` best BUY rests while the `po` best SELL beside it dies. Side-awareness
+  is load-bearing, not a refinement: a one-sided book classifies as
+  `StatusPresent`, so a rule keyed on `StatusEmpty` would arm and PLACE a market
+  buy into a book with no asks at all. It mirrors `ops.WarnNoOpposingLiquidity`, which
+  states the same finding as advice (`order place --dry-run`) where the TUI
+  refuses; keep the two in step. Every surface passes **its own** draft: the
   panel via `panelGate()`, the command bar its resolved/armed order, the ladder
-  each arm's. The gate reason lands inline and on the panel's book-state line. A
+  each arm's. The gate reason lands inline and on the panel's book-state line — the
+  preview is NOT wired into the gate; it reports the same outcome independently, as
+  an error-styled `NO_OPPOSING_LIQUIDITY` warning. A
   pane can say "loading…" — an order cannot be sent against a book the store no
   longer stands behind.
 - **Arming checks and freezes the review.** `arm` validates locally (size
@@ -828,7 +849,7 @@ cursor), and a money mover still always costs exactly two deliberate keys
   never moves the ladder's default tif; a market order is ioc-only),
   and enter places under `draftGate(l.armed.draft)` — re-judged at confirm
   because `t` may have cycled the tif since arming, which changes the verdict on
-  an empty book. Arm and place both refuse against a stale book. A cancel arms/places under the money single-flight only (like
+  a book missing this order's fill side. Arm and place both refuse against a stale book. A cancel arms/places under the money single-flight only (like
   `x` elsewhere, it must not require a fresh book). A rejection returns to the
   armed strip with the error inline (nudge and re-place, or esc out); a cancel
   result returns to browsing and reports via the standard toast.

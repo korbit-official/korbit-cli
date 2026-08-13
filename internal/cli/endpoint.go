@@ -481,9 +481,11 @@ func (d dryRunDoc) FormatText(w io.Writer) {
 	}
 	if sim := d.Simulation; sim != nil {
 		fmt.Fprint(w, "\n\n  SIMULATION (estimate only — nothing placed):")
+		// A reference price the book cannot supply is empty (never zero, see
+		// ops.PlaceSimulation), so name the absence — a blank cell reads as a value.
 		rows := [][2]string{
-			{"best bid / ask", sim.BestBid + " / " + sim.BestAsk},
-			{"mid", sim.Mid},
+			{"best bid / ask", textout.OrNone(sim.BestBid) + " / " + textout.OrNone(sim.BestAsk)},
+			{"mid", textout.OrNone(sim.Mid)},
 		}
 		if sim.Notional != "" {
 			rows = append(rows, [2]string{"notional" + quoteUnit(sim.QuoteCurrency), sim.Notional})
@@ -492,6 +494,11 @@ func (d dryRunDoc) FormatText(w io.Writer) {
 			rows = append(rows, [2]string{"est. peg price", sim.EstPegPrice})
 		}
 		rows = append(rows, [2]string{"marketable", textout.YesNo(sim.Marketable)})
+		// Beside it, because "marketable" alone misleads: a rejected post-only and a
+		// killed fill-or-kill are both marketable and both execute nothing.
+		if sim.Outcome != "" {
+			rows = append(rows, [2]string{"outcome", string(sim.Outcome)})
+		}
 		if sim.EstFilledQty != "" {
 			rows = append(rows, [2]string{"est. filled qty", sim.EstFilledQty})
 		}

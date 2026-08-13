@@ -126,10 +126,11 @@ func BoundsForSymbol(pairs []rawapi.Pair, symbol string) OrderValueBounds {
 // NotionalBoundWarnings raises the below-min / above-max warnings for an order
 // notional (an exact decimal string, in the pair's quote currency) against the
 // bounds that pair publishes. It is the ONE place those two warnings are worded
-// and thresholded, so a caller that cannot run the full AnalyzePlace — the TUI's
-// preview against an EMPTY book, which has no depth to analyze but still knows
-// price × qty — raises exactly the warnings placement would, rather than
-// silently omitting a check the same order gets everywhere else.
+// and thresholded, so every caller raises exactly the warnings placement would
+// rather than re-deriving a threshold of its own. The bounds are book-independent,
+// which is why AnalyzePlace still runs this check on a book with no resting orders
+// on the order's side: the notional is known from price × qty (or amt) alone, and a
+// below-min first maker is the mistake such a book makes MORE likely, not less.
 //
 // fallbackQuote names the unit when the pair entry carries no currency of its
 // own (the symbol's second segment). A bound the pair does not publish is

@@ -201,8 +201,15 @@ nothing; it prints the unsigned request plus two advisory blocks built from live
 data (the orderbook + tick policy + the pair's order value bounds, at the same base URL the real order
 would use, so no credentials are touched):
 
-- `simulation` — the estimated fill against the current book: `marketable`, `estFilledQty`,
-  `estAvgFillPrice` / `estWorstFillPrice`, slippage, `fullyFilled`, and the remaining-qty disposition.
+- `simulation` — the estimated fill against the current book: `bestBid` / `bestAsk` / `mid`,
+  `marketable`, `estFilledQty`, `estAvgFillPrice` / `estWorstFillPrice`, slippage, `fullyFilled`, and
+  the remaining-qty disposition. A reference price the book can't supply is `""` — an empty book side,
+  or either side missing for `mid` — never `"0"`, so check it before comparing or computing with it.
+  **Branch on `outcome`, not on `marketable`**: `"fills"` (some or all executes now), `"rests"` (nothing
+  executes, the order sits on the book as a maker), `"nothing"` (nothing executes and nothing rests —
+  rejected, killed, expired, or canceled in whole). `marketable` only says the order *would take*
+  liquidity, which is equally true of a crossing post-only (rejected) and an unfillable fill-or-kill
+  (killed); the disposition is prose for a human, never something to pattern-match.
   **Estimate only** — nothing is placed; the real fill moves with the book and fees/hidden liquidity
   aren't modeled.
 - `warnings` — an array of `{code, message}`. Codes include `INSUFFICIENT_LIQUIDITY` / high slippage
@@ -216,8 +223,15 @@ would use, so no credentials are touched):
   take no liquidity. `BOOK_DEPTH_LIMITED` means
   the order sweeps the entire visible book without filling — the book returns only so many levels per
   side, so the fill and slippage are a lower bound and the real cost may be worse (a coarser orderbook
-  grouping via `--level` shows more depth). An empty array means nothing was flagged. (Best-effort: if
-  the book can't be reached it emits the plan with a skip note — then be cautious.)
+  grouping via `--level` shows more depth). `NO_OPPOSING_LIQUIDITY` means the side this order takes from
+  holds no resting orders and the order can't rest, so nothing executes — a `gtc`/`po` limit rests
+  instead and is not warned about (read `outcome: "rests"` and `estRemainingQty`).
+  `MID_PRICE_UNAVAILABLE` means no mid could be computed, so whichever of the far-from-market price
+  check and the `--pp` estimate applied to this order did not run — the message names them; a plain
+  limit never asked for protection, and a protected market order has no limit price to check. Verify
+  the price against another source rather than reading that silence as a pass. An empty array means nothing was flagged. `checksSkipped` — a plan with no `simulation` at
+  all — appears only when the market data can't be fetched; an empty or one-sided book is analyzed, not
+  skipped. Be cautious on a skip.
 
 ```sh
 korbit order place --symbol btc_krw --side buy --type market --amt 50000 --dry-run --json
@@ -228,8 +242,13 @@ korbit order place --symbol btc_krw --side buy --type market --amt 50000 --dry-r
 warnings (and the relevant simulation numbers) and get an explicit go-ahead — a warning usually means
 the order would fill at an unfavorable price or be rejected outright. *Exception:* if the user already
 asked for immediate/unconditional execution, place it and just report what the warnings said. A clean
-dry-run (empty `warnings`) → place. Place a real order only once live trading is authorized (ground
-rule 1); start small.
+dry-run (empty `warnings`) → place, but only where a check actually ran. Exactly two signals say one did
+not: `checksSkipped` (no `simulation` at all — the market data couldn't be fetched, so nothing was
+analyzed) and `MID_PRICE_UNAVAILABLE` (a mid-dependent check was suppressed — it is a warning, so it
+also puts you in the non-empty case above). On either, verify the price against another source before
+placing. An empty `bestBid`/`bestAsk`/`mid` is **not** such a signal — it states the book's shape, and an
+order needing neither (a market sell into a bids-only book, no `--pp`) was checked in full. Place a real
+order only once live trading is authorized (ground rule 1); start small.
 
 **Step 3 — place, then confirm.**
 

@@ -863,6 +863,90 @@ func seedEmptyOrderMarket(t *testing.T, m model) model {
 		  {"currency":"btc","balance":"0.5","available":"0.5","tradeInUse":"0","withdrawalInUse":"0","avgPrice":"0"}]`))
 }
 
+// seedOneSidedOrderMarket is seedOrderMarket for a book with resting orders on
+// ONE side only: bids at 100,000,000 / 99,990,000 and no asks at all. A frame
+// arrived and it has content, so it classifies as PRESENT — which is precisely
+// why the place gate cannot key on state.StatusEmpty: nothing about this book is
+// "empty", yet a market BUY has nothing to fill against.
+func seedOneSidedOrderMarket(t *testing.T, m model) model {
+	t.Helper()
+	m = feed(t, m, dataEvent("orderbook", "btc_krw", stream.OriginSnapshot, 101, "", `{
+		"data":{"timestamp":99,"asks":[],
+		"bids":[{"price":"100000000","qty":"1"},{"price":"99990000","qty":"2"}]}}`))
+	return feed(t, m, dataEvent("myAsset", "", stream.OriginBackfill, 100, "/v2/balance",
+		`[{"currency":"krw","balance":"1000000","available":"1000000","tradeInUse":"0","withdrawalInUse":"0","avgPrice":"0"},
+		  {"currency":"btc","balance":"0.5","available":"0.5","tradeInUse":"0","withdrawalInUse":"0","avgPrice":"0"}]`))
+}
+
+// TestDraftGateOneSidedBookRefusesTheEmptyFillSide: the gate turns on the SIDE
+// the acting draft would take from, not on the book being empty. On a bids-only
+// book a market BUY has no asks to fill against and is refused on every surface,
+// while the market SELL beside it sweeps those bids and is allowed — and a best
+// order follows its PEG side, which post-only takes from its own queue.
+func TestDraftGateOneSidedBookRefusesTheEmptyFillSide(t *testing.T) {
+	m := seedOneSidedOrderMarket(t, testModel(t, true, &fakeTrader{}))
+	if st := m.orderbookStatus("btc_krw"); st != state.StatusPresent {
+		t.Fatalf("a one-sided book classifies as present, got %v — the gate must not key on StatusEmpty", st)
+	}
+
+	mktBuy := newOrderDraft("btc_krw", "buy")
+	mktBuy.typ, mktBuy.amt = "market", "500000"
+	mktSell := newOrderDraft("btc_krw", "sell")
+	mktSell.typ, mktSell.qty = "market", "0.05"
+
+	if g := m.draftGate(mktBuy); !strings.Contains(g, "market order can't fill") || !strings.Contains(g, "ask") {
+		t.Fatalf("a market buy with no asks must be refused, naming the empty side, got %q", g)
+	}
+	if g := m.draftGate(mktSell); g != "" {
+		t.Fatalf("a market sell sweeping the bids must be allowed, got %q", g)
+	}
+	// A best order is judged by its peg side, not by tif: post-only pegs to its own
+	// queue side (the populated bids for a buy), a taker tif to the opposing one.
+	poBest := func(side string) orderDraft {
+		d := newOrderDraft("btc_krw", side)
+		d.typ, d.tifIdx = "best", slices.Index(tifOptions, "po")
+		return d
+	}
+	if g := m.draftGate(poBest("buy")); g != "" {
+		t.Fatalf("a po best buy pegs to the best bid and rests — must be allowed, got %q", g)
+	}
+	if g := m.draftGate(poBest("sell")); g == "" {
+		t.Fatal("a po best sell has no ask to peg to — must be refused")
+	}
+
+	// The panel judges its OWN draft through the same rule.
+	m.order.draft = mktBuy
+	if m.panelGate() == "" {
+		t.Fatal("the panel's own market buy must be refused")
+	}
+	m.order.draft = mktSell
+	if g := m.panelGate(); g != "" {
+		t.Fatalf("the panel's own market sell must be allowed, got %q", g)
+	}
+
+	// The command bar, on its own resolved order.
+	m = seedOneSidedOrderMarket(t, testModel(t, true, &fakeTrader{}))
+	m, _ = press(t, m, k(':', ":"))
+	m = typeText(t, m, "b 500k krw @ mkt")
+	m, _ = press(t, m, special(tea.KeyEnter))
+	if m.cmdbar.armed || !strings.Contains(m.cmdbar.errText, "market order can't fill") {
+		t.Fatalf("cmdbar market buy on a bids-only book must be refused: armed=%v err=%q", m.cmdbar.armed, m.cmdbar.errText)
+	}
+
+	// The ladder, on each arm: the buy refused at the strip, the sell armed.
+	l := m.ladder
+	l.symbol = "btc_krw"
+	l.sizePcts[l.symbol] = 50
+	buyArm := l.armOrder("buy", "market", m.draftGate, nil)
+	if buyArm.view == ladderConfirm || !strings.Contains(buyArm.stripErr, "market order can't fill") {
+		t.Fatalf("ladder market buy arm must be refused: view=%v err=%q", buyArm.view, buyArm.stripErr)
+	}
+	sellArm := l.armOrder("sell", "market", m.draftGate, nil)
+	if sellArm.view != ladderConfirm || sellArm.stripErr != "" {
+		t.Fatalf("ladder market sell arm must go through: view=%v err=%q", sellArm.view, sellArm.stripErr)
+	}
+}
+
 // TestDraftGateEmptyBookJudgesActingDraft: on a live-but-empty book the gate's
 // verdict follows the draft it is GIVEN, never the order panel's — each surface
 // (panel, command bar, ladder) passes its own order, so a panel left on limit

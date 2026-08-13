@@ -627,7 +627,10 @@ func TestPlaceDryRunHumanRender(t *testing.T) {
 	if strings.Contains(out, `"dryRun"`) || strings.Contains(out, `"simulation"`) {
 		t.Fatalf("human mode must not emit JSON:\n%s", out)
 	}
-	for _, want := range []string{"DRY RUN", "SIMULATION (estimate only", "est. avg fill price", "warning(s)", "HIGH_SLIPPAGE"} {
+	// "outcome fills" rides beside "marketable": that this order EXECUTES is the
+	// fact a reader acts on, and marketable alone does not say it.
+	for _, want := range []string{"DRY RUN", "SIMULATION (estimate only", "est. avg fill price",
+		"marketable", "outcome", "fills", "warning(s)", "HIGH_SLIPPAGE"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("human dry-run missing %q:\n%s", want, out)
 		}

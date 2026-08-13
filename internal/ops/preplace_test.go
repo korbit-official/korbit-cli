@@ -820,6 +820,993 @@ func TestPrePlaceIOCWouldExpire(t *testing.T) {
 	}
 }
 
+// ---- empty and one-sided books ----
+//
+// A book with an empty side is analyzed, not refused. These tests pin both halves
+// of that: the checks that do not need the missing price still run (losing them
+// silently is what costs a caller money), and the ones that do are skipped rather
+// than fed a fabricated zero — a zero best is a real, extremely favorable price,
+// so every comparison against it answers confidently and wrongly.
+
+// The two-sided fixtures the degradation cases take one side of: a mid of
+// 10,000,000, a tick of 1000, and the KRW bounds.
+var (
+	degradeBids   = []BookLevel{{Price: "9999000", Qty: "2"}, {Price: "9990000", Qty: "5"}}
+	degradeAsks   = []BookLevel{{Price: "10001000", Qty: "2"}, {Price: "10100000", Qty: "5"}}
+	degradeBands  = []TickBand{{PriceGte: "0", TickSize: "1000"}}
+	degradeBounds = OrderValueBounds{QuoteCurrency: "krw", Min: "5000", Max: "1000000000"}
+)
+
+// analyze runs the pure analysis over a caller-supplied book. AnalyzePlace has
+// no failure mode and therefore no error return — whatever the book's shape,
+// there is an answer.
+func analyze(t *testing.T, values map[string]string, bids, asks []BookLevel) (PlaceSimulation, []PlaceWarning) {
+	t.Helper()
+	return AnalyzePlace(values, bids, asks, degradeBands, degradeBounds)
+}
+
+// orderKind is one cell of the order-type × tif matrix the degradation tests run.
+//
+// restsEmpty/restsOneSided say whether the order can actually rest as a maker
+// when the whole book is empty / when only the side it takes from is: a post-only
+// BEST order pegs to its own (queue) side, so it rests on a one-sided book that
+// prices that side and cannot on an empty one — the two differ for it alone.
+//
+// warnsNoOpposing is whether an empty fill side warrants NO_OPPOSING_LIQUIDITY,
+// which carries one meaning only: nothing would execute. So it is false for
+// everything that can rest, and false for a post-only best order in BOTH books —
+// it either rests, or is unpriceable and reports BEST_PEG_UNAVAILABLE instead.
+type orderKind struct {
+	name            string
+	typ, tif        string
+	restsEmpty      bool
+	restsOneSided   bool
+	warnsNoOpposing bool
+	midCheckApplies bool // a mid-derived check would have run (every limit)
+}
+
+var orderKinds = []orderKind{
+	{name: "market", typ: "market", warnsNoOpposing: true},
+	{name: "limit-gtc", typ: "limit", tif: "gtc", restsEmpty: true, restsOneSided: true, midCheckApplies: true},
+	{name: "limit-po", typ: "limit", tif: "po", restsEmpty: true, restsOneSided: true, midCheckApplies: true},
+	{name: "limit-ioc", typ: "limit", tif: "ioc", warnsNoOpposing: true, midCheckApplies: true},
+	{name: "limit-fok", typ: "limit", tif: "fok", warnsNoOpposing: true, midCheckApplies: true},
+	{name: "best-gtc", typ: "best", tif: "gtc", warnsNoOpposing: true},
+	{name: "best-po", typ: "best", tif: "po", restsOneSided: true},
+}
+
+// values builds the wire params for this kind on a side, sized so nothing but the
+// book is in question: an on-grid price and a notional inside the bounds.
+func (k orderKind) values(side string) map[string]string {
+	v := map[string]string{"symbol": "btc_krw", "side": side, "orderType": k.typ, "accountSeq": "1"}
+	if k.tif != "" {
+		v["timeInForce"] = k.tif
+	}
+	switch {
+	case k.typ == "limit":
+		v["price"], v["qty"] = "10000000", "0.01"
+	case side == "buy": // a market/best BUY is sized in the quote currency
+		v["amt"] = "100000"
+	default:
+		v["qty"] = "0.01"
+	}
+	if k.typ == "best" {
+		v["bestNth"] = "1"
+	}
+	return v
+}
+
+// spuriousCodes are the warnings that can only be true of a book with prices on
+// the side in question. None of them may appear when that side is empty — each
+// would be produced by comparing against a zero.
+var spuriousCodes = []string{
+	"PRICE_PROTECTION_CAPPED", "PRICE_FAR_ABOVE_MARKET", "PRICE_FAR_BELOW_MARKET",
+	"POST_ONLY_WOULD_REJECT", "HIGH_SLIPPAGE", "INSUFFICIENT_LIQUIDITY", "BOOK_DEPTH_LIMITED",
+}
+
+// assertNoSpurious fails on any warning that needs a price the book did not have,
+// and on any message that quotes a zero as a reference price.
+func assertNoSpurious(t *testing.T, ws []PlaceWarning) {
+	t.Helper()
+	for _, code := range spuriousCodes {
+		if hasCode(ws, code) {
+			t.Errorf("%s cannot be concluded without a price on that side of the book: %s", code, codes(ws))
+		}
+	}
+	for _, w := range ws {
+		for _, zero := range []string{"best ask 0", "best bid 0", "mid 0", "of the mid 0"} {
+			if strings.Contains(w.Message, zero) {
+				t.Errorf("%s quotes a fabricated zero reference price: %q", w.Code, w.Message)
+			}
+		}
+	}
+}
+
+// TestAnalyzePlaceEmptyBookDegradesGracefully: a newly listed pair with no
+// resting orders at all. Every order type on both sides must produce a
+// simulation, name the missing liquidity, and fabricate nothing.
+func TestAnalyzePlaceEmptyBookDegradesGracefully(t *testing.T) {
+	for _, k := range orderKinds {
+		for _, side := range []string{"buy", "sell"} {
+			t.Run(k.name+"/"+side, func(t *testing.T) {
+				sim, ws := analyze(t, k.values(side), nil, nil)
+
+				if sim.BestBid != "" || sim.BestAsk != "" || sim.Mid != "" {
+					t.Fatalf("an empty book has no reference price to report, got bid %q ask %q mid %q", sim.BestBid, sim.BestAsk, sim.Mid)
+				}
+				if sim.Disclaimer == "" {
+					t.Fatalf("the estimate-only disclaimer must survive every degraded state")
+				}
+				if got := hasCode(ws, "NO_OPPOSING_LIQUIDITY"); got != k.warnsNoOpposing {
+					t.Fatalf("NO_OPPOSING_LIQUIDITY = %v, want %v (it means nothing would execute — never the ordinary first-maker outcome): %s", got, k.warnsNoOpposing, codes(ws))
+				}
+				if k.typ == "best" && k.tif == "po" && !hasCode(ws, "BEST_PEG_UNAVAILABLE") {
+					// A po best order pegs to its own side, which is empty here: the peg
+					// failure is the accurate reason and stands in for the liquidity one.
+					t.Fatalf("an unpriceable post-only best order must report BEST_PEG_UNAVAILABLE: %s", codes(ws))
+				}
+				if got := hasCode(ws, "MID_PRICE_UNAVAILABLE"); got != k.midCheckApplies {
+					t.Fatalf("MID_PRICE_UNAVAILABLE = %v, want %v (report a suppressed check, stay silent where the mid is unused): %s", got, k.midCheckApplies, codes(ws))
+				}
+				assertNoSpurious(t, ws)
+
+				if sim.Marketable || sim.FullyFilled || sim.EstFilledQty != "" || sim.EstAvgFillPrice != "" {
+					t.Fatalf("nothing can fill against an empty book: %+v", sim)
+				}
+				if sim.Disposition == "" {
+					t.Fatalf("the caller must be told what becomes of the order: %+v", sim)
+				}
+				if strings.Contains(sim.Disposition, "exhausted") {
+					t.Fatalf("a book that was never populated did not run out: %q", sim.Disposition)
+				}
+				if rests := strings.Contains(sim.Disposition, "rests"); rests != k.restsEmpty {
+					t.Fatalf("disposition %q: rests=%v, want %v", sim.Disposition, rests, k.restsEmpty)
+				}
+			})
+		}
+	}
+}
+
+// TestAnalyzePlaceOneSidedBookFillSideEmpty: the side the order takes from is
+// empty while the other side has depth. The mid is still unavailable, but the
+// book does carry one real price — which must be reported as itself and never
+// mirrored onto the missing side.
+func TestAnalyzePlaceOneSidedBookFillSideEmpty(t *testing.T) {
+	for _, k := range orderKinds {
+		for _, side := range []string{"buy", "sell"} {
+			t.Run(k.name+"/"+side, func(t *testing.T) {
+				// A buy takes from the asks, a sell from the bids: keep the other side.
+				bids, asks := degradeBids, []BookLevel(nil)
+				if side == "sell" {
+					bids, asks = nil, degradeAsks
+				}
+				sim, ws := analyze(t, k.values(side), bids, asks)
+
+				if side == "buy" && (sim.BestBid != "9999000" || sim.BestAsk != "" || sim.Mid != "") {
+					t.Fatalf("bids-only book: want the real bid and nothing else, got bid %q ask %q mid %q", sim.BestBid, sim.BestAsk, sim.Mid)
+				}
+				if side == "sell" && (sim.BestAsk != "10001000" || sim.BestBid != "" || sim.Mid != "") {
+					t.Fatalf("asks-only book: want the real ask and nothing else, got bid %q ask %q mid %q", sim.BestBid, sim.BestAsk, sim.Mid)
+				}
+				if got := hasCode(ws, "NO_OPPOSING_LIQUIDITY"); got != k.warnsNoOpposing {
+					t.Fatalf("NO_OPPOSING_LIQUIDITY = %v, want %v — an order that rests is not warned, one that cannot execute is: %s", got, k.warnsNoOpposing, codes(ws))
+				}
+				if got := hasCode(ws, "MID_PRICE_UNAVAILABLE"); got != k.midCheckApplies {
+					t.Fatalf("MID_PRICE_UNAVAILABLE = %v, want %v: %s", got, k.midCheckApplies, codes(ws))
+				}
+				assertNoSpurious(t, ws)
+				if sim.Marketable || sim.EstFilledQty != "" {
+					t.Fatalf("an empty fill side fills nothing, whatever the other side holds: %+v", sim)
+				}
+				if rests := strings.Contains(sim.Disposition, "rests"); rests != k.restsOneSided {
+					t.Fatalf("disposition %q: rests=%v, want %v", sim.Disposition, rests, k.restsOneSided)
+				}
+			})
+		}
+	}
+}
+
+// TestAnalyzePlaceOneSidedBookFillSidePopulated: a one-sided book is NOT
+// uniformly degraded. When the side the order takes from is the populated one,
+// the sweep is exactly as valid as on a two-sided book — only the mid-derived
+// checks are lost, and only MID_PRICE_UNAVAILABLE is added.
+func TestAnalyzePlaceOneSidedBookFillSidePopulated(t *testing.T) {
+	cases := []struct {
+		name        string
+		bids, asks  []BookLevel
+		values      map[string]string
+		wantFill    string // EstFilledQty
+		wantAvg     string // EstAvgFillPrice
+		wantWarning string // the ONLY warning code allowed ("" = none at all)
+	}{
+		{
+			name: "market sell into a bids-only book", bids: degradeBids,
+			values:   map[string]string{"symbol": "btc_krw", "side": "sell", "orderType": "market", "qty": "0.01"},
+			wantFill: "0.01", wantAvg: "9999000",
+		},
+		{
+			name: "market buy into an asks-only book", asks: degradeAsks,
+			values:   map[string]string{"symbol": "btc_krw", "side": "buy", "orderType": "market", "amt": "100010"},
+			wantFill: "0.01", wantAvg: "10001000",
+		},
+		{
+			name: "crossing limit sell into a bids-only book", bids: degradeBids,
+			values: map[string]string{"symbol": "btc_krw", "side": "sell", "orderType": "limit",
+				"price": "9990000", "qty": "0.01", "timeInForce": "gtc"},
+			wantFill: "0.01", wantAvg: "9999000", wantWarning: "MID_PRICE_UNAVAILABLE",
+		},
+		{
+			name: "crossing limit buy into an asks-only book", asks: degradeAsks,
+			values: map[string]string{"symbol": "btc_krw", "side": "buy", "orderType": "limit",
+				"price": "10100000", "qty": "0.01", "timeInForce": "gtc"},
+			wantFill: "0.01", wantAvg: "10001000", wantWarning: "MID_PRICE_UNAVAILABLE",
+		},
+		{
+			// A price a mid WOULD have flagged as a fat finger (90% below the market).
+			// With no mid the check cannot run, and must not run on a guess.
+			name: "far-below limit sell into a bids-only book", bids: degradeBids,
+			values: map[string]string{"symbol": "btc_krw", "side": "sell", "orderType": "limit",
+				"price": "1000000", "qty": "1", "timeInForce": "gtc"},
+			wantFill: "1", wantAvg: "9999000", wantWarning: "MID_PRICE_UNAVAILABLE",
+		},
+		{
+			// The mirror image: an extra digit on a buy, with no mid to compare to.
+			name: "far-above limit buy into an asks-only book", asks: degradeAsks,
+			values: map[string]string{"symbol": "btc_krw", "side": "buy", "orderType": "limit",
+				"price": "100000000", "qty": "0.001", "timeInForce": "gtc"},
+			wantFill: "0.001", wantAvg: "10001000", wantWarning: "MID_PRICE_UNAVAILABLE",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			c.values["accountSeq"] = "1"
+			sim, ws := analyze(t, c.values, c.bids, c.asks)
+
+			if !sim.Marketable || !sim.FullyFilled || sim.EstFilledQty != c.wantFill || sim.EstAvgFillPrice != c.wantAvg {
+				t.Fatalf("the sweep must run in full against the populated side: want fill %s at %s, got %+v", c.wantFill, c.wantAvg, sim)
+			}
+			if hasCode(ws, "NO_OPPOSING_LIQUIDITY") {
+				t.Fatalf("the side this order takes from HAS liquidity: %s", codes(ws))
+			}
+			assertNoSpurious(t, ws)
+			if c.wantWarning == "" {
+				if len(ws) != 0 {
+					t.Fatalf("a mid-independent order against a populated fill side needs no warning: %s", codes(ws))
+				}
+				return
+			}
+			if got := codes(ws); got != c.wantWarning {
+				t.Fatalf("only the suppressed mid check may be added, got: %s", got)
+			}
+		})
+	}
+}
+
+// TestAnalyzePlaceNoMidDoesNotEngagePriceProtection: price protection is a band
+// around the mid, so with no mid it is not in effect. The bug this pins is worse
+// than a missing check: a band around zero excludes every level, so the sweep
+// broke on its first ask and reported a fully fillable buy as protection-canceled.
+func TestAnalyzePlaceNoMidDoesNotEngagePriceProtection(t *testing.T) {
+	values := map[string]string{"symbol": "btc_krw", "side": "buy", "orderType": "market",
+		"amt": "100010", "pp": "true", "accountSeq": "1"}
+	sim, ws := analyze(t, values, nil, degradeAsks)
+
+	if hasCode(ws, "PRICE_PROTECTION_CAPPED") {
+		t.Fatalf("protection cannot bind without a mid to measure it from: %s", codes(ws))
+	}
+	if !sim.Marketable || sim.EstFilledQty != "0.01" {
+		t.Fatalf("the ask side has depth, so the sweep must fill against it: %+v", sim)
+	}
+	if strings.Contains(sim.Disposition, "price protection") {
+		t.Fatalf("disposition must not blame price protection: %q", sim.Disposition)
+	}
+	// The caller ASKED for protection and did not get it — that has to be said.
+	if !hasCode(ws, "MID_PRICE_UNAVAILABLE") {
+		t.Fatalf("a requested --pp that could not be evaluated must be reported: %s", codes(ws))
+	}
+	// ...and it stays silent for the same order without --pp, where the mid is unused.
+	delete(values, "pp")
+	if _, plain := analyze(t, values, nil, degradeAsks); hasCode(plain, "MID_PRICE_UNAVAILABLE") {
+		t.Fatalf("an order that never uses the mid must not be warned about it: %s", codes(plain))
+	}
+}
+
+// TestAnalyzePlaceNoMidStaysSilentOnAPricelessLimitDraft: MID_PRICE_UNAVAILABLE
+// reports a check the missing mid suppressed, so it takes a price that check would
+// have examined. A limit draft carrying none yet — a UI panel on a pair the user
+// has typed nothing into — had no price sanity check to suppress, and the mid is
+// not what stopped it.
+func TestAnalyzePlaceNoMidStaysSilentOnAPricelessLimitDraft(t *testing.T) {
+	_, ws := analyze(t, map[string]string{
+		"symbol": "btc_krw", "side": "buy", "orderType": "limit", "timeInForce": "gtc", "accountSeq": "1",
+	}, nil, nil)
+	if hasCode(ws, "MID_PRICE_UNAVAILABLE") {
+		t.Fatalf("no price to sanity-check means no suppressed check to report: %s", codes(ws))
+	}
+	// The same draft once a price is entered: now the check IS one the mid stopped.
+	if _, ws := analyze(t, map[string]string{
+		"symbol": "btc_krw", "side": "buy", "orderType": "limit",
+		"price": "10000000", "timeInForce": "gtc", "accountSeq": "1",
+	}, nil, nil); !hasCode(ws, "MID_PRICE_UNAVAILABLE") {
+		t.Fatalf("want MID_PRICE_UNAVAILABLE once there is a price to check: %s", codes(ws))
+	}
+}
+
+// TestAnalyzePlaceNoMidWithProtectionOnEveryOrderType: the same gate in the
+// market, best and limit branches — a requested --pp on a book with no mid must
+// never produce a protection verdict anywhere.
+func TestAnalyzePlaceNoMidWithProtectionOnEveryOrderType(t *testing.T) {
+	for _, k := range orderKinds {
+		for _, side := range []string{"buy", "sell"} {
+			for _, book := range []string{"empty", "one-sided"} {
+				t.Run(k.name+"/"+side+"/"+book, func(t *testing.T) {
+					var bids, asks []BookLevel
+					if book == "one-sided" {
+						// The populated side is the one the order takes from, so a
+						// zero-mid band would have something to wrongly exclude.
+						if side == "buy" {
+							asks = degradeAsks
+						} else {
+							bids = degradeBids
+						}
+					}
+					values := k.values(side)
+					values["pp"], values["ppPercent"] = "true", "2"
+					sim, ws := analyze(t, values, bids, asks)
+					if hasCode(ws, "PRICE_PROTECTION_CAPPED") {
+						t.Fatalf("no mid, no protection verdict: %s", codes(ws))
+					}
+					if strings.Contains(sim.Disposition, "price protection") {
+						t.Fatalf("no mid, no protection disposition: %q", sim.Disposition)
+					}
+					if !hasCode(ws, "MID_PRICE_UNAVAILABLE") {
+						t.Fatalf("a requested --pp that could not be evaluated must be reported: %s", codes(ws))
+					}
+				})
+			}
+		}
+	}
+}
+
+// TestAnalyzePlaceEmptyBookNoSpuriousNotionalOrRejection covers the two hazards
+// that are specific to one order shape each: a market/best SELL is the only order
+// whose value comes from the book, and a post-only order is the only one whose
+// verdict comes from comparing against the opposing best.
+func TestAnalyzePlaceEmptyBookNoSpuriousNotionalOrRejection(t *testing.T) {
+	// A market SELL is valued at the best bid. With no bids it cannot be valued at
+	// all — and an unvaluable order must not be reported as below the minimum.
+	sim, ws := analyze(t, map[string]string{
+		"symbol": "btc_krw", "side": "sell", "orderType": "market", "qty": "0.01", "accountSeq": "1",
+	}, nil, degradeAsks)
+	if sim.Notional != "" {
+		t.Fatalf("a market sell with no bid to value it against has no notional, got %q", sim.Notional)
+	}
+	if hasCode(ws, "NOTIONAL_BELOW_MIN") || hasCode(ws, "NOTIONAL_ABOVE_MAX") {
+		t.Fatalf("a bound cannot be checked against a price we do not have: %s", codes(ws))
+	}
+	// A market BUY is sized in quote by --amt, so it IS valuable with no book at
+	// all — and its bound checks must still run.
+	sim, ws = analyze(t, map[string]string{
+		"symbol": "btc_krw", "side": "buy", "orderType": "market", "amt": "100", "accountSeq": "1",
+	}, nil, nil)
+	if sim.Notional != "100" || !hasCode(ws, "NOTIONAL_BELOW_MIN") {
+		t.Fatalf("an amt-sized buy is valuable without a book, so its bounds still apply: %+v / %s", sim, codes(ws))
+	}
+
+	// A post-only order is rejected only if it CROSSES the opposing best. With no
+	// opposing best nothing is crossed, on either the limit or the best path — and
+	// resting is the ordinary outcome, so neither is warned about liquidity.
+	for _, values := range []map[string]string{
+		{"symbol": "btc_krw", "side": "buy", "orderType": "best", "timeInForce": "po", "bestNth": "1", "amt": "100000"},
+		{"symbol": "btc_krw", "side": "buy", "orderType": "limit", "timeInForce": "po", "price": "10000000", "qty": "0.01"},
+	} {
+		values["accountSeq"] = "1"
+		sim, ws := analyze(t, values, degradeBids, nil)
+		if hasCode(ws, "POST_ONLY_WOULD_REJECT") {
+			t.Fatalf("%s po: nothing to cross, so nothing to reject: %s", values["orderType"], codes(ws))
+		}
+		if hasCode(ws, "NO_OPPOSING_LIQUIDITY") {
+			t.Fatalf("%s po: an order that rests as a maker must not be told nothing would execute: %s", values["orderType"], codes(ws))
+		}
+		if strings.Contains(sim.Disposition, "REJECTED") {
+			t.Fatalf("%s po: %q", values["orderType"], sim.Disposition)
+		}
+		if !strings.Contains(sim.Disposition, "rests") {
+			t.Fatalf("%s po: a post-only order with no opposing side rests as a maker: %q", values["orderType"], sim.Disposition)
+		}
+	}
+}
+
+// TestAnalyzePlaceBestOrderIsValuedAtItsPeg: a best (BBO) order rests at — or
+// crosses to — its own peg, so the peg is the price its value is measured at, not
+// the opposing best. Two things ride on that. On a two-sided book the figure is
+// simply the right one. On a book with no opposing side the peg is the ONLY price
+// there is, so valuing the order against the opposing best instead leaves the
+// notional empty and silently skips BOTH order-value bound checks — on exactly the
+// order a first maker sizing small on a new listing places, where the simulation
+// otherwise reports a real peg and a "rests at …" disposition and the dry-run
+// emits no warning at all.
+func TestAnalyzePlaceBestOrderIsValuedAtItsPeg(t *testing.T) {
+	poSell := func(qty string) map[string]string {
+		return map[string]string{"symbol": "btc_krw", "side": "sell", "orderType": "best",
+			"timeInForce": "po", "bestNth": "1", "qty": qty, "accountSeq": "1"}
+	}
+	// Asks only, no bids at all: a po SELL pegs to its own (ask) side and rests
+	// there. 0.0001 valued at that peg is 1000.1 — under the 5000 minimum.
+	sim, ws := analyze(t, poSell("0.0001"), nil, degradeAsks)
+	if sim.EstPegPrice != "10001000" || !strings.Contains(sim.Disposition, "rests") {
+		t.Fatalf("a po best sell pegs to its own (ask) side and rests: %+v", sim)
+	}
+	if sim.Notional != "1000.1" {
+		t.Fatalf("notional must be the qty valued at the peg: %q, want 1000.1", sim.Notional)
+	}
+	if !hasCode(ws, "NOTIONAL_BELOW_MIN") {
+		t.Fatalf("a peg-priced order under the minimum must be warned, got: %s", codes(ws))
+	}
+	// The other bound, same book: the missing bid side suppresses neither.
+	if _, ws := analyze(t, poSell("1000"), nil, degradeAsks); !hasCode(ws, "NOTIONAL_ABOVE_MAX") {
+		t.Fatalf("want NOTIONAL_ABOVE_MAX, got: %s", codes(ws))
+	}
+	// On a full book a taker best SELL pegs to the --best-nth level of the opposing
+	// side, which is not the best bid: the value follows the peg it crosses to.
+	sim, _ = analyze(t, map[string]string{"symbol": "btc_krw", "side": "sell", "orderType": "best",
+		"timeInForce": "gtc", "bestNth": "2", "qty": "0.01", "accountSeq": "1"}, degradeBids, degradeAsks)
+	if sim.EstPegPrice != "9990000" || sim.Notional != "99900" {
+		t.Fatalf("a taker best sell is valued at its peg (the 2nd bid): peg %q notional %q", sim.EstPegPrice, sim.Notional)
+	}
+	// A best order whose --best-nth level is not visible has no peg at all, so a
+	// base-sized SELL has nothing to be valued at: BEST_PEG_UNAVAILABLE is the
+	// finding, and a value taken from a price this order would never get would read
+	// as a checked one.
+	sim, ws = analyze(t, map[string]string{"symbol": "btc_krw", "side": "sell", "orderType": "best",
+		"timeInForce": "gtc", "bestNth": "9", "qty": "0.01", "accountSeq": "1"}, degradeBids, degradeAsks)
+	if sim.Notional != "" || !hasCode(ws, "BEST_PEG_UNAVAILABLE") {
+		t.Fatalf("an unpriceable best sell has no value to report: notional %q / %s", sim.Notional, codes(ws))
+	}
+	// A best BUY is sized by --amt, which is already quote-denominated, so it needs
+	// no reference price: its bounds hold even where no peg can be derived.
+	_, ws = analyze(t, map[string]string{"symbol": "btc_krw", "side": "buy", "orderType": "best",
+		"timeInForce": "gtc", "bestNth": "1", "amt": "100", "accountSeq": "1"}, nil, nil)
+	if !hasCode(ws, "NOTIONAL_BELOW_MIN") {
+		t.Fatalf("an amt-sized best buy is valuable without any book, got: %s", codes(ws))
+	}
+}
+
+// TestAnalyzePlacePostOnlyBestPegSideDecidesOnOneSidedBook: a best order takes its
+// price from the OPPOSING side for a taker tif but from its OWN queue side for po,
+// so a one-sided book treats the two po sides oppositely. On a bids-only book a po
+// BUY pegs to the best bid and rests; a po SELL, whose queue side is the empty
+// one, cannot be priced at all — and the peg failure, not the missing liquidity,
+// is what it is told.
+func TestAnalyzePlacePostOnlyBestPegSideDecidesOnOneSidedBook(t *testing.T) {
+	buy, buyWs := analyze(t, map[string]string{
+		"symbol": "btc_krw", "side": "buy", "orderType": "best",
+		"timeInForce": "po", "bestNth": "1", "amt": "100000", "accountSeq": "1",
+	}, degradeBids, nil)
+	if buy.EstPegPrice != "9999000" {
+		t.Fatalf("a po best buy pegs to the best bid even with no asks: %+v", buy)
+	}
+	if !strings.Contains(buy.Disposition, "rests") || buy.Marketable {
+		t.Fatalf("a po best buy priced off a populated bid side rests: %+v", buy)
+	}
+	if hasCode(buyWs, "NO_OPPOSING_LIQUIDITY") || hasCode(buyWs, "POST_ONLY_WOULD_REJECT") || hasCode(buyWs, "BEST_PEG_UNAVAILABLE") {
+		t.Fatalf("a po best buy that rests at its peg needs none of these: %s", codes(buyWs))
+	}
+
+	sell, sellWs := analyze(t, map[string]string{
+		"symbol": "btc_krw", "side": "sell", "orderType": "best",
+		"timeInForce": "po", "bestNth": "1", "qty": "0.01", "accountSeq": "1",
+	}, degradeBids, nil)
+	if !hasCode(sellWs, "BEST_PEG_UNAVAILABLE") {
+		t.Fatalf("a po best sell whose queue (ask) side is empty cannot be priced: %s", codes(sellWs))
+	}
+	if hasCode(sellWs, "NO_OPPOSING_LIQUIDITY") {
+		t.Fatalf("the peg failure is the accurate reason; do not stack a liquidity verdict on it: %s", codes(sellWs))
+	}
+	if sell.EstPegPrice != "" || sell.Marketable {
+		t.Fatalf("an unpriceable po best sell must fabricate no peg: %+v", sell)
+	}
+}
+
+// TestAnalyzePlaceEmptyBookCoEmitsCauseAndConsequence: NO_OPPOSING_LIQUIDITY is
+// the cause, the tif verdict is the consequence, and the caller needs both. A --pp
+// branch must not preempt the tif verdict either, so the pp variants are pinned too.
+func TestAnalyzePlaceEmptyBookCoEmitsCauseAndConsequence(t *testing.T) {
+	cases := []struct {
+		tif, want string
+	}{
+		{"ioc", "IOC_WOULD_EXPIRE"},
+		{"fok", "FOK_WOULD_KILL"},
+	}
+	for _, c := range cases {
+		for _, side := range []string{"buy", "sell"} {
+			for _, pp := range []string{"", "true"} {
+				name := c.tif + "/" + side
+				if pp != "" {
+					name += "/pp"
+				}
+				t.Run(name, func(t *testing.T) {
+					for _, book := range []string{"empty", "fill-side-empty"} {
+						var bids, asks []BookLevel
+						if book == "fill-side-empty" {
+							if side == "buy" {
+								bids = degradeBids
+							} else {
+								asks = degradeAsks
+							}
+						}
+						values := map[string]string{"symbol": "btc_krw", "side": side, "orderType": "limit",
+							"price": "10000000", "qty": "0.01", "timeInForce": c.tif, "accountSeq": "1"}
+						if pp != "" {
+							values["pp"] = pp
+						}
+						_, ws := analyze(t, values, bids, asks)
+						if !hasCode(ws, "NO_OPPOSING_LIQUIDITY") {
+							t.Fatalf("%s: want the cause NO_OPPOSING_LIQUIDITY, got: %s", book, codes(ws))
+						}
+						if !hasCode(ws, c.want) {
+							t.Fatalf("%s: want the consequence %s alongside it, got: %s", book, c.want, codes(ws))
+						}
+						// The cause must name the TIF, not just the order type. An
+						// otherwise identical gtc limit rests here, so a message saying
+						// only "this limit <side>" reads as a claim about every limit
+						// order and contradicts the resting case.
+						for _, w := range ws {
+							if w.Code != WarnNoOpposingLiquidity {
+								continue
+							}
+							if !strings.Contains(w.Message, c.tif+" limit") {
+								t.Errorf("%s: NO_OPPOSING_LIQUIDITY must name the tif that blocks resting, got: %s", book, w.Message)
+							}
+						}
+						assertNoSpurious(t, ws)
+					}
+				})
+			}
+		}
+	}
+}
+
+// TestAnalyzePlaceEmptyBookStillChecksNotionalAndTick is the costly-omission
+// guard: a first maker sizing small to test a new listing gets the same
+// order-value and tick-grid rejection warnings on an empty book as anywhere else.
+// Neither check needs a book price. What such an order must NOT get is a
+// nothing-would-execute verdict — it rests; the actionable signal is that no
+// price-sanity check could run.
+func TestAnalyzePlaceEmptyBookStillChecksNotionalAndTick(t *testing.T) {
+	for _, tif := range []string{"gtc", "po"} {
+		// Off the 1000 tick grid, and 1000.05 KRW is under the 5000 minimum.
+		sim, ws := analyze(t, map[string]string{
+			"symbol": "btc_krw", "side": "buy", "orderType": "limit",
+			"price": "10000500", "qty": "0.0001", "timeInForce": tif, "accountSeq": "1",
+		}, nil, nil)
+		if sim.Notional != "1000.05" {
+			t.Fatalf("%s: a limit order carries its own price, so it is always valuable: %+v", tif, sim)
+		}
+		if !hasCode(ws, "NOTIONAL_BELOW_MIN") {
+			t.Fatalf("%s: want NOTIONAL_BELOW_MIN on an empty book, got: %s", tif, codes(ws))
+		}
+		if !hasCode(ws, "PRICE_OFF_TICK") {
+			t.Fatalf("%s: want PRICE_OFF_TICK on an empty book, got: %s", tif, codes(ws))
+		}
+		if !hasCode(ws, "MID_PRICE_UNAVAILABLE") {
+			t.Fatalf("%s: a resting limit's actionable signal is the unrun price check, got: %s", tif, codes(ws))
+		}
+		if hasCode(ws, "NO_OPPOSING_LIQUIDITY") {
+			t.Fatalf("%s: a first maker executes nothing BY DESIGN; that is not a warning: %s", tif, codes(ws))
+		}
+		if sim.EstRemainingQty != "0.0001" || !strings.Contains(sim.Disposition, "rests") {
+			t.Fatalf("%s: the whole quantity rests, and the simulation must say so: %+v", tif, sim)
+		}
+	}
+	// The other bound too, on the sell side.
+	_, ws := analyze(t, map[string]string{
+		"symbol": "btc_krw", "side": "sell", "orderType": "limit",
+		"price": "10000000", "qty": "1000", "timeInForce": "gtc", "accountSeq": "1",
+	}, nil, nil)
+	if !hasCode(ws, "NOTIONAL_ABOVE_MAX") {
+		t.Fatalf("want NOTIONAL_ABOVE_MAX on an empty book, got: %s", codes(ws))
+	}
+}
+
+// TestAnalyzePlaceUnavailablePricesMarshalEmpty pins the JSON shape an agent
+// reads: the three reference-price keys are always present, and an unavailable
+// price is the empty string — never "0", which would parse as a real price.
+func TestAnalyzePlaceUnavailablePricesMarshalEmpty(t *testing.T) {
+	sim, _ := analyze(t, map[string]string{
+		"symbol": "btc_krw", "side": "buy", "orderType": "limit",
+		"price": "10000000", "qty": "0.01", "accountSeq": "1",
+	}, nil, nil)
+	b, err := json.Marshal(sim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(b)
+	for _, want := range []string{`"bestBid":""`, `"bestAsk":""`, `"mid":""`} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("want %s in the JSON document, got: %s", want, got)
+		}
+	}
+	for _, bad := range []string{`"bestBid":"0"`, `"bestAsk":"0"`, `"mid":"0"`} {
+		if strings.Contains(got, bad) {
+			t.Fatalf("a fabricated zero price reached the JSON: %s", got)
+		}
+	}
+}
+
+// ---- the structural outcome token ----
+
+// The book fixtures the outcome cases need beyond the two-sided degrade pair: a
+// spread wider than a default 5% protection band (so protection excludes even the
+// best opposing level), a book whose top levels are crossed (the only shape that
+// makes a post-only BEST order marketable), and the partial-trim book.
+var (
+	wideBids    = []BookLevel{{Price: "9000000", Qty: "5"}}
+	wideAsks    = []BookLevel{{Price: "11000000", Qty: "5"}}
+	lockedBids  = []BookLevel{{Price: "10002000", Qty: "2"}}
+	lockedAsks  = []BookLevel{{Price: "10001000", Qty: "2"}}
+	trimmedBids = []BookLevel{{Price: "9999000", Qty: "2"}}
+	trimmedAsks = []BookLevel{{Price: "10001000", Qty: "1"}, {Price: "11000000", Qty: "5"}}
+)
+
+// TestAnalyzePlaceOutcomeTokenPerBranch pins Outcome at every terminal branch of
+// the analysis. The token is what a consumer BRANCHES on (a fee estimate, a UI
+// label, an agent's decision) — Disposition is prose for a human and must never be
+// pattern-matched, and Marketable answers a different question entirely — so a
+// branch that sets the wrong token, or none, silently misstates the order.
+func TestAnalyzePlaceOutcomeTokenPerBranch(t *testing.T) {
+	cases := []struct {
+		name       string
+		bids, asks []BookLevel
+		values     map[string]string
+		want       PlaceOutcome
+	}{
+		// market
+		{
+			name: "market buy sweeps the asks", bids: degradeBids, asks: degradeAsks,
+			values: map[string]string{"side": "buy", "orderType": "market", "amt": "100010"},
+			want:   OutcomeFills,
+		},
+		{
+			name: "market sell sweeps the bids", bids: degradeBids, asks: degradeAsks,
+			values: map[string]string{"side": "sell", "orderType": "market", "qty": "0.01"},
+			want:   OutcomeFills,
+		},
+		{
+			name:   "market buy with no asks at all",
+			values: map[string]string{"side": "buy", "orderType": "market", "amt": "100010"},
+			want:   OutcomeNothing,
+		},
+		{
+			name: "market buy whose every level price protection excludes", bids: wideBids, asks: wideAsks,
+			values: map[string]string{"side": "buy", "orderType": "market", "amt": "500000", "pp": "true"},
+			want:   OutcomeNothing,
+		},
+		// limit
+		{
+			name: "non-crossing gtc limit", bids: degradeBids, asks: degradeAsks,
+			values: map[string]string{"side": "buy", "orderType": "limit", "price": "9000000", "qty": "0.01", "timeInForce": "gtc"},
+			want:   OutcomeRests,
+		},
+		{
+			name: "crossing gtc limit that fills part and rests the rest", bids: degradeBids, asks: degradeAsks,
+			values: map[string]string{"side": "buy", "orderType": "limit", "price": "10001000", "qty": "5", "timeInForce": "gtc"},
+			want:   OutcomeFills,
+		},
+		{
+			name: "gtc limit as the first maker on an empty book",
+			values: map[string]string{"side": "buy", "orderType": "limit",
+				"price": "10000000", "qty": "0.01", "timeInForce": "gtc"},
+			want: OutcomeRests,
+		},
+		{
+			name: "non-crossing post-only limit", bids: degradeBids, asks: degradeAsks,
+			values: map[string]string{"side": "buy", "orderType": "limit", "price": "9000000", "qty": "0.01", "timeInForce": "po"},
+			want:   OutcomeRests,
+		},
+		{
+			name: "crossing post-only limit (rejected)", bids: degradeBids, asks: degradeAsks,
+			values: map[string]string{"side": "buy", "orderType": "limit", "price": "10001000", "qty": "1", "timeInForce": "po"},
+			want:   OutcomeNothing,
+		},
+		{
+			name: "partially fillable fill-or-kill limit (killed)", bids: degradeBids, asks: degradeAsks,
+			values: map[string]string{"side": "buy", "orderType": "limit", "price": "10001000", "qty": "5", "timeInForce": "fok"},
+			want:   OutcomeNothing,
+		},
+		{
+			name: "fill-or-kill limit the crossing book covers", bids: degradeBids, asks: degradeAsks,
+			values: map[string]string{"side": "buy", "orderType": "limit", "price": "10001000", "qty": "2", "timeInForce": "fok"},
+			want:   OutcomeFills,
+		},
+		{
+			name: "non-crossing ioc limit (expired)", bids: degradeBids, asks: degradeAsks,
+			values: map[string]string{"side": "buy", "orderType": "limit", "price": "9000000", "qty": "0.01", "timeInForce": "ioc"},
+			want:   OutcomeNothing,
+		},
+		{
+			name: "crossing ioc limit that fills part and cancels the rest", bids: degradeBids, asks: degradeAsks,
+			values: map[string]string{"side": "buy", "orderType": "limit", "price": "10001000", "qty": "5", "timeInForce": "ioc"},
+			want:   OutcomeFills,
+		},
+		{
+			name: "ioc limit with no asks at all",
+			values: map[string]string{"side": "buy", "orderType": "limit",
+				"price": "10000000", "qty": "0.01", "timeInForce": "ioc"},
+			want: OutcomeNothing,
+		},
+		{
+			name: "crossing limit whose whole quantity price protection cancels", bids: wideBids, asks: wideAsks,
+			values: map[string]string{"side": "buy", "orderType": "limit", "price": "11000000", "qty": "1",
+				"timeInForce": "gtc", "pp": "true"},
+			want: OutcomeNothing,
+		},
+		{
+			name: "crossing limit price protection only trims", bids: trimmedBids, asks: trimmedAsks,
+			values: map[string]string{"side": "buy", "orderType": "limit", "price": "11000000", "qty": "3",
+				"timeInForce": "gtc", "pp": "true"},
+			want: OutcomeFills,
+		},
+		// best (BBO)
+		{
+			name: "post-only best resting at its queue peg", bids: degradeBids, asks: degradeAsks,
+			values: map[string]string{"side": "sell", "orderType": "best", "timeInForce": "po", "bestNth": "1", "qty": "0.01"},
+			want:   OutcomeRests,
+		},
+		{
+			name: "post-only best pegged across a crossed book (rejected)", bids: lockedBids, asks: lockedAsks,
+			values: map[string]string{"side": "buy", "orderType": "best", "timeInForce": "po", "bestNth": "1", "amt": "100000"},
+			want:   OutcomeNothing,
+		},
+		{
+			name: "taker best filling at its peg", bids: degradeBids, asks: degradeAsks,
+			values: map[string]string{"side": "buy", "orderType": "best", "timeInForce": "ioc", "bestNth": "1", "amt": "10000000"},
+			want:   OutcomeFills,
+		},
+		{
+			name: "fill-or-kill best over the peg depth (killed)", bids: degradeBids, asks: degradeAsks,
+			values: map[string]string{"side": "buy", "orderType": "best", "timeInForce": "fok", "bestNth": "1", "amt": "30000000"},
+			want:   OutcomeNothing,
+		},
+		{
+			name: "best whose --best-nth level is not visible", bids: degradeBids, asks: degradeAsks,
+			values: map[string]string{"side": "buy", "orderType": "best", "timeInForce": "ioc", "bestNth": "5", "amt": "10000000"},
+			want:   OutcomeNothing,
+		},
+		{
+			name: "post-only best whose queue side is empty", bids: degradeBids,
+			values: map[string]string{"side": "sell", "orderType": "best", "timeInForce": "po", "bestNth": "1", "qty": "0.01"},
+			want:   OutcomeNothing,
+		},
+		{
+			name: "gtc best whose every level price protection excludes", bids: wideBids, asks: wideAsks,
+			values: map[string]string{"side": "buy", "orderType": "best", "timeInForce": "gtc", "bestNth": "1",
+				"amt": "500000", "pp": "true"},
+			want: OutcomeNothing,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			c.values["symbol"], c.values["accountSeq"] = "btc_krw", "1"
+			sim, _ := analyze(t, c.values, c.bids, c.asks)
+			if sim.Outcome != c.want {
+				t.Fatalf("outcome = %q, want %q: %+v", sim.Outcome, c.want, sim)
+			}
+			// The token is the disposition's structural twin, so an order that does not
+			// execute in full must also say so in prose — a human reads that one.
+			// (A fully filled order has no remainder to describe, hence no disposition.)
+			if c.want != OutcomeFills && sim.Disposition == "" {
+				t.Fatalf("an outcome without a disposition leaves a human with nothing to read: %+v", sim)
+			}
+		})
+	}
+}
+
+// TestAnalyzePlaceOutcomeIsNotMarketable: the token exists because Marketable
+// answers a different question — "would this take liquidity" — which is true of
+// two orders that execute nothing at all. Keying a fee (or any decision) off
+// Marketable charges a taker fee on an order the server never fills.
+func TestAnalyzePlaceOutcomeIsNotMarketable(t *testing.T) {
+	cases := []struct {
+		name   string
+		values map[string]string
+	}{
+		{"crossing post-only", map[string]string{"side": "buy", "orderType": "limit",
+			"price": "10001000", "qty": "1", "timeInForce": "po"}},
+		{"partially fillable fill-or-kill", map[string]string{"side": "buy", "orderType": "limit",
+			"price": "10001000", "qty": "5", "timeInForce": "fok"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			c.values["symbol"], c.values["accountSeq"] = "btc_krw", "1"
+			sim, _ := analyze(t, c.values, degradeBids, degradeAsks)
+			if !sim.Marketable {
+				t.Fatalf("this order WOULD take liquidity — that is the trap the token exists for: %+v", sim)
+			}
+			if sim.Outcome != OutcomeNothing {
+				t.Fatalf("outcome = %q, want %q — it executes nothing: %+v", sim.Outcome, OutcomeNothing, sim)
+			}
+		})
+	}
+}
+
+// TestAnalyzePlaceOutcomeUnsetWithoutASize: the token is a verdict, so an order
+// too incomplete to have one — a UI draft with no price or quantity typed yet —
+// reports none rather than a default that reads as an answer.
+func TestAnalyzePlaceOutcomeUnsetWithoutASize(t *testing.T) {
+	sim, _ := analyze(t, map[string]string{
+		"symbol": "btc_krw", "side": "buy", "orderType": "limit", "timeInForce": "gtc", "accountSeq": "1",
+	}, degradeBids, degradeAsks)
+	if sim.Outcome != "" {
+		t.Fatalf("outcome = %q, want empty: %+v", sim.Outcome, sim)
+	}
+	b, err := json.Marshal(sim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), `"outcome"`) {
+		t.Fatalf("an absent verdict must be omitted from the JSON, not sent empty: %s", b)
+	}
+	// And it IS in the document once there is a verdict to report.
+	sim, _ = analyze(t, map[string]string{
+		"symbol": "btc_krw", "side": "buy", "orderType": "limit",
+		"price": "9000000", "qty": "0.01", "timeInForce": "gtc", "accountSeq": "1",
+	}, degradeBids, degradeAsks)
+	b, err = json.Marshal(sim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"outcome":"rests"`) {
+		t.Fatalf("want the outcome token in the JSON document: %s", b)
+	}
+}
+
+// TestAnalyzePlaceNoVerdictForASizelessDraftOnAnEmptyBook: the statement made from
+// the BOOK's shape alone obeys the same rule as every other verdict — a request
+// with no determinable size has none. An empty book is where this bites: it is the
+// one path that answers before any sizing branch runs, so a draft mid-entry would
+// otherwise be told it rests (or executes nothing) before it has a size at all.
+func TestAnalyzePlaceNoVerdictForASizelessDraftOnAnEmptyBook(t *testing.T) {
+	cases := []struct {
+		name      string
+		sizeless  map[string]string // the draft as a UI holds it mid-entry
+		sizeField string            // the field that sizes THIS shape
+		size      string
+		want      PlaceOutcome // the verdict once it is sized
+		wantRests bool         // and whether the disposition says it rests
+	}{
+		{
+			name:      "gtc limit can rest",
+			sizeless:  map[string]string{"side": "buy", "orderType": "limit", "timeInForce": "gtc"},
+			sizeField: "qty", size: "0.01", want: OutcomeRests, wantRests: true,
+		},
+		{
+			name:      "market buy cannot rest, and is sized by amt",
+			sizeless:  map[string]string{"side": "buy", "orderType": "market"},
+			sizeField: "amt", size: "100000", want: OutcomeNothing,
+		},
+		{
+			name:      "market sell cannot rest, and is sized by qty",
+			sizeless:  map[string]string{"side": "sell", "orderType": "market"},
+			sizeField: "qty", size: "0.01", want: OutcomeNothing,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			c.sizeless["symbol"], c.sizeless["accountSeq"] = "btc_krw", "1"
+			sim, ws := analyze(t, c.sizeless, nil, nil)
+			if sim.Outcome != "" || sim.Disposition != "" {
+				t.Fatalf("no size, no verdict: outcome=%q disposition=%q", sim.Outcome, sim.Disposition)
+			}
+			b, err := json.Marshal(sim)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, key := range []string{`"outcome"`, `"remainingDisposition"`} {
+				if strings.Contains(string(b), key) {
+					t.Fatalf("an absent verdict is omitted from the JSON, not sent empty: %s", b)
+				}
+			}
+			// The book-shape ADVICE is not gated on the size — it is true of this book
+			// and this tif while the size is still being typed.
+			if got := hasCode(ws, "NO_OPPOSING_LIQUIDITY"); got != (c.want == OutcomeNothing) {
+				t.Fatalf("NO_OPPOSING_LIQUIDITY = %v on a sizeless draft, want %v: %s", got, c.want == OutcomeNothing, codes(ws))
+			}
+
+			// The same draft with a size reports both — and keeps the empty-side wording
+			// that this early statement exists for, never the sweep's "exhausted" (a book
+			// with no resting orders did not run out).
+			sized := map[string]string{c.sizeField: c.size}
+			for k, v := range c.sizeless {
+				sized[k] = v
+			}
+			sim, _ = analyze(t, sized, nil, nil)
+			if sim.Outcome != c.want {
+				t.Fatalf("outcome = %q, want %q: %+v", sim.Outcome, c.want, sim)
+			}
+			if !strings.Contains(sim.Disposition, "side of the book is empty") || strings.Contains(sim.Disposition, "exhausted") {
+				t.Fatalf("the empty-side wording must win over the sweep-derived one: %q", sim.Disposition)
+			}
+			if rests := strings.Contains(sim.Disposition, "rests"); rests != c.wantRests {
+				t.Fatalf("disposition %q: rests=%v, want %v", sim.Disposition, rests, c.wantRests)
+			}
+		})
+	}
+	// The gate must read the same field the sizing branch does: a market BUY spends a
+	// quote amt, so a qty on one sizes nothing and leaves that draft without a verdict.
+	sim, _ := analyze(t, map[string]string{
+		"symbol": "btc_krw", "side": "buy", "orderType": "market", "qty": "0.01", "accountSeq": "1",
+	}, nil, nil)
+	if sim.Outcome != "" || sim.Disposition != "" {
+		t.Fatalf("a market buy is sized by amt, not qty: outcome=%q disposition=%q", sim.Outcome, sim.Disposition)
+	}
+}
+
+// TestAnalyzePlaceMidUnavailableNamesOnlyTheChecksThatApplied: the warning reports
+// checks the missing mid suppressed, so it must name the ones this order actually
+// had. A plain limit never asked for price protection and a protected market order
+// has no limit price to sanity-check; naming both there is true but reads as a lost
+// check, which on a money path misleads as much as a hidden one.
+func TestAnalyzePlaceMidUnavailableNamesOnlyTheChecksThatApplied(t *testing.T) {
+	const limitCheck = "limit price sanity check"
+	const ppCheck = "--pp price protection estimate"
+	cases := []struct {
+		name          string
+		values        map[string]string
+		want, notWant string
+	}{
+		{
+			name: "a limit price, no protection requested",
+			values: map[string]string{"side": "buy", "orderType": "limit",
+				"price": "10000000", "qty": "0.01", "timeInForce": "gtc"},
+			want: limitCheck, notWant: ppCheck,
+		},
+		{
+			name:   "protection requested, no limit price to check",
+			values: map[string]string{"side": "buy", "orderType": "market", "amt": "100000", "pp": "true"},
+			want:   ppCheck, notWant: limitCheck,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			c.values["symbol"], c.values["accountSeq"] = "btc_krw", "1"
+			_, ws := analyze(t, c.values, nil, nil)
+			msg := warnMessage(ws, WarnMidPriceUnavailable)
+			if msg == "" {
+				t.Fatalf("want MID_PRICE_UNAVAILABLE: %s", codes(ws))
+			}
+			if !strings.Contains(msg, c.want) {
+				t.Fatalf("want the applicable check named (%q): %q", c.want, msg)
+			}
+			if strings.Contains(msg, c.notWant) {
+				t.Fatalf("a check this order never had must not be reported as lost (%q): %q", c.notWant, msg)
+			}
+			if !strings.Contains(msg, "not evidence") {
+				t.Fatalf("every variant must keep the silence-is-not-a-pass clause: %q", msg)
+			}
+		})
+	}
+
+	// A protected limit order is the one shape both checks apply to, so both are
+	// named — and that is the only shape where they are.
+	_, ws := analyze(t, map[string]string{"symbol": "btc_krw", "side": "buy", "orderType": "limit",
+		"price": "10000000", "qty": "0.01", "timeInForce": "gtc", "pp": "true", "accountSeq": "1"}, nil, nil)
+	msg := warnMessage(ws, WarnMidPriceUnavailable)
+	if !strings.Contains(msg, limitCheck) || !strings.Contains(msg, ppCheck) || !strings.Contains(msg, "not evidence") {
+		t.Fatalf("a protected limit lost both checks and must be told so: %q", msg)
+	}
+}
+
+// warnMessage returns the rendered message of the first warning with code, or "".
+func warnMessage(ws []PlaceWarning, code PlaceWarningCode) string {
+	for _, w := range ws {
+		if w.Code == code {
+			return w.Message
+		}
+	}
+	return ""
+}
+
 func TestPrePlaceSkipsWhenBookUnavailable(t *testing.T) {
 	doer := fakeMarketDoer{err: context.DeadlineExceeded}
 	_, _, err := PrePlaceCheck(context.Background(), rawapi.New(doer, nil), map[string]string{

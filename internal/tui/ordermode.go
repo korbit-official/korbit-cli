@@ -938,20 +938,24 @@ func (m model) orderGate() string {
 }
 
 // draftGate is the full placement gate for one concrete draft: orderGate plus
-// the empty-book rule, which depends on what the draft IS (a market order
-// can't fill, an ioc/fok limit can't rest — emptyBookRefusal). Every surface
-// must pass ITS OWN draft — the panel its form draft (panelGate), the command
-// bar its resolved/armed order, the ladder its arming/armed order — never
-// another surface's: judging, say, a command-bar market order by the panel's
-// draft would pass refused orders and refuse valid ones.
+// the rule that depends on what the draft IS and on which SIDE of the book it
+// needs (a market order or an ioc/fok limit can't fill from an empty side, a best
+// order can't peg to one — fillSideRefusal). It is consulted for ANY live book,
+// not only a wholly orderless one: a one-sided book classifies as StatusPresent,
+// so keying this on state.StatusEmpty would arm and place a market BUY against a
+// book holding no asks at all. Every surface must pass ITS OWN draft — the panel
+// its form draft (panelGate), the command bar its resolved/armed order, the
+// ladder its arming/armed order — never another surface's: judging, say, a
+// command-bar market order by the panel's draft would pass refused orders and
+// refuse valid ones.
 func (m model) draftGate(d orderDraft) string {
 	if reason := m.orderGate(); reason != "" {
 		return reason
 	}
-	if m.orderbookStatus(m.symbol()) == state.StatusEmpty {
-		return emptyBookRefusal(d)
-	}
-	return ""
+	// orderGate has already refused a NOT-READY book, so a side missing here is the
+	// market's own emptiness rather than data still on its way.
+	book, _ := m.store.Orderbook(m.symbol())
+	return fillSideRefusal(d, book)
 }
 
 // panelGate is draftGate for the order panel's own draft — the gate every

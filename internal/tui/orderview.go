@@ -427,11 +427,16 @@ func (o orderModel) warningLines(inner int, p orderPreview) []orderFormLine {
 
 // fatalWarnCodes are the would-not-execute preplace warning classes — the
 // server rejects (or kills) the order outright, or it expires with no fill —
-// rendered as errors.
+// rendered as errors. WarnNoOpposingLiquidity belongs here for the same reason:
+// the side the order would take from holds nothing and the order cannot rest, so
+// nothing executes (the gate refuses it too — see fillSideRefusal).
+// WarnMidPriceUnavailable deliberately does NOT: it reports that a check could
+// not run, which is a caveat on the analysis, not a verdict on the order — error
+// styling would claim a failure the analysis never found.
 var fatalWarnCodes = map[ops.PlaceWarningCode]bool{
 	ops.WarnPostOnlyWouldReject: true, ops.WarnFOKWouldKill: true, ops.WarnIOCWouldExpire: true,
 	ops.WarnNotionalBelowMin: true, ops.WarnNotionalAboveMax: true, ops.WarnPriceOffTick: true,
-	ops.WarnBestPegUnavailable: true,
+	ops.WarnBestPegUnavailable: true, ops.WarnNoOpposingLiquidity: true,
 }
 
 // warningLine renders one preplace warning as a styled truncated line: a

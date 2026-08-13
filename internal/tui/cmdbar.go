@@ -473,8 +473,9 @@ func (m model) cmdBarResolve() (orderDraft, string, error) {
 }
 
 // armCmdBar resolves and freezes the order for review. The gate runs on the
-// RESOLVED draft (draftGate), after parsing: what an empty book refuses
-// depends on the typed order's own type/tif, not the order panel's draft.
+// RESOLVED draft (draftGate), after parsing: which orders a book missing a side
+// refuses depends on the typed order's own type/tif/side, not the order panel's
+// draft.
 func (m model) armCmdBar() (tea.Model, tea.Cmd) {
 	c := m.cmdbar
 	d, note, err := m.cmdBarResolve()

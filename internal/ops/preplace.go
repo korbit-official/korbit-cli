@@ -52,6 +52,33 @@ const (
 	WarnBookDepthLimited      PlaceWarningCode = "BOOK_DEPTH_LIMITED"
 	WarnPriceProtectionCapped PlaceWarningCode = "PRICE_PROTECTION_CAPPED"
 	WarnBestPegUnavailable    PlaceWarningCode = "BEST_PEG_UNAVAILABLE"
+	// WarnNoOpposingLiquidity: the side this order would take from holds no
+	// resting orders, AND this order cannot rest — so nothing would execute. It
+	// carries exactly that one meaning, because a consumer styles a warning by its
+	// code alone (the TUI renders some codes as errors): a code that meant "fatal"
+	// for one order and "normal first maker" for another could not be styled at
+	// all. An order that CAN rest is therefore not warned here — resting on an
+	// empty side is the ordinary outcome, already stated by the simulation's
+	// disposition, unfilled quantity and empty reference prices. Deliberately
+	// distinct from WarnInsufficientLiquidity, which means the book ran out
+	// part-way through a fill; here there was nothing to fill against at all.
+	//
+	// The same rule exists a second time as a UI policy: the TUI's
+	// fillSideRefusal (internal/tui/orderentry.go) REFUSES to arm the orders warned
+	// here, instead of advising. Its refusal set is a strict SUPERSET, because it
+	// also refuses a post-only best order whose queue side is empty — the case this
+	// layer reports as WarnBestPegUnavailable, the more accurate reason. The
+	// duplication is deliberate — a warning is advice an agent may override, a gate
+	// is a decision a terminal makes for its user — so keep the two in step: change
+	// one, change the other.
+	WarnNoOpposingLiquidity PlaceWarningCode = "NO_OPPOSING_LIQUIDITY"
+	// WarnMidPriceUnavailable: no mid could be computed (it needs a best price on
+	// both sides), so the checks measured against it — a limit's price sanity and
+	// --pp price protection — did not run. Emitted only when one of them would
+	// otherwise have applied, and never as evidence that the price is sound. The
+	// message names the check(s) that actually applied to THIS order, since on most
+	// orders only one of the two ever could.
+	WarnMidPriceUnavailable PlaceWarningCode = "MID_PRICE_UNAVAILABLE"
 )
 
 // PlaceWarning is one advisory customer-protection finding produced by the
@@ -75,6 +102,34 @@ type PlaceWarning struct {
 	Args   []any  `json:"-"`
 }
 
+// PlaceOutcome is the structural verdict of the simulation — what becomes of the
+// order against the current book — as a stable token a consumer branches on. Its
+// string values are part of the `--json` contract, so they never change.
+//
+// It exists because no other field answers that question. Marketable and the Est*
+// fields describe the hypothetical crossing (a killed fill-or-kill and a filled
+// market order are both marketable, and only one of them executes), and
+// Disposition, which does state the outcome, is prose written for a human to read
+// — never to be pattern-matched. Anything that must DECIDE on the outcome — a fee
+// estimate, a UI label, an agent's branch — reads this.
+type PlaceOutcome string
+
+const (
+	// OutcomeFills: some or all of the order executes immediately. A partial fill
+	// whose remainder rests or cancels is still this — something trades now.
+	OutcomeFills PlaceOutcome = "fills"
+	// OutcomeRests: nothing executes now, and the order sits on the book as a maker
+	// waiting to be filled — a non-crossing gtc/po order, including the first maker
+	// on a side with no resting orders.
+	OutcomeRests PlaceOutcome = "rests"
+	// OutcomeNothing: nothing executes AND nothing rests. The order is rejected (a
+	// crossing post-only), killed (a fill-or-kill that cannot fill in full), expired
+	// (a non-crossing IOC), unpriceable (a best order whose peg level is not
+	// visible), or canceled in whole — a market/IOC order with no liquidity to take,
+	// or an order price protection cancels in full.
+	OutcomeNothing PlaceOutcome = "nothing"
+)
+
 // SimulationDisclaimer is attached to every PlaceSimulation. It is load-bearing:
 // the numbers are a simulation against the current public orderbook, NOT the
 // outcome of a real placement — the book moves between this estimate and a real
@@ -89,6 +144,12 @@ type PlaceSimulation struct {
 	// Disclaimer is always set and states plainly that this is an estimate.
 	Disclaimer string `json:"disclaimer"`
 
+	// BestBid, BestAsk and Mid are the reference prices the analysis measured the
+	// order against. Each is EMPTY when the book cannot supply it: a side with no
+	// resting orders has no best price, and the mid needs one on both sides. They
+	// are never zero — a fabricated "0" reads as a real (and extremely favorable)
+	// price and would corrupt any arithmetic or comparison a caller does on it.
+	// The three keys are always present in the JSON; only the value can be empty.
 	BestBid string `json:"bestBid"`
 	BestAsk string `json:"bestAsk"`
 	Mid     string `json:"mid"`
@@ -109,6 +170,11 @@ type PlaceSimulation struct {
 	// Marketable is true when the order (or a limit's crossing portion) would
 	// take liquidity immediately. The Est* fields describe that simulated taker
 	// fill; they are empty for a non-crossing limit (which rests in full).
+	//
+	// It answers "would this take liquidity", NOT "does this execute": a crossing
+	// post-only is rejected and an unfillable fill-or-kill is killed, both
+	// marketable and both executing nothing. Read Outcome for what becomes of the
+	// order.
 	Marketable        bool   `json:"marketable"`
 	EstFilledQty      string `json:"estFilledQty,omitempty"`
 	EstFilledQuote    string `json:"estFilledQuote,omitempty"`
@@ -126,6 +192,12 @@ type PlaceSimulation struct {
 	// base-sized (amt is converted to qty at the peg) and does report it.
 	EstRemainingQty string `json:"estRemainingQty,omitempty"`
 	Disposition     string `json:"remainingDisposition,omitempty"`
+	// Outcome is Disposition's structural counterpart: the same verdict as one of
+	// three stable tokens (see PlaceOutcome), for a consumer that must BRANCH on it
+	// instead of displaying it. Set wherever a Disposition is; empty only when the
+	// request carries no determinable size yet (a UI draft mid-entry), where there
+	// is no outcome to state.
+	Outcome PlaceOutcome `json:"outcome,omitempty"`
 }
 
 // BookLevel is one orderbook level as its wire strings (price and base
@@ -141,10 +213,11 @@ type BookLevel struct {
 // --dry-run`. It fetches PUBLIC market data only (orderbook, tick-size policy,
 // and the pair listing the order value bounds come from) through the supplied
 // creds-less client, so it signs nothing and works before any key is set up.
-// The returned warnings are advisory. A non-nil error means
-// the orderbook could not be fetched (offline, or an invalid/untradable symbol)
-// and the analysis was skipped — the caller still emits its plan, just without
-// the safety checks.
+// The returned warnings are advisory. A non-nil error means the orderbook could
+// not be FETCHED (offline, or an invalid/untradable symbol) and no analysis
+// happened at all — the caller still emits its plan, just without the safety
+// checks. A book that arrives with an empty side is not that case: it is
+// analyzed, degrading per AnalyzePlace.
 //
 // The orderbook is sufficient for every order type: its top levels ARE the best
 // bid/ask, and walking it simulates exactly what a marketable order (a market /
@@ -162,7 +235,8 @@ func PrePlaceCheck(ctx context.Context, raw *rawapi.Client, values map[string]st
 	if req.OrderType == "limit" {
 		bands = fetchTickBands(ctx, raw, req.Symbol)
 	}
-	return AnalyzePlace(values, toBookLevels(book.Bids), toBookLevels(book.Asks), bands, fetchOrderValueBounds(ctx, raw, req.Symbol))
+	sim, ws := AnalyzePlace(values, toBookLevels(book.Bids), toBookLevels(book.Asks), bands, fetchOrderValueBounds(ctx, raw, req.Symbol))
+	return sim, ws, nil
 }
 
 // toBookLevels converts fetched orderbook levels to the transport-free form.
@@ -181,23 +255,65 @@ func toBookLevels(in []rawapi.OrderbookLevel) []BookLevel {
 // operation runs on); bids/asks are the book's levels in any order (they are
 // sorted defensively); nil/empty bands skip the tick-alignment check; a zero
 // bounds, or one whose Min/Max the pair does not publish, skips the
-// corresponding bound check. The error reports an unusable (empty) book — the
-// analysis needs both sides for a mid.
-func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, bands []TickBand, bounds OrderValueBounds) (PlaceSimulation, []PlaceWarning, error) {
+// corresponding bound check. It returns NO error, deliberately: every input is
+// pre-validated or optional and every book shape has an answer (see below), so
+// the analysis has no failure mode of its own — and a permanently-nil error
+// return would only invite dead error handling at each call site.
+//
+// A book missing a side does not abort the analysis, because most of it does not
+// need the missing price. Two independent axes, both read off the ORDER's side
+// rather than the book alone:
+//
+//   - the FILL side — the side the order takes from (asks for a buy, bids for a
+//     sell). Without it nothing fills immediately: an order that can rest becomes
+//     a maker, one that cannot does not execute. A one-sided book is therefore
+//     NOT uniformly degraded — a sell into a bids-only book sweeps normally.
+//   - the MID — needs a best price on both sides. Without it a limit's price
+//     sanity check and --pp price protection cannot be evaluated at all.
+//
+// Every check is gated on the price it actually needs, and a price the book
+// cannot supply is reported as EMPTY rather than zero (see PlaceSimulation).
+// Substituting zero does not merely lose a check, it inverts one: zero is a real
+// and extremely favorable price, so a buy "crosses" it and a protection band
+// collapses onto it, turning an absent check into a confident wrong answer.
+// A check that could not run says so (MID_PRICE_UNAVAILABLE) instead of leaving
+// the warnings empty, which reads as "safe to place", and an order that cannot
+// execute at all says that (NO_OPPOSING_LIQUIDITY). An order that merely rests
+// as a maker is NOT warned: that is the ordinary outcome and the simulation
+// already states it.
+func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, bands []TickBand, bounds OrderValueBounds) (PlaceSimulation, []PlaceWarning) {
 	req := placeRequest(analysisValues(values))
 
 	asks := sortedLevels(askLevels, true)  // ascending: best ask first
 	bids := sortedLevels(bidLevels, false) // descending: best bid first
-	if len(asks) == 0 || len(bids) == 0 {
-		return PlaceSimulation{}, nil, fmt.Errorf("the orderbook for %s is empty", req.Symbol)
+	// The reference prices are OPTIONAL: a side with no resting orders has no best
+	// price, and the mid needs both. Read the has* flags, never the zero decimal.
+	hasAsk, hasBid := len(asks) > 0, len(bids) > 0
+	var bestAsk, bestBid, mid decimal.Decimal
+	if hasAsk {
+		bestAsk = asks[0].price
 	}
-	bestAsk := asks[0].price
-	bestBid := bids[0].price
-	mid := bestBid.Add(bestAsk).Div(two)
+	if hasBid {
+		bestBid = bids[0].price
+	}
+	hasMid := hasAsk && hasBid
+	if hasMid {
+		mid = bestBid.Add(bestAsk).Div(two)
+	}
 
 	side := string(req.Side)
 	typ := string(req.OrderType)
 	tif := strings.ToLower(tifStr(req.TimeInForce))
+
+	// Whether the request carries a determinable SIZE, read from whichever field
+	// sizes this shape: a market or best BUY spends a quote amt, everything else is
+	// sized by a base qty. It gates the VERDICT at the end of the analysis — see the
+	// clear before the return.
+	sizeField := req.Qty
+	if (typ == "market" || typ == "best") && side == "buy" {
+		sizeField = req.Amt
+	}
+	_, hasSize := decOf(sizeField)
 
 	// Every quote-denominated field below is in this currency: the one the pair
 	// publishes, falling back to the symbol's second segment when the bounds were
@@ -208,9 +324,19 @@ func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, ba
 	}
 
 	sim := PlaceSimulation{
-		Disclaimer: SimulationDisclaimer,
-		BestBid:    dec(bestBid), BestAsk: dec(bestAsk), Mid: dec(mid),
+		Disclaimer:    SimulationDisclaimer,
 		QuoteCurrency: quote,
+	}
+	// A price the book cannot supply stays the empty string; dec(zero) would
+	// publish "0" as if it were a real quote.
+	if hasBid {
+		sim.BestBid = dec(bestBid)
+	}
+	if hasAsk {
+		sim.BestAsk = dec(bestAsk)
+	}
+	if hasMid {
+		sim.Mid = dec(mid)
 	}
 	var ws []PlaceWarning
 	add := func(code PlaceWarningCode, format string, a ...any) {
@@ -220,10 +346,111 @@ func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, ba
 		ws = append(ws, PlaceWarning{Code: code, Message: fmt.Sprintf(format, a...), Format: format, Args: a})
 	}
 
-	// The side of the book a marketable fill consumes, and that side's best price.
-	levels, best := asks, bestAsk
+	// The side of the book a marketable fill consumes, that side's best price, and
+	// whether it exists at all. hasBest=false is the fill side of an empty or
+	// one-sided book: nothing fills immediately, whatever the other side holds.
+	levels, best, hasBest := asks, bestAsk, hasAsk
 	if side == "sell" {
-		levels, best = bids, bestBid
+		levels, best, hasBest = bids, bestBid, hasBid
+	}
+	// --best-nth, 1-based.
+	nth := 0
+	if req.BestNth != nil {
+		nth = *req.BestNth
+	}
+	// A best (BBO) order's peg — the --best-nth level on the side its tif pegs to.
+	// Resolved once here because three separate answers hang off it: whether a
+	// post-only best order can rest at all (canRest below), the simulated fill in
+	// the best branch, and the reference price the order's value is measured at (a
+	// best order rests at, or crosses to, its peg).
+	var peg decimal.Decimal
+	hasPeg := false
+	if typ == "best" {
+		peg, hasPeg = bestPeg(tif, side, bids, asks, nth)
+	}
+	// What an empty fill side means for this order — three outcomes, not
+	// interchangeable:
+	//
+	//   canRest: it sits on the book as a maker instead of taking, so an empty fill
+	//     side is unremarkable. A gtc/po limit; and a post-only BEST order, which
+	//     pegs to its OWN (queue) side rather than the opposing one — on a bids-only
+	//     book a po best BUY pegs to the best bid and rests, while a po best SELL,
+	//     whose queue side is the empty one, cannot.
+	//   unpriceable: a post-only best order its own side cannot price. It does not
+	//     rest either, but the peg — not the missing opposing side — is the reason,
+	//     and BEST_PEG_UNAVAILABLE below states it.
+	//   neither: a market order, an ioc/fok limit, a taker-tif best order. Nothing
+	//     executes, which is what NO_OPPOSING_LIQUIDITY reports.
+	canRest := typ == "limit" && tif != "ioc" && tif != "fok"
+	unpriceable := false
+	if typ == "best" && tif == "po" {
+		canRest = hasPeg
+		unpriceable = !hasPeg
+	}
+	// ppBound is protectionBound gated on the mid EXISTING. Protection is defined
+	// as a percentage band around the mid, so with no mid there is no band and
+	// protection is simply not in effect. Passing a zero mid instead would build a
+	// band around zero, which excludes every level in the book: the sweep would
+	// break on its first level and report the whole order as protection-canceled.
+	ppBound := func() (decimal.Decimal, bool) {
+		if !hasMid {
+			return decimal.Decimal{}, false
+		}
+		return protectionBound(req, side, mid)
+	}
+
+	// State the outcome of an empty fill side up front, so the sweep-derived
+	// wording below cannot describe a book that was never populated as exhausted.
+	// The branches that can be more specific (a rejection, a kill, an expiry, a
+	// best order's peg) overwrite it; fillSimulation deliberately does not.
+	if !hasBest {
+		if canRest {
+			// Not warned: this is the ordinary first-maker outcome, and the simulation
+			// already carries it in full (nothing marketable, the whole quantity
+			// unfilled, and no reference price on the missing side).
+			sim.Disposition = fmt.Sprintf("rests on the book as a maker limit order — the %s side of the book is empty, so nothing fills immediately", oppSideName(side))
+			sim.Outcome = OutcomeRests
+		} else {
+			sim.Disposition = fmt.Sprintf("no fill — the %s side of the book is empty, so there is no liquidity to take; nothing executes", oppSideName(side))
+			sim.Outcome = OutcomeNothing
+			if !unpriceable {
+				// Name the tif, not just the order type: what cannot rest here is an
+				// ioc/fok limit, while an otherwise identical gtc limit rests happily.
+				// Naming the type alone would read as a claim about every limit order,
+				// contradicting the resting case above.
+				kind := typ
+				if typ == "limit" {
+					kind = tif + " limit"
+				}
+				add(WarnNoOpposingLiquidity, "the %s side of the book is empty, so this %s %s has nothing to fill against and would not execute — a limit order with --tif gtc would rest on the book instead.",
+					oppSideName(side), kind, side)
+			}
+		}
+	}
+	// Report the checks the missing mid suppressed — but only where one of them
+	// would otherwise have run: a limit's price sanity check needs a price to
+	// sanity-check (a draft still being typed has none, and the mid is not what
+	// stopped that check), and the --pp estimate applies only to an order that asked
+	// for protection. For anything else the mid is unused, so the warning would be
+	// pure noise.
+	//
+	// Which of the two applied decides the wording. Naming both on an order only one
+	// could ever have run — a plain limit never asked for protection, a protected
+	// market order has no limit price to sanity-check — is true but reads as a lost
+	// check, and on a money path an invented loss is as misleading as a hidden one.
+	// Every variant keeps the load-bearing clause: silence here is not a pass.
+	_, hasLimitPrice := decOf(req.Price)
+	limitCheck := typ == "limit" && hasLimitPrice
+	ppCheck := req.PP != nil && *req.PP
+	if !hasMid {
+		switch {
+		case limitCheck && ppCheck:
+			add(WarnMidPriceUnavailable, "no mid price can be computed — the book has no resting orders on one or both sides, so neither the limit price sanity check (a price far from the market) nor the --pp price protection estimate ran. Their absence is not evidence the price is sound; check it against another source.")
+		case limitCheck:
+			add(WarnMidPriceUnavailable, "no mid price can be computed — the book has no resting orders on one or both sides, so the limit price sanity check (a price far from the market) did not run. Its absence is not evidence the price is sound; check it against another source.")
+		case ppCheck:
+			add(WarnMidPriceUnavailable, "no mid price can be computed — the book has no resting orders on one or both sides, so the --pp price protection estimate did not run. Its absence is not evidence the fill will be held where you expect; check the price against another source.")
+		}
 	}
 
 	switch typ {
@@ -238,7 +465,7 @@ func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, ba
 			target, ok = decOf(req.Qty)
 		}
 		if ok {
-			ppCap, ppOn := protectionBound(req, side, mid)
+			ppCap, ppOn := ppBound()
 			sw := sweep(levels, side, ppCap, ppOn, target, quoteTarget)
 			fillSimulation(&sim, side, sw, best, !quoteTarget, target, false)
 			// The pp cap (not a lack of liquidity) stopped the sweep when it broke
@@ -256,17 +483,15 @@ func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, ba
 		// (gtc/ioc/fok), the own (queue) side's Nth level for post-only (po) — then
 		// behaves like a limit order at that derived price. Simulate the derived
 		// price and its crossing.
-		nth := 0
-		if req.BestNth != nil {
-			nth = *req.BestNth
-		}
-		peg, pegOK := bestPeg(tif, side, bids, asks, nth)
-		if !pegOK {
+		if !hasPeg {
 			// Fewer than --best-nth levels are visible on the pegging side, so the
 			// price can't be derived from the current book. Flag that the order would
 			// likely take no liquidity (rather than leave warnings empty, which reads
-			// as "safe to place"), and report only the reference prices and notional.
+			// as "safe to place"), and report only the reference prices — with no peg
+			// there is no price to value a base-sized SELL at either, so its notional
+			// stays empty (a BUY is valued by its own --amt regardless).
 			sim.Disposition = "no fill — fewer than --best-nth price levels are visible on the side this order pegs to, so no peg price can be set from the current book"
+			sim.Outcome = OutcomeNothing
 			add(WarnBestPegUnavailable, "this best (BBO) %s can't be priced — the current book has fewer levels on the side it pegs to than --best-nth requires, so it would likely take no liquidity.",
 				side)
 			break
@@ -277,13 +502,18 @@ func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, ba
 			// spread and rests as a maker — it never takes. The crossing check below
 			// therefore only fires on a transiently locked/crossed book snapshot; it
 			// is kept as a safety net, mirroring the crossing post-only limit rule.
-			if (side == "buy" && peg.GreaterThanOrEqual(bestAsk)) || (side == "sell" && peg.LessThanOrEqual(bestBid)) {
+			// It needs the OPPOSING best to compare against (the fill side's), so an
+			// empty opposing side skips it: nothing can be crossed there, and a zero
+			// would make every buy peg look like a crossing one.
+			if hasBest && ((side == "buy" && peg.GreaterThanOrEqual(bestAsk)) || (side == "sell" && peg.LessThanOrEqual(bestBid))) {
 				sim.Marketable = true
 				sim.Disposition = "REJECTED — a post-only order priced to cross the book is rejected by the server; nothing executes"
+				sim.Outcome = OutcomeNothing
 				add(WarnPostOnlyWouldReject, "this post-only (--tif po) best %s pegs to %s, which crosses the book (best %s %s) — a post-only order that would take liquidity is rejected.",
 					side, dec(peg), oppSideName(side), dec(best))
 			} else {
 				sim.Disposition = fmt.Sprintf("rests on the book as a maker limit order at %s", dec(peg))
+				sim.Outcome = OutcomeRests
 			}
 			break
 		}
@@ -297,7 +527,7 @@ func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, ba
 			break
 		}
 		limitPrice, ppBinds := peg, false
-		if ppCap, ppOn := protectionBound(req, side, mid); ppOn {
+		if ppCap, ppOn := ppBound(); ppOn {
 			limitPrice = tighter(side, peg, ppCap)
 			ppBinds = limitPrice.Equal(ppCap) && !ppCap.Equal(peg)
 		}
@@ -308,6 +538,7 @@ func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, ba
 			// else at the peg — executes nothing.
 			sim.Marketable = sw.filledBase.IsPositive()
 			sim.Disposition = "KILLED — a fill-or-kill order that cannot fill in full executes nothing"
+			sim.Outcome = OutcomeNothing
 			if ppBinds {
 				add(WarnFOKWouldKill, "this is a fill-or-kill (--tif fok) best %s pegged to %s, but price protection (--pp) limits the immediate fill to %s within %s%% of the mid %s — a FOK that cannot fill in full is KILLED (nothing executes).",
 					side, dec(peg), dec(sw.filledBase), ppPercentStr(req), dec(mid))
@@ -331,14 +562,21 @@ func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, ba
 		if !okp || !okq {
 			break
 		}
-		// Fat-finger: limit price far from mid in the unfavorable direction.
-		if side == "buy" && price.GreaterThan(scale(mid, fatFingerWarnPct, true)) {
-			add(WarnPriceFarAboveMarket, "limit BUY price %s is %s above the mid %s — double-check for an extra digit (you would overpay relative to the market)",
-				dec(price), pctStr(price.Sub(mid), mid), dec(mid))
-		}
-		if side == "sell" && price.LessThan(scale(mid, fatFingerWarnPct, false)) {
-			add(WarnPriceFarBelowMarket, "limit SELL price %s is %s below the mid %s — double-check for a missing digit (you would sell far under the market)",
-				dec(price), pctStr(mid.Sub(price), mid), dec(mid))
+		// Fat-finger: limit price far from mid in the unfavorable direction. It is
+		// entirely a statement about the mid, so with no mid there is nothing to
+		// compare against and the check is skipped (reported by
+		// MID_PRICE_UNAVAILABLE above). A one-sided pseudo-mid — half the lone ask,
+		// say — is worse than none: it would put every sane price 100% "away from
+		// the market" and warn on all of them.
+		if hasMid {
+			if side == "buy" && price.GreaterThan(scale(mid, fatFingerWarnPct, true)) {
+				add(WarnPriceFarAboveMarket, "limit BUY price %s is %s above the mid %s — double-check for an extra digit (you would overpay relative to the market)",
+					dec(price), pctStr(price.Sub(mid), mid), dec(mid))
+			}
+			if side == "sell" && price.LessThan(scale(mid, fatFingerWarnPct, false)) {
+				add(WarnPriceFarBelowMarket, "limit SELL price %s is %s below the mid %s — double-check for a missing digit (you would sell far under the market)",
+					dec(price), pctStr(mid.Sub(price), mid), dec(mid))
+			}
 		}
 		// Price protection (--pp) can hold a crossing limit's taker fill tighter
 		// than the submitted price: the effective taker bound is the tighter of the
@@ -347,7 +585,7 @@ func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, ba
 		// binding constraint.
 		effPrice, ppBinds := price, false
 		if tif != "po" {
-			if ppCap, ppOn := protectionBound(req, side, mid); ppOn {
+			if ppCap, ppOn := ppBound(); ppOn {
 				effPrice = tighter(side, price, ppCap)
 				ppBinds = effPrice.Equal(ppCap) && !ppCap.Equal(price)
 			}
@@ -360,13 +598,16 @@ func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, ba
 		// against the bare price, not effPrice, so it stays true even when price
 		// protection excludes every in-band level. It is what separates a pp-blocked
 		// crossing order (all qty canceled by pp) from a genuinely non-crossing limit
-		// (pp irrelevant — it rests or expires on its own).
-		crosses := (side == "buy" && price.GreaterThanOrEqual(best)) || (side == "sell" && price.LessThanOrEqual(best))
+		// (pp irrelevant — it rests or expires on its own). With no best on the fill
+		// side there is nothing to cross, so it is false: compared against a zero,
+		// every buy price would "cross" a book that holds no asks at all.
+		crosses := hasBest && ((side == "buy" && price.GreaterThanOrEqual(best)) || (side == "sell" && price.LessThanOrEqual(best)))
 		switch {
 		case tif == "po" && marketable:
 			// A crossing post-only is rejected outright; it neither fills nor rests.
 			sim.Marketable = true
 			sim.Disposition = "REJECTED — a post-only order that would cross the book is rejected by the server; nothing executes"
+			sim.Outcome = OutcomeNothing
 			add(WarnPostOnlyWouldReject, "this is a post-only (--tif po) limit %s at %s, but it crosses the book (best %s %s) — a post-only order that would take liquidity will be rejected. Use a non-crossing price, or drop --tif po.",
 				side, dec(price), oppSideName(side), dec(best))
 		case tif == "fok" && !fullyFillable:
@@ -374,6 +615,7 @@ func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, ba
 			// else within the book at the limit price — executes nothing.
 			sim.Marketable = marketable
 			sim.Disposition = "KILLED — a fill-or-kill order that cannot fill in full executes nothing"
+			sim.Outcome = OutcomeNothing
 			if ppBinds {
 				add(WarnFOKWouldKill, "this is a fill-or-kill (--tif fok) limit %s of %s, but price protection (--pp) limits the immediate fill to %s within %s%% of the mid %s — a FOK that cannot fill in full is KILLED (nothing executes).",
 					side, dec(qty), dec(sw.filledBase), ppPercentStr(req), dec(mid))
@@ -386,7 +628,8 @@ func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, ba
 			// would otherwise cross takes nothing: the whole quantity is canceled by
 			// pp — it neither fills nor rests, and it is NOT the non-crossing case
 			// below. gtc and ioc are handled alike here (fok is caught above by its
-			// !fullyFillable kill).
+			// !fullyFillable kill). addProtectionCapped states both the disposition and
+			// the nothing-executes outcome, since nothing was marketable.
 			sim.Marketable = false
 			sim.EstRemainingQty = dec(qty) // base-sized limit: the entire quantity is unfilled (canceled by pp)
 			addProtectionCapped(add, &sim, typ, side, ppPercentStr(req), mid, effPrice)
@@ -398,8 +641,16 @@ func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, ba
 			sim.Marketable = false
 			sim.EstRemainingQty = dec(qty)
 			sim.Disposition = "EXPIRED — an immediate-or-cancel order that does not cross the book takes no liquidity and expires immediately; nothing executes"
-			add(WarnIOCWouldExpire, "this is an immediate-or-cancel (--tif ioc) limit %s at %s, but it does not cross the book (best %s %s) — it takes no liquidity and expires immediately with no fill. Use a crossing price, or drop --tif ioc to rest the order.",
-				side, dec(price), oppSideName(side), dec(best))
+			sim.Outcome = OutcomeNothing
+			if !hasBest {
+				// No opposing side to name a best price from — and no price would cross
+				// an empty one, so the advice is to rest rather than to reprice.
+				add(WarnIOCWouldExpire, "this is an immediate-or-cancel (--tif ioc) limit %s at %s, but the %s side of the book is empty — no price crosses it, so the order takes no liquidity and expires immediately with no fill. Drop --tif ioc to rest the order instead.",
+					side, dec(price), oppSideName(side))
+			} else {
+				add(WarnIOCWouldExpire, "this is an immediate-or-cancel (--tif ioc) limit %s at %s, but it does not cross the book (best %s %s) — it takes no liquidity and expires immediately with no fill. Use a crossing price, or drop --tif ioc to rest the order.",
+					side, dec(price), oppSideName(side), dec(best))
+			}
 		default:
 			// Normal limit: the crossing portion fills now; the remainder rests
 			// (gtc/po/fok-full) or is canceled (ioc).
@@ -423,12 +674,24 @@ func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, ba
 	// Notional, in the pair's quote currency. Each bound WARNING is raised only
 	// against the bound this pair publishes; a bound it does not publish is
 	// skipped, leaving the server as the authority. The notional itself is
-	// reported for every pair (the fee estimate downstream is gated on it).
-	if notional, ok := orderNotional(req, bestBid); ok {
+	// reported for every pair (the fee estimate downstream is gated on it) —
+	// except when the order can only be valued off a book price the book does not
+	// have, where it stays empty and BOTH bound checks are skipped: an unpriceable
+	// order valued at zero would be reported as below every minimum.
+	//
+	// The reference price a base-sized order with no price of its own is valued at:
+	// a best order's peg, because that is where it rests or crosses to, and the best
+	// bid for a market sell, because that is what it sells into. Only a SELL reads
+	// it (see orderNotional).
+	ref, hasRef := bestBid, hasBid
+	if typ == "best" {
+		ref, hasRef = peg, hasPeg
+	}
+	if notional, ok := orderNotional(req, ref, hasRef); ok {
 		sim.Notional = dec(notional)
-		// Worded and thresholded in NotionalBoundWarnings, shared with the TUI's
-		// empty-book preview so the same order raises the same warning whether or
-		// not there is a book to analyze. The unit is the pair entry's own quote
+		// Worded and thresholded once in NotionalBoundWarnings, so the same order
+		// raises the same warning whatever the book's shape — the bounds need no
+		// depth. The unit is the pair entry's own quote
 		// currency wherever the entry carries one, falling back to the symbol's
 		// second segment — the same currency by API contract.
 		ws = append(ws, NotionalBoundWarnings(notional.String(), bounds, quote)...)
@@ -446,7 +709,20 @@ func AnalyzePlace(values map[string]string, bidLevels, askLevels []BookLevel, ba
 		}
 	}
 
-	return sim, ws, nil
+	// No size, no verdict. Every sizing branch above bails out when its size field
+	// is absent or unparseable, so what can reach here without one is a statement
+	// made from the BOOK's shape alone (before the type switch, or a best order's
+	// missing peg) — and a request with no determinable size is not yet an order
+	// whose outcome can be stated. That is what Outcome promises, and Notional is
+	// empty for the same reason. Clearing the pair together keeps the prose and the
+	// token from disagreeing: a sizeless draft must not claim it rests on the book
+	// either. The warnings stay — they are advice about the book, the type and the
+	// tif, true while the size is still being typed.
+	if !hasSize {
+		sim.Disposition, sim.Outcome = "", ""
+	}
+
+	return sim, ws
 }
 
 // analysisValues returns values with accountSeq defaulted: the analysis never
@@ -471,9 +747,28 @@ func analysisValues(values map[string]string) map[string]string {
 // and only the disposition is set. restsRemainder says whether an unfilled
 // remainder rests on the book (a gtc/po limit) or is canceled (a market or IOC
 // order).
+//
+// A disposition the caller has ALREADY stated is left alone: the wording here is
+// derived from the sweep, so it describes a book that ran out, and the caller's
+// is the more specific statement (an empty book side never ran out — it was
+// never populated). The Outcome token follows the same rule, for the same reason.
 func fillSimulation(sim *PlaceSimulation, side string, sw sweepResult, best decimal.Decimal, hasOrderQty bool, orderQty decimal.Decimal, restsRemainder bool) {
 	sim.Marketable = sw.filledBase.IsPositive()
 	sim.FullyFilled = sw.fullyFilled
+	// The structural outcome, read off the same sweep the wording below is derived
+	// from so the token and the prose cannot disagree: anything that fills executes,
+	// an untaken order that may sit on the book rests, and one that can do neither
+	// is canceled/expired unfilled.
+	if sim.Outcome == "" {
+		switch {
+		case sw.filledBase.IsPositive():
+			sim.Outcome = OutcomeFills
+		case restsRemainder:
+			sim.Outcome = OutcomeRests
+		default:
+			sim.Outcome = OutcomeNothing
+		}
+	}
 	if sw.filledBase.IsPositive() {
 		sim.EstFilledQty = dec(sw.filledBase)
 		sim.EstFilledQuote = dec(sw.filledQuote)
@@ -495,13 +790,15 @@ func fillSimulation(sim *PlaceSimulation, side string, sw sweepResult, best deci
 	if hasOrderQty {
 		if rem := orderQty.Sub(sw.filledBase); rem.IsPositive() {
 			sim.EstRemainingQty = dec(rem)
-			if restsRemainder {
+			switch {
+			case sim.Disposition != "": // already stated, and more specific
+			case restsRemainder:
 				sim.Disposition = "rests on the book as a maker limit order"
-			} else {
+			default:
 				sim.Disposition = "canceled — a market/IOC order takes only the available liquidity"
 			}
 		}
-	} else if !sw.fullyFilled {
+	} else if !sw.fullyFilled && sim.Disposition == "" {
 		// Market BUY (quote-sized): the book is exhausted before the full amount is
 		// spent, so the unspent quote is canceled. (A price-protection trim overrides
 		// this disposition at the call site; a best BUY is base-sized, not here.)
@@ -660,10 +957,19 @@ func sortedLevels(in []BookLevel, ascending bool) []bookLevel {
 }
 
 // orderNotional estimates the order's value in the pair's QUOTE currency —
-// whatever that currency is; nothing here depends on which. ok=false only when
-// the size is not determinable from the request. A market/best sell is valued at
-// the best bid.
-func orderNotional(req rawapi.OrderPlaceRequest, bestBid decimal.Decimal) (decimal.Decimal, bool) {
+// whatever that currency is; nothing here depends on which. ok=false when the
+// size is not determinable from the request, or when the only reference price
+// that could value it is missing.
+//
+// The sizing matrix makes this asymmetric, so only one shape is book-dependent: a
+// market/best BUY is sized in quote by amt and a limit order carries its own
+// price, both determinable from the request alone; a market/best SELL carries a
+// base qty and no price of its own, so it is valued at ref — the price the CALLER
+// resolves for the order's type, since a market order sells into the opposing best
+// while a best order rests at (or crosses to) its own peg. Without ref
+// (hasRef=false) such an order cannot be valued: valuing it at zero would report
+// it as below every minimum, a rejection claim the analysis cannot support.
+func orderNotional(req rawapi.OrderPlaceRequest, ref decimal.Decimal, hasRef bool) (decimal.Decimal, bool) {
 	typ := string(req.OrderType)
 	if req.Side == "buy" && (typ == "market" || typ == "best") {
 		return decOf(req.Amt) // amt is the quote currency to spend
@@ -679,8 +985,11 @@ func orderNotional(req rawapi.OrderPlaceRequest, bestBid decimal.Decimal) (decim
 		}
 		return price.Mul(qty), true
 	}
-	// market/best sell: value the base qty at the best bid.
-	return qty.Mul(bestBid), true
+	// market/best sell: value the base qty at the reference price.
+	if !hasRef {
+		return decimal.Decimal{}, false
+	}
+	return qty.Mul(ref), true
 }
 
 // protectionBound returns the price a price-protected (--pp) taker order is held
@@ -713,7 +1022,15 @@ func ppPercentStr(req rawapi.OrderPlaceRequest) string {
 // filled at a worse price. It sets the disposition and emits the warning. The
 // band is directional — a buy fills UP TO the ceiling mid*(1+pct/100), a sell
 // DOWN TO the floor mid*(1-pct/100) — so the two sides get distinct wording.
+//
+// It owns the Outcome token alongside the disposition it overwrites, so the two
+// cannot disagree: a partly filled order still executes, while one whose every
+// takeable level the band excluded neither fills nor rests — its whole quantity is
+// canceled. Callers set the fill fields before calling.
 func addProtectionCapped(add func(PlaceWarningCode, string, ...any), sim *PlaceSimulation, typ, side, pct string, mid, bound decimal.Decimal) {
+	if !sim.Marketable {
+		sim.Outcome = OutcomeNothing
+	}
 	if side == "sell" {
 		sim.Disposition = fmt.Sprintf("unfilled remainder canceled by price protection — fills kept within %s%% of the mid %s (down to %s)", pct, dec(mid), dec(bound))
 		add(WarnPriceProtectionCapped, "price protection (--pp) holds this %s %s to fills within %s%% of the mid %s (down to %s); the unfilled remainder is canceled rather than filled at a worse price.",

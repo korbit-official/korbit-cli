@@ -152,9 +152,9 @@ func (l ladderModel) sizePct() int { return l.sizePcts[l.symbol] }
 
 // handleKey routes one key press. placeGate is the parent's freshness+money
 // gate for placement ("" = clear), resolved per draft (model.draftGate) — the
-// ladder arms both limit and market orders, and what an empty book refuses
-// depends on the draft being armed, so a single precomputed string cannot
-// serve both b/s and B/S; busyGate is the money single-flight alone (a cancel
+// ladder arms both limit and market orders, and which of them a book missing a
+// side refuses depends on the draft being armed, so a single precomputed string
+// cannot serve both b/s and B/S; busyGate is the money single-flight alone (a cancel
 // must work against a stale book); prices are the ladder's visible row prices
 // top to bottom (the row-layout source); bands/fees are the symbol's cached
 // metadata; level is the book's grouping level ("" = raw), which buckets the
@@ -428,7 +428,8 @@ func (l ladderModel) handleConfirmKey(msg tea.KeyPressMsg, placeGate func(orderD
 			return l, ladderActCancel
 		}
 		// Gate the ARMED draft: its tif may have been cycled since arming (the
-		// confirm strip's t key), and on an empty book that changes the verdict.
+		// confirm strip's t key), and on a book missing this order's fill side that
+		// changes the verdict.
 		if g := placeGate(l.armed.draft); g != "" {
 			l.stripErr = g
 			return l, ladderActNone

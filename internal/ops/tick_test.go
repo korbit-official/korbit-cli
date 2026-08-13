@@ -173,13 +173,10 @@ func TestAnalyzePlacePure(t *testing.T) {
 	bands := []TickBand{{PriceGte: "0", TickSize: "1000"}}
 
 	// A resting limit buy on the grid: no warnings, not marketable.
-	sim, ws, err := AnalyzePlace(map[string]string{
+	sim, ws := AnalyzePlace(map[string]string{
 		"symbol": "btc_krw", "side": "buy", "orderType": "limit",
 		"price": "9990000", "qty": "0.01",
 	}, bids, asks, bands, OrderValueBounds{})
-	if err != nil {
-		t.Fatalf("AnalyzePlace: %v", err)
-	}
 	if sim.Marketable || len(ws) != 0 {
 		t.Fatalf("resting limit: marketable=%v warnings=%s", sim.Marketable, codes(ws))
 	}
@@ -194,33 +191,37 @@ func TestAnalyzePlacePure(t *testing.T) {
 	}
 
 	// Off-grid price: the pure path flags it from the supplied bands.
-	_, ws, err = AnalyzePlace(map[string]string{
+	_, ws = AnalyzePlace(map[string]string{
 		"symbol": "btc_krw", "side": "buy", "orderType": "limit",
 		"price": "9990500", "qty": "0.01",
 	}, bids, asks, bands, OrderValueBounds{})
-	if err != nil {
-		t.Fatalf("AnalyzePlace: %v", err)
-	}
 	if !hasCode(ws, "PRICE_OFF_TICK") {
 		t.Fatalf("want PRICE_OFF_TICK, got: %s", codes(ws))
 	}
 
 	// nil bands skip the tick check but nothing else.
-	_, ws, err = AnalyzePlace(map[string]string{
+	_, ws = AnalyzePlace(map[string]string{
 		"symbol": "btc_krw", "side": "buy", "orderType": "limit",
 		"price": "9990500", "qty": "0.01",
 	}, bids, asks, nil, OrderValueBounds{})
-	if err != nil {
-		t.Fatalf("AnalyzePlace: %v", err)
-	}
 	if hasCode(ws, "PRICE_OFF_TICK") {
 		t.Fatalf("nil bands must skip the tick check, got: %s", codes(ws))
 	}
 
-	// An empty side is an unusable book.
-	if _, _, err := AnalyzePlace(map[string]string{
-		"symbol": "btc_krw", "side": "buy", "orderType": "limit", "price": "1", "qty": "1",
-	}, bids, nil, nil, OrderValueBounds{}); err == nil {
-		t.Fatal("empty asks: want an error")
+	// An empty side is analyzed, not refused: the checks that need the missing
+	// price are skipped (and reported), the rest still run. Covered in depth by the
+	// degradation tests in preplace_test.go; pinned here so the pure entry point
+	// never goes back to failing.
+	sim, ws = AnalyzePlace(map[string]string{
+		"symbol": "btc_krw", "side": "buy", "orderType": "limit", "price": "9990500", "qty": "0.01",
+	}, bids, nil, bands, OrderValueBounds{})
+	if sim.BestAsk != "" || sim.Mid != "" || sim.BestBid != "9999000" {
+		t.Fatalf("empty asks: want an empty ask/mid and the real bid, got bid %q ask %q mid %q", sim.BestBid, sim.BestAsk, sim.Mid)
+	}
+	if !hasCode(ws, "MID_PRICE_UNAVAILABLE") || !hasCode(ws, "PRICE_OFF_TICK") {
+		t.Fatalf("empty asks: want the suppressed-mid report + the still-runnable tick check, got: %s", codes(ws))
+	}
+	if hasCode(ws, "NO_OPPOSING_LIQUIDITY") {
+		t.Fatalf("a gtc limit rests as a maker instead of executing; that is not a warning: %s", codes(ws))
 	}
 }
