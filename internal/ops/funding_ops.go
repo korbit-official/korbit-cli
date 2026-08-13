@@ -392,7 +392,7 @@ func init() {
 				{Name: "id", Type: "number", Desc: "KRW withdrawal id"},
 				{Name: "quantity", Type: "string", Desc: "withdrawn amount excluding fee (KRW)"},
 				{Name: "fee", Type: "string", Desc: "withdrawal fee (KRW)"},
-				{Name: "status", Type: "string", Desc: "processing | done | failed | canceled"},
+				{Name: "status", Type: "string", Desc: "pending | reviewing | processing | done | failed | canceled"},
 				{Name: "createdAt", Type: "number", Desc: "withdrawal request timestamp (ms)"},
 			},
 			Examples: []string{"{prog} krw withdraw history --limit 50"},
