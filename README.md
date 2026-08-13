@@ -71,11 +71,11 @@ Run `korbit --help` for the full list and `korbit <command> --help` for the deta
 
 ### Terminal dashboard
 
-`korbit tui` opens a full-screen, interactive dashboard — the quickest way to watch the Korbit market from your terminal. It streams live prices, the order book, recent trades, and a candlestick chart, and switches symbols as you browse. Sign in with `--key <name>` to also see your balances and open orders update live.
+`korbit tui` opens a full-screen, interactive dashboard — the quickest way to watch the Korbit market from your terminal. It streams live prices, the order book, recent trades, and a candlestick chart, and switches symbols as you browse. Signed in with your key, it also shows your balances and open orders updating live. Add `--public` for a market-only view that needs no API key.
 
 ```sh
-korbit tui                     # watch the market
-korbit tui --key trading-bot   # also show your balances and orders
+korbit tui                     # your balances and orders alongside the market
+korbit tui --public            # market only — no API key needed
 ```
 
 ### Real-time stream
