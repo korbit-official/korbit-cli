@@ -126,7 +126,7 @@ func (m *Manager) Start(ctx context.Context) (StartResult, error) {
 		return m.finishStart(ctx, rt, bundle, pf)
 	}
 
-	pf, err := m.bringUpWithVersionGate(ctx, rt, bundle)
+	pf, err := m.bringUpWithRecovery(ctx, rt, bundle)
 	if err != nil {
 		return StartResult{}, err
 	}
@@ -164,19 +164,71 @@ func (m *Manager) freshen(ctx context.Context) (recreated bool, err error) {
 	return recreated, nil
 }
 
-// bringUpWithVersionGate runs the bundle's init-db (if needed) + detached `run`
-// under the min-version gate (MinVersionEnv): if the bundle reports itself too
-// old, it updates the bundle from the source and retries ONCE. A still-too-old
+// withBundleRecovery runs one bundle invocation and recovers ONCE from a corrupt
+// cached bundle: Deno's module cache holds HTML (or otherwise non-JS) for a
+// remote bundle URL — e.g. the docs SPA index served during a deploy gap. It
+// force-refreshes the cache (deno cache --reload) and re-runs; a still-bad body
+// surfaces an actionable error.
+//
+// EVERY bundle invocation `start` makes goes through here — the license banner,
+// the `status --json` reads (readStatusDoc), and the bring-up — because the
+// poisoned cache entry fails all of them alike, and which one runs first depends
+// on the flags and on whether a server is already up. Any other failure, and a
+// corrupt-classified LOCAL source (which can't be a stale cache), passes straight
+// through. The retry is per-invocation: a heal by the first one leaves nothing
+// for the rest to recover from, and when the source is genuinely serving a web
+// page each subsequent invocation re-attempts the refresh — cheap, because what
+// it re-fetches in that case is that page, not the bundle.
+func (m *Manager) withBundleRecovery(ctx context.Context, run func() error) error {
+	err := run()
+	if !isBundleCorrupt(err) {
+		return err
+	}
+	// Only a remote source caches, so a local/file:// bundle can't be a stale
+	// cache — reloading it is a no-op and retrying would fail identically.
+	if localPath(m.sourceURL()) != "" {
+		return err
+	}
+	m.log().Warn("cached sandbox bundle is not valid JavaScript — refreshing and retrying once", "detail", err.Error())
+	if m.deps.Log != nil {
+		m.deps.Log(err.Error() + " — refreshing the bundle and retrying once")
+	}
+	if uerr := m.reloadDenoBundle(ctx); uerr != nil {
+		return fmt.Errorf("%w; refreshing it failed too: %v", err, uerr)
+	}
+	rerr := run()
+	if isBundleCorrupt(rerr) {
+		return fmt.Errorf("%w even after refreshing it from %s — the source may be serving a web page instead of the bundle; check the URL and your network", rerr, m.sourceURL())
+	}
+	return rerr
+}
+
+// bringUpWithRecovery runs the bundle's init-db (if needed) + detached `run`,
+// recovering from the two startup failures a cache refresh fixes: the corrupt
+// cached bundle (withBundleRecovery, shared with every other bundle invocation)
+// and the min-version gate (MinVersionEnv) — the bundle reports itself too old,
+// so it updates the bundle from the source and retries once; a still-too-old
 // bundle, or a failed update, surfaces an actionable error pointing at
-// --skip-version-check. Any non-version failure passes straight through.
-func (m *Manager) bringUpWithVersionGate(ctx context.Context, rt Runtime, bundle string) (Pidfile, error) {
-	pf, err := m.bringUp(ctx, rt, bundle)
+// --skip-version-check.
+//
+// The corrupt-cache recovery runs first (it wraps the bring-up), so a refreshed
+// bundle that then reports itself too old still gets the version recovery and its
+// actionable error — at the cost of a second refresh of the same bundle. Rare
+// enough to leave simple: it needs the source to have served a web page AND the
+// bundle behind it to be outdated.
+func (m *Manager) bringUpWithRecovery(ctx context.Context, rt Runtime, bundle string) (Pidfile, error) {
+	var pf Pidfile
+	err := m.withBundleRecovery(ctx, func() error {
+		var berr error
+		pf, berr = m.bringUp(ctx, rt, bundle)
+		return berr
+	})
 	var vt *versionTooOldError
 	if err == nil || !errors.As(err, &vt) {
 		return pf, err
 	}
-	// SkipVersionCheck leaves MinVersionEnv unset, so the bundle can't raise this;
-	// guard anyway so a stray signal can't loop.
+	// SkipVersionCheck leaves MinVersionEnv unset, so the bundle can't raise
+	// this; guard anyway so a stray signal can't loop.
 	if m.cfg.SkipVersionCheck {
 		return Pidfile{}, err
 	}
@@ -196,8 +248,8 @@ func (m *Manager) bringUpWithVersionGate(ctx context.Context, rt Runtime, bundle
 
 // bringUp initializes the database if absent, then spawns the detached `run` on
 // the requested/default port (with the OS-assigned ephemeral fallback on the
-// default). A version-too-old failure is NOT a port collision, so it skips the
-// fallback and propagates for the gate to handle.
+// default). A version-too-old or corrupt-bundle failure is NOT a port collision,
+// so it skips the fallback and propagates for the recovery caller to handle.
 func (m *Manager) bringUp(ctx context.Context, rt Runtime, bundle string) (Pidfile, error) {
 	if !m.dbInitialized() {
 		if err := m.runInitDB(ctx, rt, bundle); err != nil {
@@ -213,9 +265,11 @@ func (m *Manager) bringUp(ctx context.Context, rt Runtime, bundle string) (Pidfi
 		wantPort = DefaultPort
 	}
 	pf, err := m.spawnAndWait(ctx, rt, bundle, wantPort)
-	if err != nil && !fixed && !isVersionTooOld(err) {
+	if err != nil && !fixed && !isVersionTooOld(err) && !isBundleCorrupt(err) {
 		// Collision (or an early bind failure): re-spawn letting the OS assign a
-		// free port. The bundle writes the real port back to the pidfile.
+		// free port. The bundle writes the real port back to the pidfile. A
+		// version-too-old or corrupt-bundle failure is NOT a port collision, so it
+		// skips the fallback (the recovery caller refreshes and retries instead).
 		m.log().Warn("sandbox port unavailable — retrying on an OS-assigned port", "port", wantPort)
 		if m.deps.Log != nil {
 			m.deps.Log(fmt.Sprintf("port %d unavailable — retrying on an OS-assigned port", wantPort))
@@ -248,6 +302,9 @@ func (m *Manager) runInitDB(ctx context.Context, rt Runtime, bundle string) erro
 	}
 	if vt := versionTooOldFrom(buf.String()); vt != nil {
 		return vt
+	}
+	if bc := bundleCorruptFrom(buf.String()); bc != nil {
+		return bc
 	}
 	return fmt.Errorf("initializing the sandbox database: %w (see %s)", runErr, m.logPath())
 }
@@ -378,6 +435,12 @@ func (m *Manager) spawnAndWait(ctx context.Context, rt Runtime, bundle string, p
 			// surface it as the typed error rather than a generic startup failure.
 			if vt := versionTooOldFrom(tail); vt != nil {
 				return Pidfile{}, vt
+			}
+			// A cached bundle that is HTML rather than JS is a stale-cache problem
+			// (recovered by a refresh + retry), not a bundle-emitted startup line,
+			// so classify it before the bundle's own prefixes.
+			if bc := bundleCorruptFrom(tail); bc != nil {
+				return Pidfile{}, bc
 			}
 			if msg := classifyStartupFailure(tail); msg != "" {
 				m.log().Warn("sandbox failed to start", "reason", msg, "logPath", m.logPath())
@@ -701,11 +764,39 @@ func (m *Manager) licenseCommand() string { return progname.Name() + " sandbox l
 // in the CLI (the "pointer, never body" rule). Best-effort: a failure to render
 // the banner must not block `start` (the real fetch/runtime errors surface from
 // the start sequence itself), so the caller ignores the error.
+//
+// It is `start`'s FIRST bundle invocation, so it is also the first to meet a
+// corrupt cached bundle — hence the same refresh-and-retry as the rest
+// (withBundleRecovery), which both keeps the notice printing and heals the cache
+// before anything downstream reaches for it. That refresh is a network fetch, so
+// "must not block" here means must not FAIL the start, not that the step is
+// free.
+//
+// Classifying the failure needs the output, so the notice is buffered rather than
+// streamed. Only a corrupt bundle withholds it — its output is a Deno stack trace,
+// not a notice. Every other failure still relays whatever the bundle wrote, as
+// streaming did: a bundle that printed the notice and then exited non-zero for an
+// unrelated reason must not cost the user the notice.
 func (m *Manager) showBanner(ctx context.Context) {
 	if m.deps.BannerOut == nil {
 		return
 	}
-	_ = m.License(ctx, []string{"--show-banner"}, m.deps.BannerOut, m.deps.BannerOut)
+	var buf bytes.Buffer
+	err := m.withBundleRecovery(ctx, func() error {
+		buf.Reset()
+		lerr := m.License(ctx, []string{"--show-banner"}, &buf, &buf)
+		if lerr == nil {
+			return nil
+		}
+		if bc := bundleCorruptFrom(buf.String()); bc != nil {
+			return bc
+		}
+		return lerr
+	})
+	if isBundleCorrupt(err) {
+		return
+	}
+	_, _ = m.deps.BannerOut.Write(buf.Bytes())
 }
 
 // RuntimeStatus reports the managed-Deno cache status (no network call).

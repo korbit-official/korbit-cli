@@ -393,7 +393,7 @@ func (m *Manager) dbInitialized() bool {
 
 // versionTooOldError signals the bundle refused to start because it is older
 // than MinSandboxVersion (the MinVersionEnv gate). It is recovered by updating
-// the bundle and retrying once (bringUpWithVersionGate); `have` is the bundle's
+// the bundle and retrying once (bringUpWithRecovery); `have` is the bundle's
 // reported version, "" if it couldn't be parsed.
 type versionTooOldError struct{ have string }
 
@@ -420,6 +420,38 @@ func versionTooOldFrom(out string) *versionTooOldError {
 		return nil
 	}
 	return &versionTooOldError{have: parseSandboxVersion(out)}
+}
+
+// bundleCorruptError signals Deno failed to load the remote bundle as a JS module
+// because its cached body is not JavaScript — classically an HTML page served for
+// the bundle URL (e.g. the docs site's SPA index during a deploy gap, before the
+// bundle is published there). Deno keeps that body in its module cache, so every
+// start re-parses it. Recovered by force-refreshing the cache (deno cache
+// --reload) and retrying once (bringUpWithRecovery); a local/file:// source can't
+// be a stale cache and is never classified this way.
+type bundleCorruptError struct{}
+
+func (e *bundleCorruptError) Error() string {
+	return "the cached sandbox bundle is not valid JavaScript — it looks like an HTML page"
+}
+
+// bundleCorruptFrom returns a *bundleCorruptError when captured Deno output shows
+// the remote bundle failing to parse because its body is HTML rather than JS — the
+// tell is the markup Deno echoes on the offending source line (`1 | <!DOCTYPE
+// html>`). Output-classification, the same approach as classifyStartupFailure, so
+// it works for the detached run captured to the log.
+func bundleCorruptFrom(out string) *bundleCorruptError {
+	l := strings.ToLower(out)
+	if strings.Contains(l, "<!doctype") || strings.Contains(l, "<html") {
+		return &bundleCorruptError{}
+	}
+	return nil
+}
+
+// isBundleCorrupt reports whether err is (or wraps) a bundleCorruptError.
+func isBundleCorrupt(err error) bool {
+	var bc *bundleCorruptError
+	return errors.As(err, &bc)
 }
 
 // parseSandboxVersion finds the bare MAJOR.MINOR.PATCH the bundle prints on the

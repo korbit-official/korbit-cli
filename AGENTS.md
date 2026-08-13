@@ -446,7 +446,10 @@ real signature verifier, for full-stack signing/order-protocol checks without
 touching production. All logic lives in `internal/sandbox` (+ `sandbox/deno`);
 the cli layer only dispatches and formats. The detail — Deno-only/no-bundle-cache,
 the detached-spawn + pidfile-as-source-of-truth + never-spawn-a-duplicate guard,
-the min-version gate with auto-update-and-retry, managed-Deno resolution, the
+the min-version gate (`bringUpWithRecovery`) and the corrupt-cache self-heal
+(`withBundleRecovery`, wrapping every bundle invocation `start` makes — for a
+bundle URL that briefly served HTML; both refresh the bundle and retry once),
+managed-Deno resolution, the
 least-privilege `denoRunPerms` flag set, and the storage split — is documented at
 its symbols across `sandbox/sandbox.go`, `lifecycle.go`, `runtime.go`,
 `cache.go`, and `sandbox/deno/deno.go`. The sandbox-key safety predicates

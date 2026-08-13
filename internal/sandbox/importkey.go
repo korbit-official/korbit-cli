@@ -77,7 +77,24 @@ func (m *Manager) importKey(doc statusDoc, port int) (apiKeyID string, imported 
 
 // readStatusDoc runs `status --json` against the managed db and parses the
 // fields the CLI models (statusDoc). The read is structural — no text scraping.
+// It is a bundle invocation on both of `start`'s paths (the paper-mode gate
+// before bring-up, and the result build for a freshly-spawned OR reused server),
+// so it self-heals a corrupt cached bundle exactly like the bring-up does.
 func (m *Manager) readStatusDoc(ctx context.Context, rt Runtime, bundle string) (statusDoc, error) {
+	var doc statusDoc
+	err := m.withBundleRecovery(ctx, func() error {
+		var rerr error
+		doc, rerr = m.runStatusDoc(ctx, rt, bundle)
+		return rerr
+	})
+	return doc, err
+}
+
+// runStatusDoc is the single `status --json` invocation behind readStatusDoc. A
+// failure whose output shows the cached bundle is not JavaScript returns the
+// typed *bundleCorruptError, so the caller's recovery refreshes and retries
+// rather than surfacing an opaque "reading sandbox status" failure.
+func (m *Manager) runStatusDoc(ctx context.Context, rt Runtime, bundle string) (statusDoc, error) {
 	bin, argv, env, err := rt.command(ctx, m.denoRunPerms(), bundle, "status", "--db", m.dbPath(), "--json")
 	if err != nil {
 		return statusDoc{}, err
@@ -88,6 +105,12 @@ func (m *Manager) readStatusDoc(ctx context.Context, rt Runtime, bundle string) 
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if rerr := cmd.Run(); rerr != nil {
+		// Classify over both streams, like every other site (runInitDB, the run.log
+		// tail, the banner): Deno puts the module-parse error on stderr, but nothing
+		// here depends on that.
+		if bc := bundleCorruptFrom(stdout.String() + stderr.String()); bc != nil {
+			return statusDoc{}, bc
+		}
 		return statusDoc{}, fmt.Errorf("reading sandbox status: %w (%s)", rerr, bytes.TrimSpace(stderr.Bytes()))
 	}
 	var doc statusDoc
