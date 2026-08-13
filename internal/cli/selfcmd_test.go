@@ -44,8 +44,14 @@ func TestSelfInstallDoctorAndRepair(t *testing.T) {
 	home := t.TempDir()
 	env := selfEnv(home)
 
+	// Decline PATH wiring so the install reports the instructions branch. An
+	// injected confirm also keeps the flow off the real /dev/tty (which the
+	// production confirm opens directly, bypassing stdin) — without it a `go test`
+	// run in an interactive shell prompts the developer's own terminal.
+	declinePath := func(string, bool) (bool, error) { return false, nil }
+
 	// --- self install (the script's entry point), driven through cli.Execute ---
-	out, _, code := runCLI([]string{"self", "install", "--json"}, env, newStub())
+	out, _, code := runCLIInstallConfirm([]string{"self", "install", "--json"}, env, newStub(), declinePath)
 	if code != 0 {
 		t.Fatalf("self install exit=%d out=%s", code, out)
 	}
@@ -96,7 +102,7 @@ func TestSelfInstallDoctorAndRepair(t *testing.T) {
 	if err := os.Remove(inst.Executable); err != nil {
 		t.Fatal(err)
 	}
-	rout, _, rcode := runCLI([]string{"self", "install", "--json"}, env, newStub())
+	rout, _, rcode := runCLIInstallConfirm([]string{"self", "install", "--json"}, env, newStub(), declinePath)
 	if rcode != 0 {
 		t.Fatalf("repair install exit=%d out=%s", rcode, rout)
 	}

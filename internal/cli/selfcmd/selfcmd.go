@@ -77,8 +77,12 @@ func runInstall(cx *clienv.Cmd) error {
 	// The install script pipes into `sh`, so stdin is the pipe; the confirm reads
 	// the controlling terminal (/dev/tty) when there is one, else PATH wiring only
 	// prints guidance. The confirm renders a diff preview of each PATH addition and
-	// asks per file, defaulting to yes.
-	tty := openTTYConfirm()
+	// asks per file, defaulting to yes. An injected confirm (tests) takes
+	// precedence, so the flow never reaches a real terminal in-process.
+	tty := cx.InstallConfirm
+	if tty == nil {
+		tty = openTTYConfirm()
+	}
 	var confirm func(selfupdate.PathAddition) (bool, error)
 	if tty != nil {
 		binDir := abbrev(cfg.Layout().ExecutableDir(), oh)

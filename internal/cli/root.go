@@ -87,6 +87,13 @@ type Deps struct {
 	// path on, bypassing the TTY gate, so the destructive flow is exercisable
 	// in-process).
 	SelfUninstallConfirm clienv.Confirm
+	// SelfInstallConfirm is the yes/no prompt `self install` asks its PATH-wiring
+	// questions through. nil means the real /dev/tty-backed confirmer (the install
+	// script pipes into `sh`, so the prompt must talk to the controlling terminal,
+	// not the piped stdin); tests inject a scripted one so the flow never reaches a
+	// real terminal — without it a `go test` run in an interactive shell prompts
+	// the developer's own /dev/tty.
+	SelfInstallConfirm clienv.Confirm
 	// SkillFS is the embedded Agent Skill content, rooted at the skill directory
 	// (SKILL.md at the top), used by `agent skill install`/`doctor`. main injects
 	// the //go:embed FS; tests inject a fstest.MapFS. nil only on a build that
@@ -389,12 +396,13 @@ func (rt *runtime) env() clienv.Env {
 			NoFsync:      rt.noFsyncMode(),
 			Experimental: rt.experimentalEnabled(),
 		},
-		Key:        rt.key,
-		IPProbe:    rt.deps.IPProbe,
-		FamilyDoer: rt.deps.FamilyDoer,
-		Family:     rt.deps.netFamily,
-		WSDial:     rt.deps.WSDial,
-		Confirm:    rt.confirmer(),
+		Key:            rt.key,
+		IPProbe:        rt.deps.IPProbe,
+		FamilyDoer:     rt.deps.FamilyDoer,
+		Family:         rt.deps.netFamily,
+		WSDial:         rt.deps.WSDial,
+		Confirm:        rt.confirmer(),
+		InstallConfirm: rt.deps.SelfInstallConfirm,
 	}
 }
 
@@ -1298,7 +1306,10 @@ type depsResolved struct {
 	// SelfUninstallConfirm is the `self uninstall` yes/no prompt; nil = the real
 	// stdin-backed confirmer (selfcmd.StdinConfirmer, which needs a terminal).
 	SelfUninstallConfirm clienv.Confirm
-	SkillFS              fs.FS
+	// SelfInstallConfirm is the `self install` PATH-wiring yes/no prompt; nil = the
+	// real /dev/tty-backed confirmer (selfcmd.openTTYConfirm).
+	SelfInstallConfirm clienv.Confirm
+	SkillFS            fs.FS
 
 	// skipBinding marks dialer deps that a CALLER INJECTED (a test stub via
 	// cli.Execute(.., Deps{Doer: ...}), or an embedder's own client) rather than
@@ -1414,7 +1425,7 @@ func resolveDeps(d Deps) depsResolved {
 		// callers (the set-base-url endpoint smoke test) get a working client too.
 		doer = http.DefaultClient
 	}
-	r := depsResolved{Getenv: getenv, Now: now, Sleep: sleep, Doer: doer, IPProbe: probe, FamilyDoer: familyDoer, WSDial: wsDial, TUIRun: d.TUIRun, SetupUIRun: d.SetupUIRun, SelfUninstallConfirm: d.SelfUninstallConfirm, SkillFS: d.SkillFS}
+	r := depsResolved{Getenv: getenv, Now: now, Sleep: sleep, Doer: doer, IPProbe: probe, FamilyDoer: familyDoer, WSDial: wsDial, TUIRun: d.TUIRun, SetupUIRun: d.SetupUIRun, SelfUninstallConfirm: d.SelfUninstallConfirm, SelfInstallConfirm: d.SelfInstallConfirm, SkillFS: d.SkillFS}
 	r.skipBinding.doer = d.Doer != nil
 	r.skipBinding.ipProbe = d.IPProbe != nil
 	r.skipBinding.familyDoer = d.FamilyDoer != nil

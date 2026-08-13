@@ -92,6 +92,13 @@ type Env struct {
 	// (stdin is not a terminal, or a machine-output mode is active) — such a
 	// command must refuse to run rather than proceed non-interactively.
 	Confirm Confirm
+	// InstallConfirm is the yes/no prompt `self install` asks its PATH-wiring
+	// questions through. Distinct from Confirm because install's real backing is
+	// /dev/tty (the install script pipes into `sh`, so stdin is the pipe), not
+	// stdin. nil means no confirmer was injected, so install falls back to its own
+	// /dev/tty confirmer; tests inject one so the flow never reaches a real
+	// terminal.
+	InstallConfirm Confirm
 }
 
 // Confirm asks the user a yes/no question with a default (used on empty input or

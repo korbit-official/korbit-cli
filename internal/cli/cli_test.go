@@ -121,6 +121,27 @@ func runCLIConfirm(args []string, env map[string]string, doer korbit.Doer, confi
 	return out.String(), errb.String(), code
 }
 
+// runCLIInstallConfirm is runCLI with an injected `self install` PATH-wiring
+// confirmer, so the install flow is exercisable in-process without reaching a
+// real /dev/tty (which, run interactively, would prompt the developer).
+func runCLIInstallConfirm(args []string, env map[string]string, doer korbit.Doer, confirm func(string, bool) (bool, error)) (string, string, int) {
+	merged := map[string]string{"KORBIT_CLI_HOME": sharedTestHome()}
+	for k, v := range env {
+		merged[k] = v
+	}
+	var out, errb bytes.Buffer
+	code := cli.Execute(args, cli.Deps{
+		Getenv:             func(k string) string { return merged[k] },
+		Stdout:             &out,
+		Stderr:             &errb,
+		Doer:               doer,
+		Now:                func() int64 { return 1700000000000 },
+		Sleep:              func(time.Duration) {},
+		SelfInstallConfirm: confirm,
+	})
+	return out.String(), errb.String(), code
+}
+
 // seedBoundKey creates a bound key "bot" in home and returns its public key.
 func seedBoundKey(t *testing.T, home string) ed25519.PublicKey {
 	t.Helper()
