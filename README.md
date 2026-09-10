@@ -31,9 +31,7 @@ irm https://docs.digitalx.miraeasset.com/install.ps1 | iex
 
 The binary then manages itself — `dgx-cli self update`, `dgx-cli self doctor`, `dgx-cli self uninstall`.
 
-Installed under the earlier product name, as `korbit`? It keeps working. How to
-come onto `dgx-cli` from that install, and what happens to its data directory,
-is in [`MIGRATION.md`](MIGRATION.md).
+Upgrading from an earlier release? See [`MIGRATION.md`](MIGRATION.md).
 
 Prefer to manage it yourself? Download a release binary, or install from source with `go install github.com/digitalx-official/digitalx-cli@latest`.
 
@@ -130,7 +128,7 @@ The sandbox bundle is separately licensed (software of Digital X Co., Ltd.) — 
 
 ## Keys & storage
 
-You can add multiple keys; select one per command with `--key` (or set a default with `dgx-cli key use`). Both ED25519 and HMAC-SHA256 keys are supported. Private keys are stored encrypted on disk by default, or in your OS keychain, and all state lives under `~/.digitalx-cli/` (or `~/.korbit-cli/` for installs made before the rename). Manage keys with `dgx-cli key …` and move them between backends with `dgx-cli keystore migrate`.
+You can add multiple keys; select one per command with `--key` (or set a default with `dgx-cli key use`). Both ED25519 and HMAC-SHA256 keys are supported. Private keys are stored encrypted on disk by default, or in your OS keychain, and all state lives under `~/.digitalx-cli/`. Manage keys with `dgx-cli key …` and move them between backends with `dgx-cli keystore migrate`.
 
 ## License
 

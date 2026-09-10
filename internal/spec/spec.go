@@ -81,12 +81,11 @@ var GlobalFlags = []GlobalFlag{
 	{Flag: "version", TakesValue: false, Desc: "print the CLI version"},
 }
 
-// GlobalEnvNote states the environment-variable naming rule behind every
-// "(also: DIGITALX_CLI_… env var)" above, so a user whose shell profile or CI
-// job predates the rename knows it still works. Rendered under the global
-// options in the root help.
-const GlobalEnvNote = "Environment: the legacy KORBIT_CLI_* spellings are still accepted; a non-empty DIGITALX_CLI_* name wins when both are set. " +
-	"Setting a DIGITALX_CLI_* name to an empty value does not blank a set KORBIT_CLI_* one — unset the legacy name instead."
+// GlobalEnvNote states the empty-is-unset rule behind every
+// "(also: DIGITALX_CLI_… env var)" above, so a user who exports one of them to
+// "" knows it does not force the value off. Rendered under the global options
+// in the root help.
+const GlobalEnvNote = "Environment: a DIGITALX_CLI_* variable counts as set only when its value is non-empty — exporting one as an empty string reads as unset, not as an override."
 
 // Find resolves a command from positional path segments, preferring the deepest
 // matching command (e.g. "sandbox runtime status" over "sandbox runtime" over

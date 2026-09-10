@@ -132,6 +132,7 @@ archives:
       - DISCLAIMER.ko.md
       - README.md
       - README.ko.md
+      - MIGRATION.md
 
   # The legacy asset set. The archive name AND the binary inside it are both
   # fixed by what an older updater looks for, so neither may be renamed.

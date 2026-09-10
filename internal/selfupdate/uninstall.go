@@ -279,7 +279,7 @@ func (c Config) editPath(loc string, res *UninstallResult) {
 	case changed:
 		res.Edited = append(res.Edited, loc)
 	default:
-		res.Warnings = append(res.Warnings, fmt.Sprintf("no digitalx-cli (or legacy korbit-cli) block found in %s — nothing to undo", loc))
+		res.Warnings = append(res.Warnings, fmt.Sprintf("no digitalx-cli block found in %s — nothing to undo", loc))
 	}
 }
 

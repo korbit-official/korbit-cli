@@ -88,8 +88,9 @@ cp "$root/assets/digitalx.png" "$stage/icon.png"
 # modules, so it ships the same license/notice/disclaimer set as the release
 # archives — attribution travels with every distributed copy. These sit at the
 # bundle root alongside manifest.json; the MCPB spec only requires manifest.json
-# there, so extra top-level files are fine.
-for doc in LICENSE NOTICE THIRD_PARTY_LICENSES.txt DISCLAIMER.md DISCLAIMER.ko.md README.md README.ko.md; do
+# there, so extra top-level files are fine. MIGRATION.md rides along for the same
+# reason it is in the release archives: the README links to it.
+for doc in LICENSE NOTICE THIRD_PARTY_LICENSES.txt DISCLAIMER.md DISCLAIMER.ko.md README.md README.ko.md MIGRATION.md; do
 	cp "$root/$doc" "$stage/$doc"
 done
 
@@ -112,7 +113,7 @@ cat >"$stage/manifest.json" <<EOF
   "repository": { "type": "git", "url": "https://github.com/digitalx-official/digitalx-cli.git" },
   "license": "Apache-2.0",
   "icon": "icon.png",
-  "keywords": ["digitalx", "digitalx-cli", "dgx-cli", "korbit", "cryptocurrency", "exchange", "trading", "mcp"],
+  "keywords": ["digitalx", "digitalx-cli", "dgx-cli", "cryptocurrency", "exchange", "trading", "mcp"],
   "server": {
     "type": "binary",
     "entry_point": "$entry_point",

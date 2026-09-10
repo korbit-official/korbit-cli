@@ -31,9 +31,7 @@ irm https://docs.digitalx.miraeasset.com/install.ps1 | iex
 
 이후 바이너리는 스스로 관리됩니다 — `dgx-cli self update`, `dgx-cli self doctor`, `dgx-cli self uninstall`.
 
-이전 제품 이름인 `korbit`으로 설치했더라도 그대로 동작합니다. 그 설치에서 `dgx-cli`로
-넘어오는 방법과 데이터 디렉터리의 처리 방식은 [`MIGRATION.md`](MIGRATION.md)에
-정리되어 있습니다.
+이전 릴리스에서 업그레이드하나요? [`MIGRATION.md`](MIGRATION.md)를 참고하세요.
 
 직접 관리하고 싶다면 릴리스 바이너리를 내려받거나, 소스에서 `go install github.com/digitalx-official/digitalx-cli@latest`로 설치하세요.
 
@@ -130,7 +128,7 @@ dgx-cli sandbox stop
 
 ## 키 & 저장소
 
-키를 여러 개 추가할 수 있으며, 명령마다 `--key`로 하나를 선택합니다(기본값은 `dgx-cli key use`로 지정). ED25519와 HMAC-SHA256 키를 모두 지원합니다. 개인키는 기본적으로 디스크에 암호화되어 저장되거나 OS 키체인에 보관되며, 모든 상태는 `~/.digitalx-cli/`(이름 변경 전에 설치한 경우에는 `~/.korbit-cli/`) 아래에 있습니다. 키는 `dgx-cli key …`로 관리하고, 백엔드 간 이동은 `dgx-cli keystore migrate`로 합니다.
+키를 여러 개 추가할 수 있으며, 명령마다 `--key`로 하나를 선택합니다(기본값은 `dgx-cli key use`로 지정). ED25519와 HMAC-SHA256 키를 모두 지원합니다. 개인키는 기본적으로 디스크에 암호화되어 저장되거나 OS 키체인에 보관되며, 모든 상태는 `~/.digitalx-cli/` 아래에 있습니다. 키는 `dgx-cli key …`로 관리하고, 백엔드 간 이동은 `dgx-cli keystore migrate`로 합니다.
 
 ## 라이선스
 

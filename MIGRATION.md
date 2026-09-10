@@ -341,7 +341,10 @@ stray `journal.db`, since the earlier names are the right ones there.
   changes: a keystore written by either generation is read by both, and an OS
   keychain item is never re-created or re-encrypted.
 - **Environment variables.** Both spellings are honored indefinitely; the
-  canonical `DIGITALX_CLI_*` name wins when both are set.
+  canonical `DIGITALX_CLI_*` name wins when both are set — and only when its
+  value is non-empty. Exporting the canonical name as an empty string reads as
+  unset and falls through to the legacy one, so to turn a setting off, unset the
+  legacy name too.
 - **A pinned home, directory and contents.** A home fixed with
   `DIGITALX_CLI_HOME` or `KORBIT_CLI_HOME` keeps whatever
   [file-name layout](#files-inside-the-cli-home) its own basename implies,
@@ -368,4 +371,4 @@ Every outcome above is a field, not prose, so `--json` is enough to act on:
 Every release is published to **both** release repositories, each with its own
 archive set and both with the same signed `checksums.txt`, which is what lets an
 installed CLI of either generation update itself and verify what it fetched:
-[`RELEASING.md`](RELEASING.md).
+[`RELEASING.md`](https://github.com/digitalx-official/digitalx-cli/blob/master/RELEASING.md).

@@ -1,8 +1,8 @@
 ---
 name: digitalx-cli
 description: >-
-  Operate the Digital X (Korbit) cryptocurrency exchange through its CLI — the `dgx-cli` command,
-  also installed as `korbit`, packaged as digitalx-cli/korbit-cli — or its MCP tools. Consult this
+  Operate the Digital X cryptocurrency exchange through its CLI — the `dgx-cli` command,
+  packaged as digitalx-cli — or its MCP tools. Consult this
   skill BEFORE running any such command or Digital X MCP tool: it carries the safety rules
   (dry-run-first order placement, idempotency, decimal-string money) and the right workflow for each
   task. Use it whenever the user wants to do anything on Digital X / 디지털엑스 / Korbit / 코빗 —
