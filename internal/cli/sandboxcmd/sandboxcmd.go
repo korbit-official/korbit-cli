@@ -65,7 +65,7 @@ func Run(cx *clienv.Cmd, c *spec.Command, cmd *cobra.Command, args []string) err
 	scfg := sandbox.Config{
 		Home:        home,
 		CacheDir:    cacheDir,
-		URL:         envalias.Lookup(cx.Getenv, "DIGITALX_CLI_SANDBOX_URL"),
+		URL:         envalias.Lookup(cx.Getenv, sandbox.EnvSandboxURL),
 		RuntimePref: envalias.Lookup(cx.Getenv, "DIGITALX_CLI_SANDBOX_RUNTIME"),
 	}
 	deps := sandbox.Deps{

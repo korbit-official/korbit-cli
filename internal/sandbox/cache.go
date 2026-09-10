@@ -19,6 +19,11 @@ import (
 // (see envalias).
 const EnvCacheDir = "DIGITALX_CLI_SANDBOX_CACHE"
 
+// EnvSandboxURL names the environment variable that overrides the bundle source,
+// so an error message can name it without spelling it out again. Its legacy
+// KORBIT_CLI_SANDBOX_URL spelling is likewise accepted (see envalias).
+const EnvSandboxURL = "DIGITALX_CLI_SANDBOX_URL"
+
 // CacheDirName is the cache directory under os.UserCacheDir();
 // LegacyCacheDirName is the one an installation made under the earlier product
 // name carries. An existing legacy directory keeps being used rather than
@@ -64,8 +69,10 @@ func isDir(path string) bool {
 // It is the only place the bundle should ever come from; a local path / file://
 // URL is also accepted (offline/dev use) via the URL override. Under the Deno
 // runtime the bundle source is passed straight to `deno run`, which fetches and
-// caches it; the CLI does not download or cache the bundle itself.
-const DefaultSandboxURL = "https://docs.korbit.co.kr/korbit-sandbox.mjs"
+// caches it; the CLI does not download or cache the bundle itself. Deno keys that
+// cache by URL, so this URL is fetched on its first run even when another URL
+// serving the same bundle is already cached.
+const DefaultSandboxURL = "https://docs.digitalx.miraeasset.com/digitalx-sandbox.mjs"
 
 // Doer performs an HTTP request; *http.Client satisfies it. Used to download the
 // managed Deno binary and to probe the sandbox's /v2/time readiness endpoint.
@@ -101,22 +108,22 @@ func writeCacheReadme(dir string) {
 
 const cacheReadmeText = `# korbit-cli sandbox cache
 
-Cache maintained by korbit-cli for its local sandbox (a mock of the Korbit Open
-API for local development and testing). Safe to delete — recreated on the next
+Cache maintained by korbit-cli for its local sandbox (a mock of the Digital X
+Open API for local development and testing). Safe to delete — recreated on the next
 ` + "`sandbox`" + ` command.
 
 The sandbox runs under Deno, which fetches the bundle from the Official Source
-(https://docs.korbit.co.kr) and caches it here:
+(https://docs.digitalx.miraeasset.com) and caches it here:
 
 - ` + "`deno/`" + ` — pinned, SHA-256-verified Deno runtimes (github.com/denoland/deno)
   the CLI downloads on demand, one directory per version and platform
   (` + "`<version>_<target>/`" + `). It runs the bundle under a least-privilege
   permission sandbox (loopback networking + this cache and the sandbox state dir
   only). Old versions are pruned automatically when the CLI updates Deno.
-- ` + "`deno-modules/`" + ` — Deno's own cache of the bundle (` + "`korbit-sandbox.mjs`" + `) and
+- ` + "`deno-modules/`" + ` — Deno's own cache of the bundle (` + "`digitalx-sandbox.mjs`" + `) and
   any dependencies.
 
-Terms: the bundle (korbit-sandbox.mjs) is proprietary software of Digital X Co., Ltd. under its
+Terms: the bundle (digitalx-sandbox.mjs) is proprietary software of Digital X Co., Ltd. under its
 OWN terms — it is NOT covered by korbit-cli's open-source license. Read those
 terms with ` + "`korbit sandbox license`" + `, obtain the bundle only from the
 Official Source, and keep use conformant (local development and testing only).

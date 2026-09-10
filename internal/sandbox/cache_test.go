@@ -25,7 +25,7 @@ func TestWriteCacheReadme(t *testing.T) {
 		t.Fatalf("README not written: %v", err)
 	}
 	s := string(readme)
-	if !strings.Contains(s, "docs.korbit.co.kr") {
+	if !strings.Contains(s, "docs.digitalx.miraeasset.com") {
 		t.Error("README should point at the Official Source")
 	}
 	// Fork-safety pointer: the README must flag that the bundle is separately
@@ -45,11 +45,11 @@ func TestWriteCacheReadme(t *testing.T) {
 
 func TestLocalPathClassification(t *testing.T) {
 	cases := map[string]string{
-		"https://docs.korbit.co.kr/x.mjs": "",
-		"http://localhost/x.mjs":          "",
-		"file:///tmp/x.mjs":               "/tmp/x.mjs",
-		"./rel/x.mjs":                     "./rel/x.mjs",
-		"/abs/x.mjs":                      "/abs/x.mjs",
+		"https://docs.digitalx.miraeasset.com/x.mjs": "",
+		"http://localhost/x.mjs":                     "",
+		"file:///tmp/x.mjs":                          "/tmp/x.mjs",
+		"./rel/x.mjs":                                "./rel/x.mjs",
+		"/abs/x.mjs":                                 "/abs/x.mjs",
 	}
 	for src, want := range cases {
 		if got := localPath(src); got != want {

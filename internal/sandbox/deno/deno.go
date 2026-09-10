@@ -37,6 +37,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -247,13 +248,34 @@ func (m *Manager) ModuleCacheDir() string { return filepath.Join(m.cacheDir, "de
 // DENO_DIR to ModuleCacheDir so module fetching/caching stays inside our cache.
 func (m *Manager) RunEnv() []string { return []string{"DENO_DIR=" + m.ModuleCacheDir()} }
 
-// HasModuleCache reports whether Deno has fetched anything into the run-time
-// module cache yet (a cheap "is the bundle cached" proxy for `sandbox status` —
-// the deno runtime delegates bundle caching to Deno, so there is no single
-// bundle file of ours to stat).
-func (m *Manager) HasModuleCache() bool {
-	entries, err := os.ReadDir(filepath.Join(m.ModuleCacheDir(), "remote"))
+// HasModuleCache reports whether Deno has fetched src into the run-time module
+// cache yet (the "is this bundle cached" check for `sandbox status` and the
+// first-download notice — the deno runtime delegates bundle caching to Deno, so
+// there is no bundle file of ours to stat). It is per-source: a different URL,
+// even one serving the same bundle, is a separate cache entry and reads as
+// not-yet-fetched. A non-http(s) src is never in this cache.
+func (m *Manager) HasModuleCache(src string) bool {
+	dir := m.remoteCacheDir(src)
+	if dir == "" {
+		return false
+	}
+	entries, err := os.ReadDir(dir)
 	return err == nil && len(entries) > 0
+}
+
+// remoteCacheDir is the directory Deno caches a remote module's host under:
+// <DENO_DIR>/remote/<scheme>/<host>, with an explicit non-default port appended
+// as "_PORT<port>". Empty for anything but an http(s) URL with a host.
+func (m *Manager) remoteCacheDir(src string) string {
+	u, err := url.Parse(src)
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return ""
+	}
+	host := u.Hostname()
+	if port := u.Port(); port != "" {
+		host += "_PORT" + port
+	}
+	return filepath.Join(m.ModuleCacheDir(), "remote", u.Scheme, host)
 }
 
 // binName is the executable name within the cache (deno or deno.exe).

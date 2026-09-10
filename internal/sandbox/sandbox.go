@@ -57,8 +57,12 @@ const DefaultKeyName = "sandbox"
 // to run, so the CLI can update + retry rather than fail confusingly against a
 // build missing a capability it relies on. Bump this in lockstep when the CLI
 // starts depending on a newer bundle feature. The pre-release version-skew guard
-// (repo-root scripts/) asserts this never exceeds the bundle's own version.
-const MinSandboxVersion = "1.2.0"
+// asserts this never exceeds the bundle's own version.
+//
+// The floor is exactly 1.4.0: that is the first bundle that accepts `init-db
+// --mode digitalx-api` and reads the DIGITALX_SANDBOX_* config names, both of
+// which this CLI relies on.
+const MinSandboxVersion = "1.4.0"
 
 // Config carries one sandbox operation's settings. Zero values resolve to the
 // documented defaults.
@@ -93,7 +97,7 @@ type Config struct {
 	// ensurePaperDB); combine with Fresh to switch modes.
 	Paper bool
 	// AllPairs seeds a fresh database from a live production snapshot (the
-	// bundle's `init-db --mode korbit-api`) so every LAUNCHED production pair
+	// bundle's `init-db --mode digitalx-api`) so every LAUNCHED production pair
 	// exists (the tradable universe), instead of the bundle's built-in fixture
 	// pairs. Orthogonal to Paper: with Paper it mirrors those pairs LIVE, without
 	// it they are on the simulated market. The snapshot is cached beside the db
@@ -346,16 +350,22 @@ func parsePidfile(path string) (Pidfile, error) {
 //   - --allow-write: only the state dir (db sidecars + pidfile). run.log is
 //     written by this process, not the bundle.
 //   - --allow-net: loopback — IPv6 "[::1]" and IPv4 "127.0.0.1" (the server binds
-//     loopback and `status` probes the loopback port) — plus "*.korbit.co.kr" (the
-//     Korbit API hosts the bundle reaches). No other external host and no
-//     non-loopback interface is reachable, so the bundle can't phone home elsewhere
-//     or be reached from the LAN. Not port-scoped because the collision fallback
-//     binds an OS-assigned ephemeral port (--port 0).
-//   - --allow-env: only the bundle's own KORBIT_SANDBOX_* config knobs (a prefix
-//     wildcard, so it never drifts from the bundle's config), NODE_OPTIONS (read by the
-//     node-version precheck), and the POSIX locale vars (LANG/LANGUAGE/LC_ALL/
-//     LC_MESSAGES) the bundle reads to pick the banner/`license` language. No
-//     blanket env access — secrets in the environment stay unreadable.
+//     loopback and `status` probes the loopback port) — plus
+//     "*.digitalx.miraeasset.com" (the API hosts the bundle reaches for a live
+//     seed or feed) and their "*.korbit.co.kr" alias hosts. No other external
+//     host and no non-loopback interface is reachable, so the bundle can't phone
+//     home elsewhere or be reached from the LAN. Not port-scoped because the
+//     collision fallback binds an OS-assigned ephemeral port (--port 0). The
+//     alias hosts are what a pre-1.4.0 bundle reaches for (a bundle pinned via
+//     the URL override and started with --skip-version-check); drop that grant
+//     once no pre-1.4.0 bundle is in use.
+//   - --allow-env: only the bundle's own config knobs — both the
+//     DIGITALX_SANDBOX_* namespace and the KORBIT_SANDBOX_* one it also reads
+//     (prefix wildcards, so they never drift from the bundle's config) — plus
+//     NODE_OPTIONS (read by the node-version precheck) and the POSIX locale vars
+//     (LANG/LANGUAGE/LC_ALL/LC_MESSAGES) the bundle reads to pick the
+//     banner/`license` language. No blanket env access — secrets in the
+//     environment stay unreadable.
 //   - --allow-sys: only osRelease, cpus, and systemMemoryInfo (host facts the
 //     bundle reads, e.g. on the production-seeding path). No blanket --allow-sys.
 //
@@ -367,8 +377,8 @@ func (m *Manager) denoRunPerms() []string {
 		"--no-prompt",
 		"--allow-read=" + m.stateDir(),
 		"--allow-write=" + m.stateDir(),
-		"--allow-net=[::1],127.0.0.1,*.korbit.co.kr",
-		"--allow-env=KORBIT_SANDBOX_*,NODE_OPTIONS,LANG,LANGUAGE,LC_ALL,LC_MESSAGES",
+		"--allow-net=[::1],127.0.0.1,*.digitalx.miraeasset.com,*.korbit.co.kr",
+		"--allow-env=" + sandboxEnvPrefix + "*," + legacySandboxEnvPrefix + "*,NODE_OPTIONS,LANG,LANGUAGE,LC_ALL,LC_MESSAGES",
 		"--allow-sys=osRelease,cpus,systemMemoryInfo",
 	}
 }
@@ -389,7 +399,7 @@ func loopbackURLs(port int) (rest, ws string) {
 }
 
 // initDBArgs builds the `init-db` invocation for an uninitialized db. AllPairs
-// seeds from a live production snapshot (`--mode korbit-api`) so every launched
+// seeds from a live production snapshot (`--mode digitalx-api`) so every launched
 // pair exists rather than just the bundle fixtures, and points the bundle at a
 // snapshot cache (`--market-cache`) beside the db so a repeated (re)seed reuses
 // the fetched pair set + tick policies instead of refetching them. Paper mirrors
@@ -399,7 +409,7 @@ func loopbackURLs(port int) (rest, ws string) {
 func (m *Manager) initDBArgs() []string {
 	args := []string{"init-db", "--db", m.dbPath()}
 	if m.cfg.AllPairs {
-		args = append(args, "--mode", "korbit-api", "--market-cache", m.marketCachePath())
+		args = append(args, "--mode", "digitalx-api", "--market-cache", m.marketCachePath())
 	}
 	if m.cfg.Paper {
 		args = append(args, "--source", "live")
@@ -407,7 +417,7 @@ func (m *Manager) initDBArgs() []string {
 	return args
 }
 
-// marketCachePath is where the korbit-api snapshot cache lives: a file beside the
+// marketCachePath is where the digitalx-api snapshot cache lives: a file beside the
 // db, distinct from the db and its -wal/-shm/-pid sidecars so `freshen` (which
 // deletes only those) leaves it in place — a repeated `start --all-pairs --fresh`
 // reseeds from the cache without refetching. It sits in the db's directory, which
@@ -473,21 +483,33 @@ func (m *Manager) ensureBundleAndRuntime(ctx context.Context) (bundleRef string,
 // withRuntimeEnv applies a runtime's extra environment to a child command (e.g.
 // Deno's DENO_DIR), rebuilding from os.Environ so the child still inherits the
 // ambient environment it needs (PATH, locale, proxy settings, …). The CLI owns
-// the entire KORBIT_SANDBOX_* namespace: every inherited KORBIT_SANDBOX_* var is
-// dropped, and only the ones the manager passes in extra (e.g. versionGateEnv,
-// LicenseCmdEnv) reach the bundle. This keeps the bundle's config knobs fully
-// CLI-controlled — in particular a stray user-exported MinVersionEnv can't arm
-// the bundle's version refusal on a non-gated command (status/license/exec).
+// the bundle's config namespaces end to end: every inherited var in either
+// sandboxEnvPrefixes namespace is dropped, and only the ones the manager passes
+// in extra (e.g. versionGateEnv, LicenseCmdEnv) reach the bundle. This keeps the
+// bundle's config knobs fully CLI-controlled — in particular a stray
+// user-exported MinVersionEnv (under either spelling) can't arm the bundle's
+// version refusal on a non-gated command (status/license/exec).
 func withRuntimeEnv(cmd *exec.Cmd, extra []string) {
 	environ := os.Environ()
 	base := make([]string, 0, len(environ)+len(extra))
 	for _, e := range environ {
-		if strings.HasPrefix(e, sandboxEnvPrefix) {
+		if hasSandboxEnvPrefix(e) {
 			continue
 		}
 		base = append(base, e)
 	}
 	cmd.Env = append(base, extra...)
+}
+
+// hasSandboxEnvPrefix reports whether an environment entry belongs to one of the
+// bundle config namespaces the CLI owns.
+func hasSandboxEnvPrefix(entry string) bool {
+	for _, p := range sandboxEnvPrefixes {
+		if strings.HasPrefix(entry, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // dbInitialized reports whether the sandbox db file exists (a proxy for

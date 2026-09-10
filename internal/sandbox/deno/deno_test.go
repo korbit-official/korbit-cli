@@ -255,17 +255,78 @@ func TestRunEnvAndReload(t *testing.T) {
 	if len(env) != 1 || env[0] != wantEnv {
 		t.Errorf("RunEnv = %v, want [%q]", env, wantEnv)
 	}
-	if m.HasModuleCache() {
+	const src = "https://docs.digitalx.miraeasset.com/digitalx-sandbox.mjs"
+	if m.HasModuleCache(src) {
 		t.Error("HasModuleCache should be false before anything is fetched")
 	}
 
-	bin, argv := m.ReloadArgs("https://example.com/korbit-sandbox.mjs")
+	bin, argv := m.ReloadArgs("https://example.com/digitalx-sandbox.mjs")
 	if bin != m.Path() {
 		t.Errorf("ReloadArgs bin = %q, want %q", bin, m.Path())
 	}
-	want := []string{"cache", "--reload", "https://example.com/korbit-sandbox.mjs"}
+	want := []string{"cache", "--reload", "https://example.com/digitalx-sandbox.mjs"}
 	if strings.Join(argv, " ") != strings.Join(want, " ") {
 		t.Errorf("ReloadArgs argv = %v, want %v", argv, want)
+	}
+}
+
+// TestHasModuleCacheIsPerSource pins that the cached-bundle check is keyed by
+// the source URL the way Deno's own module cache is
+// (<DENO_DIR>/remote/<scheme>/<host>[_PORT<port>]): a bundle fetched from one
+// URL must not make a different URL look cached, and a non-http(s) source is
+// never in that cache.
+func TestHasModuleCacheIsPerSource(t *testing.T) {
+	cache := t.TempDir()
+	m := NewManager(cache, nil, Config{}, nil, nil, nil)
+	remote := filepath.Join(m.ModuleCacheDir(), "remote")
+
+	// A bundle already fetched from the legacy host.
+	legacyHost := filepath.Join(remote, "https", "docs.korbit.co.kr")
+	if err := os.MkdirAll(legacyHost, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(legacyHost, "deadbeef"), []byte("cached"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if !m.HasModuleCache("https://docs.korbit.co.kr/korbit-sandbox.mjs") {
+		t.Error("the fetched source should read as cached")
+	}
+	if m.HasModuleCache("https://docs.digitalx.miraeasset.com/digitalx-sandbox.mjs") {
+		t.Error("a different host must NOT read as cached — Deno keys its cache by URL")
+	}
+	if m.HasModuleCache("http://docs.korbit.co.kr/korbit-sandbox.mjs") {
+		t.Error("a different scheme must NOT read as cached")
+	}
+
+	// An explicit non-default port is a separate host directory ("_PORT<port>").
+	ported := filepath.Join(remote, "http", "127.0.0.1_PORT8771")
+	if err := os.MkdirAll(ported, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ported, "cafe"), []byte("cached"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !m.HasModuleCache("http://127.0.0.1:8771/digitalx-sandbox.mjs") {
+		t.Error("a ported source should read as cached from its _PORT directory")
+	}
+	if m.HasModuleCache("http://127.0.0.1:9999/digitalx-sandbox.mjs") {
+		t.Error("a different port must NOT read as cached")
+	}
+
+	// Sources that are never in Deno's remote cache.
+	for _, src := range []string{"", "/abs/path/digitalx-sandbox.mjs", "file:///tmp/digitalx-sandbox.mjs", "://nonsense"} {
+		if m.HasModuleCache(src) {
+			t.Errorf("HasModuleCache(%q) must be false — not a remote http(s) source", src)
+		}
+	}
+
+	// An empty host directory is not a cache hit either.
+	if err := os.MkdirAll(filepath.Join(remote, "https", "empty.example.test"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if m.HasModuleCache("https://empty.example.test/digitalx-sandbox.mjs") {
+		t.Error("an empty host directory must not read as cached")
 	}
 }
 

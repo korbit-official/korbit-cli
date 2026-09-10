@@ -25,16 +25,16 @@ func TestInitDBArgsPaper(t *testing.T) {
 	if !strings.Contains(strings.Join(paper, " "), "--source live") {
 		t.Errorf("paper init-db args should carry --source live: %v", paper)
 	}
-	if strings.Contains(strings.Join(paper, " "), "--mode korbit-api") {
-		t.Errorf("paper-only init-db args should not carry --mode korbit-api (fixtures pairs only): %v", paper)
+	if strings.Contains(strings.Join(paper, " "), "--mode digitalx-api") {
+		t.Errorf("paper-only init-db args should not carry --mode digitalx-api (fixtures pairs only): %v", paper)
 	}
 
-	// --all-pairs seeds from the live production snapshot (--mode korbit-api) and
+	// --all-pairs seeds from the live production snapshot (--mode digitalx-api) and
 	// points the bundle at the snapshot cache, independent of --paper.
 	allWalk := New(Config{Home: t.TempDir(), AllPairs: true}, Deps{})
 	allWalkArgs := allWalk.initDBArgs()
-	if joined := strings.Join(allWalkArgs, " "); !strings.Contains(joined, "--mode korbit-api") || strings.Contains(joined, "--source") {
-		t.Errorf("--all-pairs (no --paper) should carry --mode korbit-api and no --source: %v", allWalkArgs)
+	if joined := strings.Join(allWalkArgs, " "); !strings.Contains(joined, "--mode digitalx-api") || strings.Contains(joined, "--source") {
+		t.Errorf("--all-pairs (no --paper) should carry --mode digitalx-api and no --source: %v", allWalkArgs)
 	}
 	if !strings.Contains(strings.Join(allWalkArgs, " "), "--market-cache "+allWalk.marketCachePath()) {
 		t.Errorf("--all-pairs should carry --market-cache at the beside-db path: %v", allWalkArgs)
@@ -43,8 +43,8 @@ func TestInitDBArgsPaper(t *testing.T) {
 	// --all-pairs + --paper: every launched pair, mirrored live, cached.
 	allPaper := New(Config{Home: t.TempDir(), AllPairs: true, Paper: true}, Deps{}).initDBArgs()
 	joined := strings.Join(allPaper, " ")
-	if !strings.Contains(joined, "--mode korbit-api") || !strings.Contains(joined, "--source live") || !strings.Contains(joined, "--market-cache") {
-		t.Errorf("--all-pairs --paper should carry --mode korbit-api --source live --market-cache: %v", allPaper)
+	if !strings.Contains(joined, "--mode digitalx-api") || !strings.Contains(joined, "--source live") || !strings.Contains(joined, "--market-cache") {
+		t.Errorf("--all-pairs --paper should carry --mode digitalx-api --source live --market-cache: %v", allPaper)
 	}
 
 	// The cache path is NOT one of the sidecars freshen deletes, so it survives --fresh.

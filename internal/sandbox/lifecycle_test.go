@@ -120,7 +120,7 @@ case "$sub" in
     # Doer fakes /v2/time readiness).
     if [ "$port" = "0" ]; then port=45999; fi
     printf '{"pid":%%s,"port":%%s}' "$$" "$port" > "%s"
-    echo "korbit-sandbox listening on http://127.0.0.1:$port"
+    echo "digitalx-sandbox listening on http://127.0.0.1:$port"
     # Stay alive until signalled.
     while true; do sleep 1; done
     ;;
@@ -130,9 +130,10 @@ case "$sub" in
 JSON
     ;;
   license)
-    # Echo the footer-command override so a test can assert the env wiring; the
-    # real bundle renders the framed notice here.
-    echo "LICENSE_CMD=$KORBIT_SANDBOX_LICENSE_CMD"
+    # Echo the footer-command override under both env names so a test can assert
+    # the env wiring; the real bundle renders the framed notice here.
+    echo "LICENSE_CMD=$DIGITALX_SANDBOX_LICENSE_CMD"
+    echo "LEGACY_LICENSE_CMD=$KORBIT_SANDBOX_LICENSE_CMD"
     ;;
 esac
 `, dbPidPath, string(statusJSON))
@@ -342,8 +343,8 @@ func TestDenoRunPermsLeastPrivilege(t *testing.T) {
 		"--no-prompt",
 		"--allow-read=" + m.stateDir(),
 		"--allow-write=" + m.stateDir(),
-		"--allow-net=[::1],127.0.0.1,*.korbit.co.kr",
-		"--allow-env=KORBIT_SANDBOX_*,NODE_OPTIONS,LANG,LANGUAGE,LC_ALL,LC_MESSAGES",
+		"--allow-net=[::1],127.0.0.1,*.digitalx.miraeasset.com,*.korbit.co.kr",
+		"--allow-env=DIGITALX_SANDBOX_*,KORBIT_SANDBOX_*,NODE_OPTIONS,LANG,LANGUAGE,LC_ALL,LC_MESSAGES",
 		"--allow-sys=osRelease,cpus,systemMemoryInfo",
 	}
 	if joined != strings.Join(want, " ") {
@@ -352,6 +353,14 @@ func TestDenoRunPermsLeastPrivilege(t *testing.T) {
 	for _, banned := range []string{"--allow-all", "--allow-run", "--allow-ffi", "--allow-import"} {
 		if strings.Contains(joined, banned) {
 			t.Errorf("denoRunPerms must not grant %s, got %v", banned, perms)
+		}
+	}
+	// The bundle reads its config knobs under both namespaces, so --allow-env must
+	// grant both prefixes — otherwise a knob set under the other spelling is
+	// unreadable to it.
+	for _, prefix := range sandboxEnvPrefixes {
+		if !strings.Contains(joined, prefix+"*") {
+			t.Errorf("--allow-env must grant %s*, got %v", prefix, perms)
 		}
 	}
 }

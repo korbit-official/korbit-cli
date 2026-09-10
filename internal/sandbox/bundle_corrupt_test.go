@@ -33,7 +33,7 @@ func TestBundleCorruptFrom(t *testing.T) {
 	}
 	// Ordinary output, and a non-HTML syntax error, must not classify — reloading
 	// on a genuine bundle bug would just fail identically after a wasted fetch.
-	if bundleCorruptFrom("korbit-sandbox listening on http://127.0.0.1:9999") != nil {
+	if bundleCorruptFrom("digitalx-sandbox listening on http://127.0.0.1:9999") != nil {
 		t.Error("normal output must not classify as corrupt")
 	}
 	if bundleCorruptFrom("error: SyntaxError: Unexpected token 'x'") != nil {
@@ -97,7 +97,7 @@ case "$sub" in
   run)
     if [ "$port" = "0" ]; then port=45999; fi
     printf '{"pid":%%s,"port":%%s}' "$$" "$port" > "%s"
-    echo "korbit-sandbox listening on http://127.0.0.1:$port"
+    echo "digitalx-sandbox listening on http://127.0.0.1:$port"
     while true; do sleep 1; done
     ;;
   status)

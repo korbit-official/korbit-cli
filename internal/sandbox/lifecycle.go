@@ -241,9 +241,22 @@ func (m *Manager) bringUpWithRecovery(ctx context.Context, rt Runtime, bundle st
 	}
 	pf, err = m.bringUp(ctx, rt, bundle)
 	if err != nil && errors.As(err, &vt) {
-		return Pidfile{}, fmt.Errorf("%w even after updating the bundle — re-run with --skip-version-check to start anyway, or update %s", err, progname.Name())
+		return Pidfile{}, fmt.Errorf("%w even after updating the bundle — %s", err, m.versionGateWayOut())
 	}
 	return pf, err
+}
+
+// versionGateWayOut is the advice appended when the update-and-retry still meets
+// a too-old bundle. With an overridden bundle source the refresh can only re-fetch
+// that same source, so updating this CLI cannot help and --skip-version-check
+// only defers the failure to the first flag the old bundle doesn't understand:
+// the way out is to point the override at a supported bundle or drop it.
+func (m *Manager) versionGateWayOut() string {
+	if m.cfg.URL != "" {
+		return fmt.Sprintf("the bundle source is pinned to %s (--url, or %s): point it at a %s-or-newer bundle, or drop the override to use the Official Source (%s)",
+			m.cfg.URL, EnvSandboxURL, MinSandboxVersion, DefaultSandboxURL)
+	}
+	return fmt.Sprintf("re-run with --skip-version-check to start anyway, or update %s", progname.Name())
 }
 
 // bringUp initializes the database if absent, then spawns the detached `run` on
@@ -310,12 +323,14 @@ func (m *Manager) runInitDB(ctx context.Context, rt Runtime, bundle string) erro
 }
 
 // versionGateEnv is the env that arms the bundle's min-version refusal on the
-// start invocations (init-db / run); empty when the check is skipped.
+// start invocations (init-db / run); empty when the check is skipped. Both
+// spellings of the name are set, so the gate also reaches a bundle that predates
+// the DIGITALX_SANDBOX_* namespace (reachable via the bundle URL override).
 func (m *Manager) versionGateEnv() []string {
 	if m.cfg.SkipVersionCheck {
 		return nil
 	}
-	return []string{MinVersionEnv + "=" + MinSandboxVersion}
+	return bundleEnv(MinVersionEnv, LegacyMinVersionEnv, MinSandboxVersion)
 }
 
 // ensurePaperDB gates a --paper start on an ALREADY-initialized database: the
@@ -621,12 +636,12 @@ func (m *Manager) announceBundleSource(rt Runtime) {
 	if localPath(src) != "" {
 		return
 	}
-	if rt.deno != nil && rt.deno.HasModuleCache() {
+	if rt.deno != nil && rt.deno.HasModuleCache(src) {
 		return
 	}
 	m.log().Info("downloading sandbox bundle", "url", src)
 	if m.deps.Log != nil {
-		m.deps.Log(fmt.Sprintf("downloading the Korbit API Sandbox from %s (Deno caches it for next time) …", src))
+		m.deps.Log(fmt.Sprintf("downloading the Digital X API Sandbox from %s (Deno caches it for next time) …", src))
 	}
 }
 
@@ -643,13 +658,15 @@ func (m *Manager) Status(ctx context.Context) StatusResult {
 		DB:         m.dbPath(), KeyName: m.keyName(),
 	}
 	// Deno fetches+caches the bundle itself (DENO_DIR), so there is no bundle file
-	// of ours to stat: report whether Deno has fetched it. A local / file:// source
-	// is read fresh on every run, so "cached" there means the file is present.
+	// of ours to stat: report whether Deno has fetched THIS source (the cache is
+	// keyed by URL, so a different URL reads as not-yet-fetched even when it serves
+	// the same bundle). A local / file:// source is read fresh on every run, so
+	// "cached" there means the file is present.
 	if lp := localPath(res.SourceURL); lp != "" {
 		_, err := os.Stat(lp)
 		res.BundleCached = err == nil
 	} else {
-		res.BundleCached = m.denoManager().HasModuleCache()
+		res.BundleCached = m.denoManager().HasModuleCache(res.SourceURL)
 	}
 	if pf, err := m.readPidfile(); err == nil {
 		res.Server.PID, res.Server.Port = pf.PID, pf.Port
@@ -749,7 +766,7 @@ func (m *Manager) License(ctx context.Context, extra []string, stdout, stderr io
 		return err
 	}
 	cmd := exec.CommandContext(ctx, bin, argv...)
-	withRuntimeEnv(cmd, append(env, LicenseCmdEnv+"="+m.licenseCommand()))
+	withRuntimeEnv(cmd, append(env, bundleEnv(LicenseCmdEnv, LegacyLicenseCmdEnv, m.licenseCommand())...))
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	return cmd.Run()

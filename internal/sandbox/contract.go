@@ -38,24 +38,47 @@ const (
 )
 
 // Environment variables the manager sets on the bundle for a managed run.
+//
+// Each setting has two spellings: the DIGITALX_SANDBOX_* name the bundle reads
+// first, and the KORBIT_SANDBOX_* name it falls back to. The manager sets BOTH
+// (see bundleEnv), so a bundle pinned to an older build via the URL override —
+// which only knows the KORBIT_SANDBOX_* names — still sees the setting.
 const (
-	// sandboxEnvPrefix is the namespace for every bundle config knob. The CLI owns
-	// it end to end: inherited KORBIT_SANDBOX_* vars are stripped from the child
-	// environment (see withRuntimeEnv) so only the values the manager sets reach
-	// the bundle. Every env name below carries this prefix, which also keeps it
-	// inside the bundle run's --allow-env allowlist.
-	sandboxEnvPrefix = "KORBIT_SANDBOX_"
+	// sandboxEnvPrefix is the namespace for every bundle config knob, and
+	// legacySandboxEnvPrefix is the same namespace under its earlier spelling. The
+	// CLI owns both end to end: inherited vars in either namespace are stripped
+	// from the child environment (see withRuntimeEnv) so only the values the
+	// manager sets reach the bundle. Every env name below carries one of these
+	// prefixes, which also keeps it inside the bundle run's --allow-env allowlist
+	// (both prefixes are granted).
+	sandboxEnvPrefix       = "DIGITALX_SANDBOX_"
+	legacySandboxEnvPrefix = "KORBIT_SANDBOX_"
 	// MinVersionEnv tells the bundle the lowest version this CLI supports; an
 	// older bundle refuses to start (printing its version + VersionTooOldPrefix),
 	// so the manager can update + retry. Set on the start invocations (init-db /
-	// run) unless the version check is skipped. The name's KORBIT_SANDBOX_ prefix
-	// keeps it inside the bundle run's --allow-env allowlist.
-	MinVersionEnv = "KORBIT_SANDBOX_MIN_VERSION"
+	// run) unless the version check is skipped. LegacyMinVersionEnv is the same
+	// setting under the name a bundle predating the DIGITALX_SANDBOX_* namespace
+	// reads; both are set.
+	MinVersionEnv       = sandboxEnvPrefix + "MIN_VERSION"
+	LegacyMinVersionEnv = legacySandboxEnvPrefix + "MIN_VERSION"
 	// LicenseCmdEnv overrides the command the bundle's banner footer names for the
 	// full terms, so a re-surfaced banner points at `<prog> sandbox license`
-	// instead of the standalone bundle invocation. Same allowlisted prefix.
-	LicenseCmdEnv = "KORBIT_SANDBOX_LICENSE_CMD"
+	// instead of the standalone bundle invocation. LegacyLicenseCmdEnv is its
+	// earlier spelling; both are set.
+	LicenseCmdEnv       = sandboxEnvPrefix + "LICENSE_CMD"
+	LegacyLicenseCmdEnv = legacySandboxEnvPrefix + "LICENSE_CMD"
 )
+
+// sandboxEnvPrefixes is the full set of bundle config-knob namespaces the CLI
+// owns — the current spelling and its predecessor.
+var sandboxEnvPrefixes = []string{sandboxEnvPrefix, legacySandboxEnvPrefix}
+
+// bundleEnv renders one bundle setting as the KEY=value entries to add to the
+// child environment: the current name and its earlier spelling, same value, so
+// the setting reaches a bundle that reads either name.
+func bundleEnv(name, legacyName, value string) []string {
+	return []string{name + "=" + value, legacyName + "=" + value}
+}
 
 // Pidfile is the JSON the bundle writes next to its db file (at <db>-pid) once
 // it binds, and removes on a clean exit. The CLI reads the actual bound port
