@@ -460,9 +460,6 @@ func (s *mcpServer) build(readOnly, multiKey bool) *mcp.Server {
 	// the skill the way Claude Code does, can still reach the same safety rules
 	// and per-task playbooks. Topics are discovered from the embedded skill, so
 	// the enum/description can never drift from what `agent skill install` ships.
-	// It is registered under two names — the same handler, schema and topics —
-	// because a tool name can be written down in an agent config or a saved
-	// prompt; the alias's description sends the model to the canonical name.
 	guideTopics, _ := agentskill.GuideTopics(s.skillFS)
 	guideHandler := s.makeGuideHandler()
 	server.AddTool(&mcp.Tool{
@@ -470,14 +467,6 @@ func (s *mcpServer) build(readOnly, multiKey bool) *mcp.Server {
 		Description: guideDesc(guideTopics),
 		InputSchema: guideSchema(guideTopics),
 		Annotations: &mcp.ToolAnnotations{Title: "Digital X workflow guide", ReadOnlyHint: true},
-	}, guideHandler)
-	count++
-
-	server.AddTool(&mcp.Tool{
-		Name:        legacyGuideName,
-		Description: legacyGuideDesc(guideTopics),
-		InputSchema: guideSchema(guideTopics),
-		Annotations: &mcp.ToolAnnotations{Title: "Digital X workflow guide (deprecated alias)", ReadOnlyHint: true},
 	}, guideHandler)
 	count++
 
@@ -666,8 +655,7 @@ func makeBotRuntimeReferenceHandler() mcp.ToolHandler {
 	}
 }
 
-// makeGuideHandler returns the read-only guide handler (shared by the guide
-// tool and its deprecated alias): it returns the
+// makeGuideHandler returns the read-only guide handler: it returns the
 // requested skill guidance text (overview when `topic` is omitted, the named
 // playbook otherwise). The SDK does not validate arguments against the schema,
 // so the topic is re-checked here — agentskill.GuideContent rejects an unknown
@@ -1072,7 +1060,7 @@ func mcpPlanDoc(readOnly, multiKey bool, launchKey, baseURL string, keyNames []s
 		}
 		tools = append(tools, toolName(c))
 	}
-	tools = append(tools, "list_keys", botRuntimeReferenceName, guideName, legacyGuideName, "setup", "doctor")
+	tools = append(tools, "list_keys", botRuntimeReferenceName, guideName, "setup", "doctor")
 	return mcpPlan{
 		DryRun: true, Transport: "stdio", ReadOnly: readOnly, MultiKey: multiKey,
 		LaunchKey: launchKey, BaseURL: baseURL, ConfigKeys: keyNames,

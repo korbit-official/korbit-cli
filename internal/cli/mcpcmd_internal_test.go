@@ -17,7 +17,6 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/digitalx-official/digitalx-cli/internal/agentskill"
 	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
 	"github.com/digitalx-official/digitalx-cli/internal/callrec"
 	"github.com/digitalx-official/digitalx-cli/internal/clock"
@@ -301,15 +300,14 @@ func TestMCPBuildToolSetAndReadOnly(t *testing.T) {
 	if ro >= full {
 		t.Fatalf("read-only (%d) should expose fewer tools than full (%d)", ro, full)
 	}
-	// full = every endpoint command + the six hand-registered non-endpoint tools
-	// (list_keys, bot_runtime_reference, the guide tool under both its names,
-	// setup, doctor).
+	// full = every endpoint command + the five hand-registered non-endpoint tools
+	// (list_keys, bot_runtime_reference, the guide tool, setup, doctor).
 	// The onboarding tools (setup/doctor) and the read-only doc tools are exposed in
 	// both modes — they act on the local keystore or return text, not the exchange —
 	// so read-only only drops non-GET endpoints.
 	endpoints := len(endpointSurface())
-	if full != endpoints+6 {
-		t.Fatalf("full tool count = %d, want %d (endpoints + list_keys + bot_runtime_reference + %s + %s + setup + doctor)", full, endpoints+6, guideName, legacyGuideName)
+	if full != endpoints+5 {
+		t.Fatalf("full tool count = %d, want %d (endpoints + list_keys + bot_runtime_reference + %s + setup + doctor)", full, endpoints+5, guideName)
 	}
 }
 
@@ -1040,42 +1038,20 @@ func TestMCPBoolFlagOrEnv(t *testing.T) {
 	}
 }
 
-// TestMCPGuideAliasIsRegisteredAndIdentical: the guide tool is reachable under
-// both its names — a saved agent config or prompt may name either — and the two
-// registrations are the same tool: one handler, one schema, same topics. Only
-// the descriptions differ, and the alias's says which name to prefer.
-func TestMCPGuideAliasIsRegisteredAndIdentical(t *testing.T) {
+// TestMCPGuideToolIsRegistered: the guide tool is served under its one
+// canonical name and the dry-run plan lists exactly the tools the server
+// registers, so `mcp serve --dry-run` never misreports the surface.
+func TestMCPGuideToolIsRegistered(t *testing.T) {
 	srv, done := buildTestMCP(t, &mcpHTTPStub{route: okJSON(`{}`)}, "", false)
 	defer done()
 	srv.build(false, false)
 
 	plan := mcpPlanDoc(false, false, "", "https://example.invalid", nil)
-	for _, want := range []string{guideName, legacyGuideName} {
-		if !slices.Contains(plan.Tools, want) {
-			t.Errorf("the plan must list the %q tool: %v", want, plan.Tools)
-		}
+	if !slices.Contains(plan.Tools, guideName) {
+		t.Errorf("the plan must list the %q tool: %v", guideName, plan.Tools)
 	}
 	if plan.ToolCount != srv.toolCount {
 		t.Errorf("plan tool count %d != served tool count %d", plan.ToolCount, srv.toolCount)
-	}
-
-	topics, err := agentskill.GuideTopics(srv.skillFS)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(legacyGuideDesc(topics), guideName) || !strings.Contains(legacyGuideDesc(topics), "DEPRECATED") {
-		t.Errorf("the alias description must mark it deprecated and name %q: %q", guideName, legacyGuideDesc(topics))
-	}
-	if !strings.Contains(legacyGuideDesc(topics), guideDesc(topics)) {
-		t.Errorf("the alias must describe the same tool: %q", legacyGuideDesc(topics))
-	}
-
-	// One handler serves both names, so the alias returns the same content.
-	h := srv.makeGuideHandler()
-	canonical := callNamedTool(t, h, guideName, `{}`)
-	alias := callNamedTool(t, h, legacyGuideName, `{}`)
-	if resultText(canonical) != resultText(alias) {
-		t.Errorf("alias content differs:\n%s\n---\n%s", resultText(canonical), resultText(alias))
 	}
 }
 

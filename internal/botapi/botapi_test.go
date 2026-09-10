@@ -215,7 +215,7 @@ func TestWhereExceptionIsPerEvent(t *testing.T) {
 	}
 }
 
-func TestKorbitDeniedInWhere(t *testing.T) {
+func TestAPIDeniedInWhere(t *testing.T) {
 	ft := newFakeTransport()
 	r := newTestRuntime(t, Options{Where: "api.ticker('btc_krw')", API: ft.api(apiExtra{})})
 	_, err := r.Match(dataEvent(`{}`))
@@ -919,7 +919,7 @@ func TestOnSyntaxErrorReported(t *testing.T) {
 	}
 }
 
-func TestKorbitGetIsGone(t *testing.T) {
+func TestAPIGetIsGone(t *testing.T) {
 	err := runOn(t, Options{
 		API: newFakeTransport().api(apiExtra{}),
 		On:  "if (typeof api.get !== 'undefined') throw new Error('api.get must be removed')",

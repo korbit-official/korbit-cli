@@ -482,8 +482,7 @@ reported and left alone.
 It reaches an MCP host two ways. Claude Code installs the skill files on disk
 (above). A pure MCP host (Claude Desktop via the `.mcpb` bundle) never does, so
 `mcp serve` exposes the **same** content through the read-only `digitalx_guide`
-tool — registered under the deprecated alias `korbit_guide` as well, same
-handler: `internal/agentskill/guide.go` reads the embedded tree (`SKILL.md` as
+tool: `internal/agentskill/guide.go` reads the embedded tree (`SKILL.md` as
 the overview, each `references/<topic>.md` as a topic) and the server's
 `Instructions` nudge the model to call it. One embedded source feeds both paths,
 so they cannot drift.

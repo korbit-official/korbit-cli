@@ -45,12 +45,6 @@ const mcpDryRunArg = "dryRun"
 // cannot drift from what `agent skill install` writes to disk.
 const guideName = "digitalx_guide"
 
-// legacyGuideName is the same tool under its other name, registered alongside
-// guideName and served by the same handler. An agent config, saved prompt, or
-// stored plan can name a tool literally, so removing the name would break a
-// caller that has it written down; its description points at guideName.
-const legacyGuideName = "korbit_guide"
-
 // mcpGuideTopicArg selects a focused playbook for the guide tool; omitted, the
 // tool returns the overview and task router (SKILL.md).
 const mcpGuideTopicArg = "topic"
@@ -64,12 +58,6 @@ func guideDesc(topics []string) string {
 		b.WriteString(" Topics: " + strings.Join(topics, ", ") + ".")
 	}
 	return b.String()
-}
-
-// legacyGuideDesc is guideDesc plus the line telling the model which name to
-// prefer, so a model choosing between the two identical tools picks guideName.
-func legacyGuideDesc(topics []string) string {
-	return "DEPRECATED alias of the `" + guideName + "` tool — identical behavior; call `" + guideName + "` instead. " + guideDesc(topics)
 }
 
 // guideSchema is the input schema for the guide tool: an optional `topic`
