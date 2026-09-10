@@ -19,7 +19,7 @@ least one channel — the channel flags are booleans, no per-channel symbols:
 - **Private (signed):** `--my-orders`, `--my-trades`, `--my-assets` (balance changes)
 - `--symbols` is required for every channel except `--my-assets` (account-wide, no symbols); a
   `--my-assets`-only run needs no `--symbols`.
-- `--account-seq 1,2` — sub-accounts the private channels cover (default: the key's configured accountSeq, else 1/main).
+- `--account-seq 1,2` — accounts the private channels cover (default: the key's configured accountSeq, else 1/main).
 - `--trade-history N` — with `--trades`, seed up to N recent REST trades (tagged `origin:backfill`)
   before live data.
 - `--candles 1,60` — real-time OHLCV candles per listed interval (the candles endpoint's values:

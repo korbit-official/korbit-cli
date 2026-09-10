@@ -281,6 +281,7 @@ get` before treating funds as free.
 | `NO_BALANCE` | Insufficient `available` (a buy whose fee is charged in the quote currency also reserves the fee) | Re-read `balance`, shrink the order |
 | `ORDER_VALUE_TOO_SMALL` / `_TOO_LARGE` | Notional outside the pair's order value bounds, in the pair's quote currency | Resize; read the pair's own bounds from `pairs` (`minOrderValue` / `maxOrderValue`, in its `quoteCurrency`) — they differ per pair, and a pair that omits one publishes no figure for it (skip that check; the server still enforces) |
 | `PRICE_TICK_SIZE_INVALID` | Price off the tick grid | Round to the tick grid and retry |
+| `TOO_MANY_OPEN_ORDERS` | Too many orders already open for this account on this pair (currently 100, subject to change) | `order open --symbol …`, cancel what you no longer need (or wait for fills), then retry — don't resend in a loop |
 | `TRY_AGAIN` (on cancel) | Order mid-processing | Auto-retried within `--retry-timeout`; if it still surfaces, wait ~1s and run the cancel again |
 | `EXCEED_TIME_WINDOW` | Host clock drift | Reads/cancels/`order place` auto-resync once and retry; single-shot withdrawals don't — pass `--time-sync on` to sign with a corrected clock. `doctor` shows the offset |
 | HTTP 429 (`retryAfterSec`) | Rate limited | Idempotent calls auto-wait within `--retry-timeout`; for a write, wait `retryAfterSec` then resend yourself |
