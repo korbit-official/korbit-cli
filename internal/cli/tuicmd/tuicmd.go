@@ -79,7 +79,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string, tuiRun func(tui.Conf
 	}
 
 	if cx.Modes.JSONMode && !cx.Modes.DryRun {
-		return output.Usagef("tui is interactive and has no JSON output — use `dgx-cli monitor` for machine-readable streaming")
+		return output.Usagef("tui is interactive and has no JSON output — use `%s monitor` for machine-readable streaming", progname.Name())
 	}
 
 	home, cfg, err := cx.LoadConfig()
@@ -214,7 +214,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string, tuiRun func(tui.Conf
 	runFn := tuiRun
 	if runFn == nil {
 		if !writerIsTerminal(cx.IO.Out) {
-			return output.Usagef("tui needs an interactive terminal (stdout is not a TTY) — use `dgx-cli monitor` for piped or machine-readable streaming")
+			return output.Usagef("tui needs an interactive terminal (stdout is not a TTY) — use `%s monitor` for piped or machine-readable streaming", progname.Name())
 		}
 		runFn = tui.Run
 	}

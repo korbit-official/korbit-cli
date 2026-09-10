@@ -24,6 +24,7 @@ import (
 	"github.com/digitalx-official/digitalx-cli/internal/i18n"
 	"github.com/digitalx-official/digitalx-cli/internal/stream/state"
 	"github.com/digitalx-official/digitalx-cli/internal/tui/uikit"
+	"github.com/digitalx-official/digitalx-cli/internal/version"
 )
 
 // Key is the comparable cache key: equal Keys render identically. TickerRev is
@@ -82,6 +83,12 @@ func acctChip(k Key) string {
 	return i18n.T("accountSeq:") + strconv.Itoa(k.AccountSeq)
 }
 
+// title is the app name the header leads with: the PRODUCT's name plus the
+// screen it is showing. It is deliberately the product (internal/version) and
+// not the invoked command name (internal/progname) — the header identifies the
+// application, not a command line to type.
+const title = version.Product + " tui"
+
 // AcctChipSpan reports the screen column span [start, start+width) of the acct
 // chip on the header's first line, so a click on it can be hit-tested (the TUI
 // opens the sub-account switcher on such a click). ok is false when there is no
@@ -92,7 +99,7 @@ func AcctChipSpan(k Key) (start, width int, ok bool) {
 	if chip == "" {
 		return 0, 0, false
 	}
-	left := "dgx-cli tui" + "  " + i18n.T("%d markets", k.MarketCount)
+	left := title + "  " + i18n.T("%d markets", k.MarketCount)
 	right := chip + "  " + i18n.T("key:") + k.KeyName + "  " + k.BaseURL
 	prefix := 0 // visible cells before the chip within the right block
 	if k.Cramped != "" {
@@ -115,7 +122,7 @@ func render(k Key, d Data) string {
 
 	// The symbol list lives in the sidebar; the header names the app and the
 	// active symbol count, with the key/endpoint on the right.
-	left := uikit.StyTitle.Render("dgx-cli tui") + uikit.StyDim.Render("  "+i18n.T("%d markets", k.MarketCount))
+	left := uikit.StyTitle.Render(title) + uikit.StyDim.Render("  "+i18n.T("%d markets", k.MarketCount))
 	right := ""
 	if k.KeyName != "" {
 		tail := i18n.T("key:") + k.KeyName + "  " + k.BaseURL

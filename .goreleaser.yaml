@@ -11,7 +11,9 @@
 # signing identity is configured):  goreleaser release --snapshot --clean
 version: 2
 
-project_name: dgx-cli
+# The product's name — the project is digitalx-cli; `dgx-cli` is only the binary
+# it installs (set per build below).
+project_name: digitalx-cli
 
 before:
   hooks:

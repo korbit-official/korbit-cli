@@ -42,7 +42,9 @@ func TestRendersTwoLinesAndContent(t *testing.T) {
 	if got := strings.Count(out, "\n") + 1; got != 2 {
 		t.Errorf("header = %d lines, want 2", got)
 	}
-	if !strings.Contains(out, "dgx-cli tui") {
+	// The product name, not the binary name (`dgx-cli`): the header names the
+	// application, not a command to type.
+	if !strings.Contains(out, "digitalx-cli tui") {
 		t.Errorf("line 1 should name the app; got: %q", out)
 	}
 	if !strings.Contains(out, "3 markets") {

@@ -320,7 +320,7 @@
   "switch scope": "범위 전환",
   "switch sub-account": "어카운트 전환",
   "symbol": "심볼",
-  "terminal too small (%s) — dgx-cli tui needs at least %s (%s recommended); resize the terminal to continue": "터미널이 너무 작습니다 (%s) — dgx-cli tui는 최소 %s가 필요합니다 (권장 %s). 터미널 크기를 키워 주세요",
+  "terminal too small (%s) — %s tui needs at least %s (%s recommended); resize the terminal to continue": "터미널이 너무 작습니다 (%s) — %s tui는 최소 %s가 필요합니다 (권장 %s). 터미널 크기를 키워 주세요",
   "the %s side of the book is empty — a best order has no level there to peg to; place a limit order to rest as the first maker": "%s 측 호가가 비어 있습니다 — best 주문은 기준으로 삼을 호가가 없습니다; 지정가로 최초 메이커 주문을 넣으세요",
   "the %s side of the book is empty — a market order can't fill; place a limit order to rest as the first maker": "%s 측 호가가 비어 있습니다 — 시장가는 체결할 수 없습니다; 지정가로 최초 메이커 주문을 넣으세요",
   "the %s side of the book is empty — an ioc/fok limit can't fill and would cancel; use gtc or po to rest as the first maker": "%s 측 호가가 비어 있습니다 — ioc/fok 지정가는 체결 없이 즉시 취소됩니다; gtc 또는 po로 최초 메이커 주문을 넣으세요",

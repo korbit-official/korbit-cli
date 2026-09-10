@@ -14,6 +14,7 @@ import (
 
 	"github.com/digitalx-official/digitalx-cli/internal/accountseq"
 	"github.com/digitalx-official/digitalx-cli/internal/i18n"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
 	"github.com/digitalx-official/digitalx-cli/internal/stream/state"
 	"github.com/digitalx-official/digitalx-cli/internal/tui/components/balances"
 	"github.com/digitalx-official/digitalx-cli/internal/tui/components/fills"
@@ -78,8 +79,8 @@ func (m model) render() string {
 	}
 	minW, minH, recW, recH := m.sizeFloors()
 	if m.w < minW || m.h < minH {
-		return uikit.Wrap(i18n.T("terminal too small (%s) — dgx-cli tui needs at least %s (%s recommended); resize the terminal to continue",
-			fmt.Sprintf("%dx%d", m.w, m.h), fmt.Sprintf("%dx%d", minW, minH), fmt.Sprintf("%dx%d", recW, recH)), maxInt(10, m.w-1))
+		return uikit.Wrap(i18n.T("terminal too small (%s) — %s tui needs at least %s (%s recommended); resize the terminal to continue",
+			fmt.Sprintf("%dx%d", m.w, m.h), progname.Name(), fmt.Sprintf("%dx%d", minW, minH), fmt.Sprintf("%dx%d", recW, recH)), maxInt(10, m.w-1))
 	}
 
 	header := m.renderHeader()
