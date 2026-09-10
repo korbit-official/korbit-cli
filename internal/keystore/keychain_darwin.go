@@ -190,8 +190,8 @@ func init() {
 // nativeKeychain is the macOS keychainProvider over Security.framework.
 type nativeKeychain struct{}
 
-func (nativeKeychain) set(account, secret string) error {
-	svc := cfString(keychainService)
+func (nativeKeychain) set(service, account, secret string) error {
+	svc := cfString(service)
 	defer cfRelease(svc)
 	acct := cfString(account)
 	defer cfRelease(acct)
@@ -227,8 +227,8 @@ func (nativeKeychain) set(account, secret string) error {
 	}
 }
 
-func (nativeKeychain) get(account string) (string, bool, error) {
-	svc := cfString(keychainService)
+func (nativeKeychain) get(service, account string) (string, bool, error) {
+	svc := cfString(service)
 	defer cfRelease(svc)
 	acct := cfString(account)
 	defer cfRelease(acct)
@@ -262,8 +262,8 @@ func (nativeKeychain) get(account string) (string, bool, error) {
 	}
 }
 
-func (nativeKeychain) del(account string) error {
-	svc := cfString(keychainService)
+func (nativeKeychain) del(service, account string) error {
+	svc := cfString(service)
 	defer cfRelease(svc)
 	acct := cfString(account)
 	defer cfRelease(acct)
@@ -282,10 +282,10 @@ func (nativeKeychain) del(account string) error {
 	}
 }
 
-func (nativeKeychain) probe() error {
+func (nativeKeychain) probe(service string) error {
 	// Read-only lookup of a never-written sentinel: a healthy keychain answers
 	// errSecItemNotFound with no prompt; only a genuine backend failure errors.
-	_, _, err := nativeKeychain{}.get(probeAccount)
+	_, _, err := nativeKeychain{}.get(service, probeAccount)
 	return err
 }
 

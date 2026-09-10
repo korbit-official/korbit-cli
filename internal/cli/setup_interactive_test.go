@@ -76,7 +76,7 @@ func TestSetupInteractiveBindsUnboundKey(t *testing.T) {
 	seedUnboundKey(t, home, "default")
 	var lines []string
 	out, stderr, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""),
+		map[string]string{"DIGITALX_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""),
 		pasteKey("KEYID-IX", &lines))
 	if code != 0 {
 		t.Fatalf("interactive setup must succeed: exit = %d — %s", code, stderr)
@@ -111,7 +111,7 @@ func TestSetupInteractiveNewKey(t *testing.T) {
 	home := t.TempDir()
 	var lines []string
 	out, stderr, code := runWithSetupUI([]string{"setup", "--name", "fresh"},
-		map[string]string{"KORBIT_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""),
+		map[string]string{"DIGITALX_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""),
 		pasteKey("KEYID-FRESH", &lines))
 	if code != 0 {
 		t.Fatalf("interactive setup must succeed: exit = %d — %s", code, stderr)
@@ -133,7 +133,7 @@ func TestSetupInteractiveQuitWithoutFinishing(t *testing.T) {
 	seedUnboundKey(t, home, "default")
 	quit := func(cfg setupui.Config) error { return nil } // never calls Submit
 	out, stderr, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""), quit)
+		map[string]string{"DIGITALX_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""), quit)
 	if code != 0 {
 		t.Fatalf("quitting interactive setup must not error: exit = %d — %s", code, stderr)
 	}
@@ -155,7 +155,7 @@ func TestSetupInteractiveCtrlCEmitsNothing(t *testing.T) {
 	seedUnboundKey(t, home, "default")
 	abort := func(setupui.Config) error { return setupui.ErrInterrupted }
 	out, stderr, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""), abort)
+		map[string]string{"DIGITALX_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""), abort)
 	if code != 0 {
 		t.Fatalf("Ctrl-C abort must exit 0: %d — %s", code, stderr)
 	}
@@ -181,7 +181,7 @@ func TestSetupInteractiveCtrlCAfterBindEmitsNothing(t *testing.T) {
 		return setupui.ErrInterrupted
 	}
 	out, _, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""), abortAfterBind)
+		map[string]string{"DIGITALX_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""), abortAfterBind)
 	if code != 0 {
 		t.Fatalf("Ctrl-C after bind must exit 0: %d", code)
 	}
@@ -210,7 +210,7 @@ func TestSetupInteractiveRejectsUnregisteredKey(t *testing.T) {
 		return setupui.ErrInterrupted // the user gives up after the rejection
 	}
 	out, _, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), stub)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), stub)
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
@@ -242,7 +242,7 @@ func TestSetupInteractiveNetworkFailureDoesNotBind(t *testing.T) {
 		return setupui.ErrInterrupted
 	}
 	_, _, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), stub)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), stub)
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
@@ -266,7 +266,7 @@ func TestSetupInteractiveResyncsOnClockSkew(t *testing.T) {
 	doer := skewThenOKDoer{whoamiCalls: &calls}
 	var lines []string
 	out, stderr, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), pasteKey("KEYID-OK", &lines))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), pasteKey("KEYID-OK", &lines))
 	if code != 0 {
 		t.Fatalf("a clock-skew resync must let a valid id succeed: exit=%d — %s", code, stderr)
 	}
@@ -287,7 +287,7 @@ func TestSetupNoInteractiveSkipsPrompt(t *testing.T) {
 	stub := func(setupui.Config) error { called = true; return nil }
 	// Human mode (no --compact), so only --no-interactive can suppress the prompt.
 	out, stderr, code := runWithSetupUI([]string{"setup", "--no-interactive"},
-		map[string]string{"KORBIT_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""), stub)
+		map[string]string{"DIGITALX_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""), stub)
 	if code != 0 {
 		t.Fatalf("setup --no-interactive must succeed: exit = %d — %s", code, stderr)
 	}
@@ -307,7 +307,7 @@ func TestSetupCompactSkipsPrompt(t *testing.T) {
 	called := false
 	stub := func(setupui.Config) error { called = true; return nil }
 	out, _, code := runWithSetupUI([]string{"setup", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""), stub)
+		map[string]string{"DIGITALX_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""), stub)
 	if code != 0 {
 		t.Fatalf("setup --compact must succeed: exit = %d", code)
 	}
@@ -338,7 +338,7 @@ func TestSetupInteractiveSubmitValidation(t *testing.T) {
 		return nil
 	}
 	out, stderr, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""), stub)
+		map[string]string{"DIGITALX_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""), stub)
 	if code != 0 {
 		t.Fatalf("interactive setup must succeed after a valid retry: exit = %d — %s", code, stderr)
 	}
@@ -359,7 +359,7 @@ func TestSetupJSONSkipsPrompt(t *testing.T) {
 	called := false
 	stub := func(setupui.Config) error { called = true; return nil }
 	out, _, code := runWithSetupUI([]string{"setup", "--json"},
-		map[string]string{"KORBIT_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""), stub)
+		map[string]string{"DIGITALX_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""), stub)
 	if code != 0 {
 		t.Fatalf("setup --json must succeed: exit = %d", code)
 	}

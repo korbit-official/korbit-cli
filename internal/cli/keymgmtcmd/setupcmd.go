@@ -98,9 +98,9 @@ func (r setupDoneResult) headline() string {
 	switch {
 	case r.Status == "configuredViaEnvironment":
 		if r.APIKeyID != nil && *r.APIKeyID != "" {
-			return i18n.T("A credential is configured via the environment (apiKeyId %s) — there is no stored key to set up. To create and manage a stored key instead, unset the KORBIT_CLI_API_KEY_* variables.", *r.APIKeyID)
+			return i18n.T("A credential is configured via the environment (apiKeyId %s) — there is no stored key to set up. To create and manage a stored key instead, unset the DIGITALX_CLI_API_KEY_* variables.", *r.APIKeyID)
 		}
-		return i18n.T("A credential is configured via the environment (KORBIT_CLI_API_KEY_*) — there is no stored key to set up. To create and manage a stored key instead, unset those variables.")
+		return i18n.T("A credential is configured via the environment (DIGITALX_CLI_API_KEY_*) — there is no stored key to set up. To create and manage a stored key instead, unset those variables.")
 	case r.Status == "configured":
 		if r.APIKeyID != nil && *r.APIKeyID != "" {
 			return i18n.T("Key %q is configured (apiKeyId %s).", r.Name, *r.APIKeyID)
@@ -143,7 +143,7 @@ const defaultKeyName = "default"
 //	setup --api-key (bound, same id)     no-op (already configured) + doctor
 //	setup --api-key (bound, diff id)     error — setup never rebinds
 //	setup --api-key SANDBOX_…            error — not created via setup
-//	inline KORBIT_CLI_API_KEY_* set      report env credential + doctor; --api-key errors
+//	inline DIGITALX_CLI_API_KEY_* set      report env credential + doctor; --api-key errors
 //
 // The awaiting rows (new/unbound, no --api-key/--wait) finish per the wired path:
 // the on-TTY interactive prompt, else print-and-exit. --wait selects the headless
@@ -153,14 +153,14 @@ func RunSetup(flags map[string]string, positionals []string, ctx KeyContext) err
 		return err
 	}
 	apiKey := strings.TrimSpace(flags["api-key"])
-	// An inline credential supplied via the environment (KORBIT_CLI_API_KEY_*) means
+	// An inline credential supplied via the environment (DIGITALX_CLI_API_KEY_*) means
 	// the credential already exists, with no keystore involved — there is nothing
 	// for setup to create. Report the active credential and health-check it, the
 	// same "already configured + doctor" shape as a bound stored key. --api-key has
 	// no meaning here.
 	if ctx.Getenv != nil && keys.InlineCredsPresent(ctx.Getenv) {
 		if apiKey != "" {
-			return output.Usagef("--api-key can't be combined with an inline credential (KORBIT_CLI_API_KEY_*); unset the inline variables to manage a stored key")
+			return output.Usagef("--api-key can't be combined with an inline credential (DIGITALX_CLI_API_KEY_*); unset the inline variables to manage a stored key")
 		}
 		return emitInlineSetup(ctx)
 	}
@@ -288,13 +288,13 @@ func emitSetupBound(ctx KeyContext, name, apiKey string) error {
 }
 
 // emitInlineSetup handles `setup` when the credential is supplied inline via the
-// environment (KORBIT_CLI_API_KEY_*): there is no stored key to create, so it
+// environment (DIGITALX_CLI_API_KEY_*): there is no stored key to create, so it
 // reports the active credential and runs the complementary health check against it
 // (the empty key name routes doctor to its inline path). It is the inline twin of
 // the bound "already configured + doctor" report.
 func emitInlineSetup(ctx KeyContext) error {
 	// Confirm the inline credential actually resolves before reporting it
-	// configured: a partial or unparsable KORBIT_CLI_API_KEY_* set is a config
+	// configured: a partial or unparsable DIGITALX_CLI_API_KEY_* set is a config
 	// failure (as it is for doctor and every signed command), not an advisory
 	// doctor warning on a result that claims success.
 	sel, err := keys.Select("", ctx.Getenv)

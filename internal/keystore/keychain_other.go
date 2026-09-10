@@ -23,12 +23,12 @@ type osKeyring struct{}
 
 func init() { keychain = osKeyring{} }
 
-func (osKeyring) set(account, secret string) error {
-	return keyring.Set(keychainService, account, secret)
+func (osKeyring) set(service, account, secret string) error {
+	return keyring.Set(service, account, secret)
 }
 
-func (osKeyring) get(account string) (string, bool, error) {
-	secret, err := keyring.Get(keychainService, account)
+func (osKeyring) get(service, account string) (string, bool, error) {
+	secret, err := keyring.Get(service, account)
 	if errors.Is(err, keyring.ErrNotFound) {
 		return "", false, nil
 	}
@@ -38,16 +38,16 @@ func (osKeyring) get(account string) (string, bool, error) {
 	return secret, true, nil
 }
 
-func (osKeyring) del(account string) error {
-	err := keyring.Delete(keychainService, account)
+func (osKeyring) del(service, account string) error {
+	err := keyring.Delete(service, account)
 	if errors.Is(err, keyring.ErrNotFound) {
 		return nil
 	}
 	return err
 }
 
-func (osKeyring) probe() error {
-	_, err := keyring.Get(keychainService, probeAccount)
+func (osKeyring) probe(service string) error {
+	_, err := keyring.Get(service, probeAccount)
 	if err == nil || errors.Is(err, keyring.ErrNotFound) {
 		return nil
 	}

@@ -57,3 +57,88 @@ func TestLocalPathClassification(t *testing.T) {
 		}
 	}
 }
+
+// setUserCacheBase points os.UserCacheDir at a fresh temp directory and returns
+// it, so the ResolveCacheDir branches that probe the user cache never see the
+// developer's real one.
+func setUserCacheBase(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	t.Setenv("USERPROFILE", dir)
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(dir, "cache"))
+	base, err := os.UserCacheDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(base, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	return base
+}
+
+func cacheEnv(vars map[string]string) func(string) string {
+	return func(k string) string { return vars[k] }
+}
+
+func TestResolveCacheDir(t *testing.T) {
+	t.Run("env wins", func(t *testing.T) {
+		setUserCacheBase(t)
+		got, err := ResolveCacheDir(cacheEnv(map[string]string{"DIGITALX_CLI_SANDBOX_CACHE": "/tmp/custom"}))
+		if err != nil || got != "/tmp/custom" {
+			t.Fatalf("ResolveCacheDir = %q, %v", got, err)
+		}
+	})
+
+	t.Run("legacy env accepted", func(t *testing.T) {
+		setUserCacheBase(t)
+		got, err := ResolveCacheDir(cacheEnv(map[string]string{"KORBIT_CLI_SANDBOX_CACHE": "/tmp/legacy"}))
+		if err != nil || got != "/tmp/legacy" {
+			t.Fatalf("ResolveCacheDir = %q, %v", got, err)
+		}
+	})
+
+	t.Run("current env wins over legacy", func(t *testing.T) {
+		setUserCacheBase(t)
+		got, err := ResolveCacheDir(cacheEnv(map[string]string{
+			"DIGITALX_CLI_SANDBOX_CACHE": "/tmp/custom",
+			"KORBIT_CLI_SANDBOX_CACHE":   "/tmp/legacy",
+		}))
+		if err != nil || got != "/tmp/custom" {
+			t.Fatalf("ResolveCacheDir = %q, %v", got, err)
+		}
+	})
+
+	t.Run("existing current directory", func(t *testing.T) {
+		base := setUserCacheBase(t)
+		if err := os.MkdirAll(filepath.Join(base, CacheDirName), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(filepath.Join(base, LegacyCacheDirName), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		got, err := ResolveCacheDir(cacheEnv(nil))
+		if want := filepath.Join(base, CacheDirName); err != nil || got != want {
+			t.Fatalf("ResolveCacheDir = %q, %v; want %q", got, err, want)
+		}
+	})
+
+	t.Run("existing legacy directory", func(t *testing.T) {
+		base := setUserCacheBase(t)
+		if err := os.MkdirAll(filepath.Join(base, LegacyCacheDirName), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		got, err := ResolveCacheDir(cacheEnv(nil))
+		if want := filepath.Join(base, LegacyCacheDirName); err != nil || got != want {
+			t.Fatalf("ResolveCacheDir = %q, %v; want %q", got, err, want)
+		}
+	})
+
+	t.Run("neither directory exists", func(t *testing.T) {
+		base := setUserCacheBase(t)
+		got, err := ResolveCacheDir(cacheEnv(nil))
+		if want := filepath.Join(base, CacheDirName); err != nil || got != want {
+			t.Fatalf("ResolveCacheDir = %q, %v; want %q", got, err, want)
+		}
+	})
+}

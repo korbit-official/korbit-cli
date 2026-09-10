@@ -83,7 +83,7 @@ func TestCompletePagedResultIsBareArray(t *testing.T) {
 	body := `{"success":true,"data":[{"id":1,"currency":"btc"},{"id":2,"currency":"btc"},{"id":3,"currency":"btc"}]}`
 	out, stderr, code := runCLI(
 		[]string{"deposit", "history", "btc", "--key", "bot", "--json"},
-		map[string]string{"KORBIT_CLI_HOME": home}, &stubDoer{resp: resp(200, body, nil)})
+		map[string]string{"DIGITALX_CLI_HOME": home}, &stubDoer{resp: resp(200, body, nil)})
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, stderr)
 	}
@@ -116,7 +116,7 @@ func TestOrderPlaceAcknowledgmentOnlyShape(t *testing.T) {
 		out, stderr, code := runCLI(
 			[]string{"order", "place", "--symbol", "btc_krw", "--side", "buy", "--type", "limit",
 				"--price", "100000000", "--qty", "0.001", "--key", "bot", "--compact"},
-			map[string]string{"KORBIT_CLI_HOME": home}, doer)
+			map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 		if code != 0 {
 			t.Fatalf("place must succeed, exit=%d out=%s", code, out)
 		}
@@ -169,7 +169,7 @@ func TestOrderPlaceDuplicateGuidanceInEnvelope(t *testing.T) {
 		}
 		base := []string{"order", "place", "--symbol", "btc_krw", "--side", "buy", "--type", "limit",
 			"--price", "100000000", "--qty", "0.001", "--key", "bot"}
-		return runCLI(append(base, args...), map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		return runCLI(append(base, args...), map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	}
 
 	// JSON mode: the guidance rides the structured error envelope on stderr; there

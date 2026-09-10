@@ -94,9 +94,9 @@ func buildTestMCP(t *testing.T, doer apiclient.Doer, key string, multiKey bool) 
 		deps: resolveDeps(Deps{
 			Getenv: func(k string) string {
 				switch k {
-				case "KORBIT_CLI_HOME":
+				case "DIGITALX_CLI_HOME":
 					return home
-				case "KORBIT_CLI_BASE_URL":
+				case "DIGITALX_CLI_BASE_URL":
 					return "http://127.0.0.1:9999"
 				}
 				return ""
@@ -456,9 +456,9 @@ func TestMCPOrderPlaceDryRunWithInlineCredentialSkipsStoredDefaultBaseURL(t *tes
 		deps: resolveDeps(Deps{
 			Getenv: func(k string) string {
 				switch k {
-				case "KORBIT_CLI_HOME":
+				case "DIGITALX_CLI_HOME":
 					return home
-				case "KORBIT_CLI_BASE_URL":
+				case "DIGITALX_CLI_BASE_URL":
 					return "http://127.0.0.1:9999"
 				case keys.EnvAPIKeyID:
 					return "INLINE-KEY"
@@ -997,7 +997,7 @@ func TestMCPToolStringsSubstituteProgName(t *testing.T) {
 // (the env form is how the .mcpb Desktop Extension toggles them). The flag, when
 // set, wins; otherwise only "1"/"true"/"yes" enable it.
 func TestMCPBoolFlagOrEnv(t *testing.T) {
-	const env = "KORBIT_CLI_MCP_READ_ONLY"
+	const env = "DIGITALX_CLI_MCP_READ_ONLY"
 	tests := []struct {
 		name    string
 		flagSet bool

@@ -126,7 +126,7 @@ The sandbox bundle is separately licensed (software of Digital X Co., Ltd.) — 
 
 ## Keys & storage
 
-You can add multiple keys; select one per command with `--key` (or set a default with `korbit key use`). Both ED25519 and HMAC-SHA256 keys are supported. Private keys are stored encrypted on disk by default, or in your OS keychain, and all state lives under `~/.korbit-cli/`. Manage keys with `korbit key …` and move them between backends with `korbit keystore migrate`.
+You can add multiple keys; select one per command with `--key` (or set a default with `korbit key use`). Both ED25519 and HMAC-SHA256 keys are supported. Private keys are stored encrypted on disk by default, or in your OS keychain, and all state lives under `~/.digitalx-cli/` (or `~/.korbit-cli/` for installs made before the rename). Manage keys with `korbit key …` and move them between backends with `korbit keystore migrate`.
 
 ## License
 

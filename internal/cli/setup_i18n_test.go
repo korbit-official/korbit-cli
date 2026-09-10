@@ -44,7 +44,7 @@ func TestSetupInteractiveLocalizesKorean(t *testing.T) {
 	var lines []string
 	var prompt string
 	out, stderr, code := runWithSetupUI([]string{"setup", "--lang", "ko"},
-		map[string]string{"KORBIT_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""),
+		map[string]string{"DIGITALX_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""),
 		pasteKeyCapture("KEYID-KO", &lines, &prompt))
 	if code != 0 {
 		t.Fatalf("interactive ko setup must succeed: exit = %d — %s", code, stderr)
@@ -78,7 +78,7 @@ func TestSetupKoreanStaysEnglishNonInteractive(t *testing.T) {
 	called := false
 	stub := func(setupui.Config) error { called = true; return nil }
 	out, stderr, code := runWithSetupUI([]string{"setup", "--lang", "ko", "--no-interactive"},
-		map[string]string{"KORBIT_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""), stub)
+		map[string]string{"DIGITALX_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""), stub)
 	if code != 0 {
 		t.Fatalf("setup --lang ko --no-interactive must succeed: exit = %d — %s", code, stderr)
 	}
@@ -102,7 +102,7 @@ func TestDoctorStaysEnglishWithLangKo(t *testing.T) {
 	resetLang(t)
 	home := t.TempDir() // no keys → a failing "keys" check with a localizable detail
 	out, _, _ := runWithDeps([]string{"doctor", "--lang", "ko"},
-		map[string]string{"KORBIT_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""))
 	if !strings.Contains(out, "no keys configured") {
 		t.Fatalf("standalone doctor must render its problem detail in English: %s", out)
 	}
@@ -120,7 +120,7 @@ func TestSetupKoreanStaysEnglishJSON(t *testing.T) {
 	called := false
 	stub := func(setupui.Config) error { called = true; return nil }
 	out, _, code := runWithSetupUI([]string{"setup", "--lang", "ko", "--json"},
-		map[string]string{"KORBIT_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""), stub)
+		map[string]string{"DIGITALX_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""), stub)
 	if code != 0 {
 		t.Fatalf("setup --lang ko --json must succeed: exit = %d", code)
 	}

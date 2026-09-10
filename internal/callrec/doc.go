@@ -45,7 +45,7 @@
 // Routing orders through this package — rather than a caller holding a raw
 // journal.Logger — keeps every journaled write behind one lazily-opened handle.
 //
-// KORBIT_CLI_NO_JOURNAL is honored here: the Decision short-circuits to "don't
+// DIGITALX_CLI_NO_JOURNAL is honored here: the Decision short-circuits to "don't
 // record" before any open, so opting out never creates the file.
 //
 // # Per-call isolation (ForCall) — concurrency

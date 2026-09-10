@@ -134,7 +134,7 @@ const okTime = `{"success":true,"data":{"time":1700000000100}}` // ~100ms skew
 func TestDoctorNoKeysFails(t *testing.T) {
 	home := t.TempDir()
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, routeDoer{timeBody: okTime}, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, routeDoer{timeBody: okTime}, fakeProbe("203.0.113.7", ""))
 	if code != 4 {
 		t.Fatalf("exit = %d, want 4", code)
 	}
@@ -162,7 +162,7 @@ func TestDoctorUnboundKeyRunsEnvChecks(t *testing.T) {
 	home := t.TempDir()
 	seedUnboundKey(t, home, "k1")
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, routeDoer{timeBody: okTime}, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, routeDoer{timeBody: okTime}, fakeProbe("203.0.113.7", ""))
 	if code != 4 {
 		t.Fatalf("exit = %d, want 4 — %s", code, out)
 	}
@@ -185,7 +185,7 @@ func TestDoctorHealthy(t *testing.T) {
 		timeBody:     okTime,
 	}
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("exit = %d, want 0 — %s", code, out)
 	}
@@ -206,7 +206,7 @@ func TestDoctorMissingWriteOrdersWarnsButPasses(t *testing.T) {
 		timeBody:     okTime,
 	}
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("a warning must not fail doctor: exit = %d — %s", code, out)
 	}
@@ -224,7 +224,7 @@ func TestDoctorIPBlockedFails(t *testing.T) {
 		timeBody:     okTime,
 	}
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 4 {
 		t.Fatalf("exit = %d, want 4 — %s", code, out)
 	}
@@ -255,7 +255,7 @@ func TestDoctorIPAllowlistOneFamilyAccepted(t *testing.T) {
 		timeBody:     okTime,
 	}
 	out, _, code := runWithFamilyDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, defaultDoer,
+		map[string]string{"DIGITALX_CLI_HOME": home}, defaultDoer,
 		map[string]apiclient.Doer{"tcp4": v4OK, "tcp6": ipErr},
 		fakeProbe("203.0.113.7", "2001:db8::1"))
 	if code != 4 {
@@ -292,7 +292,7 @@ func TestDoctorHonorsAndReportsFamily(t *testing.T) {
 		return "2001:db8::1", nil
 	}
 	out, _, code := runWithFamilyDeps([]string{"doctor", "--family", "ipv6", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, ok,
+		map[string]string{"DIGITALX_CLI_HOME": home}, ok,
 		map[string]apiclient.Doer{"tcp4": ok, "tcp6": ok}, probe)
 	if code != 0 {
 		t.Fatalf("exit=%d: %s", code, out)
@@ -323,7 +323,7 @@ func TestDoctorIPAllowlistNeitherFamilyAccepted(t *testing.T) {
 	defaultDoer := ipErr
 	defaultDoer.timeBody = okTime
 	out, _, code := runWithFamilyDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, defaultDoer,
+		map[string]string{"DIGITALX_CLI_HOME": home}, defaultDoer,
 		map[string]apiclient.Doer{"tcp4": ipErr, "tcp6": ipErr},
 		fakeProbe("203.0.113.7", "2001:db8::1"))
 	if code != 4 {
@@ -354,7 +354,7 @@ func TestDoctorIPAllowlistBothFamiliesAccepted(t *testing.T) {
 		timeBody:     okTime,
 	}
 	out, _, code := runWithFamilyDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, defaultDoer,
+		map[string]string{"DIGITALX_CLI_HOME": home}, defaultDoer,
 		map[string]apiclient.Doer{"tcp4": ok, "tcp6": ok},
 		fakeProbe("203.0.113.7", "2001:db8::1"))
 	if code != 4 {
@@ -378,7 +378,7 @@ func TestDoctorIPAllowlistFamilyReplayNetworkError(t *testing.T) {
 	}
 	dead := routeDoer{whoamiErr: errors.New("dial tcp: no route to host")}
 	out, _, code := runWithFamilyDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, defaultDoer,
+		map[string]string{"DIGITALX_CLI_HOME": home}, defaultDoer,
 		map[string]apiclient.Doer{"tcp4": dead, "tcp6": dead},
 		fakeProbe("203.0.113.7", "2001:db8::1"))
 	if code != 4 {
@@ -394,7 +394,7 @@ func TestDoctorNetworkOnlyIsExit1(t *testing.T) {
 	seedBoundKey(t, home)
 	doer := routeDoer{whoamiErr: errors.New("dial tcp: no route"), timeBody: okTime}
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 1 {
 		t.Fatalf("exit = %d, want 1 (network only) — %s", code, out)
 	}
@@ -415,7 +415,7 @@ func TestDoctorUnboundKeyFails(t *testing.T) {
 	home := t.TempDir()
 	seedUnboundKey(t, home, "bot")
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, routeDoer{}, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, routeDoer{}, fakeProbe("203.0.113.7", ""))
 	if code != 4 {
 		t.Fatalf("exit = %d, want 4 — %s", code, out)
 	}
@@ -442,7 +442,7 @@ func TestDoctorClockSkewUsesRequestMidpoint(t *testing.T) {
 		timeBody:     `{"success":true,"data":{"time":1700000001500}}`, // = (t0+t1)/2
 	}
 	out, _, code := runWithClock([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), clock)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), clock)
 	if code != 0 {
 		t.Fatalf("exit = %d — %s", code, out)
 	}
@@ -460,7 +460,7 @@ func TestDoctorClockSkewWarns(t *testing.T) {
 		timeBody:     `{"success":true,"data":{"time":1700000009000}}`, // 9s ahead
 	}
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("a clock-skew warning must not fail doctor: exit = %d — %s", code, out)
 	}
@@ -481,7 +481,7 @@ func TestDoctorFastClockSuggestsTimeSync(t *testing.T) {
 		timeBody:     `{"success":true,"data":{"time":1699999991000}}`, // 9s BEHIND local => local is fast
 	}
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("a clock-skew warning must not fail doctor: exit = %d — %s", code, out)
 	}
@@ -502,7 +502,7 @@ func TestDoctorDefaultRunSkipsClockConfig(t *testing.T) {
 		timeBody:     `{"success":true,"data":{"time":1700000009000}}`, // 9s skew -> warns
 	}
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("exit = %d, want 0 — %s", code, out)
 	}
@@ -534,7 +534,7 @@ func TestDoctorDiagnoseClockUnsupported(t *testing.T) {
 		timeBody:     okTime,
 	}
 	out, _, code := runWithDeps([]string{"doctor", "--diagnose-clock", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("the OS clock diagnosis must never fail doctor: exit = %d — %s", code, out)
 	}
@@ -552,7 +552,7 @@ func TestDoctorRefusesSignedPlaintextBaseURL(t *testing.T) {
 	seedBoundKey(t, home)
 	doer := &capturingDoer{whoamiBody: `{"success":true,"data":{}}`, timeBody: okTime}
 	_, stderr, code := runWithDeps([]string{"doctor", "--base-url", "http://non-local.example", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 2 {
 		t.Fatalf("exit = %d, want 2 (usage) — %s", code, stderr)
 	}
@@ -573,7 +573,7 @@ func TestDoctorDeactivatedKeyFails(t *testing.T) {
 		timeBody:     okTime,
 	}
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 4 {
 		t.Fatalf("a deactivated key must fail doctor: exit = %d — %s", code, out)
 	}
@@ -588,7 +588,7 @@ func TestSetupResumesUnboundKey(t *testing.T) {
 	home := t.TempDir()
 	seedUnboundKey(t, home, "default")
 	out, stderr, code := runWithDeps([]string{"setup", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("re-running setup on an unbound key must not error: exit = %d — %s", code, stderr)
 	}
@@ -606,7 +606,7 @@ func TestSetupReportsAlreadyConfigured(t *testing.T) {
 	// A re-run on a bound key now runs a complementary doctor for it (a signed
 	// whoami), so a stub Doer keeps it hermetic.
 	out, stderr, code := runWithDeps([]string{"setup", "--name", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("re-running setup on a bound key must not error: exit = %d — %s", code, stderr)
 	}
@@ -633,7 +633,7 @@ func TestSetupReportsAlreadyConfiguredHMAC(t *testing.T) {
 		t.Fatal(err)
 	}
 	out, stderr, code := runWithDeps([]string{"setup", "--name", "hmac-bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("re-running setup on a bound hmac key must not error: exit = %d — %s", code, stderr)
 	}
@@ -651,7 +651,7 @@ func TestSetupBindsAPIKeyAndRunsDoctor(t *testing.T) {
 	home := t.TempDir()
 	seedUnboundKey(t, home, "trading-bot")
 	out, stderr, code := runWithDeps([]string{"setup", "--name", "trading-bot", "--api-key", "KEYID-NEW", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("setup --api-key on an unbound key must succeed: exit = %d — %s", code, stderr)
 	}
@@ -675,7 +675,7 @@ func TestSetupBindsAPIKeyAndRunsDoctor(t *testing.T) {
 func TestSetupRejectsSandboxAPIKey(t *testing.T) {
 	home := t.TempDir()
 	out, stderr, code := runWithDeps([]string{"setup", "--name", "sandbox-bot", "--api-key", "SANDBOX_ED25519_KEY_00000001_0000002", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""))
 	if code != 2 {
 		t.Fatalf("expected a usage error (exit 2), got %d — %s%s", code, out, stderr)
 	}
@@ -694,7 +694,7 @@ func TestSetupRejectsSandboxAPIKey(t *testing.T) {
 func TestSetupRejectsAPIKeyOnNewKey(t *testing.T) {
 	home := t.TempDir()
 	out, stderr, code := runWithDeps([]string{"setup", "--name", "fresh", "--api-key", "KEYID-9", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""))
 	if code != 2 {
 		t.Fatalf("expected a usage error (exit 2), got %d — %s%s", code, out, stderr)
 	}
@@ -712,10 +712,10 @@ func TestSetupRejectsAPIKeyOnNewKey(t *testing.T) {
 func TestSetupWithInlineCredential(t *testing.T) {
 	inlineEnv := func(home string) map[string]string {
 		return map[string]string{
-			"KORBIT_CLI_HOME":           home,
-			"KORBIT_CLI_API_KEY_ID":     "KEYID-ENV",
-			"KORBIT_CLI_API_KEY_SECRET": "secret",
-			"KORBIT_CLI_API_KEY_TYPE":   "hmac-sha256",
+			"DIGITALX_CLI_HOME":           home,
+			"DIGITALX_CLI_API_KEY_ID":     "KEYID-ENV",
+			"DIGITALX_CLI_API_KEY_SECRET": "secret",
+			"DIGITALX_CLI_API_KEY_TYPE":   "hmac-sha256",
 		}
 	}
 	t.Run("reports env credential and runs doctor", func(t *testing.T) {
@@ -775,7 +775,7 @@ func TestSetupWithInlineCredential(t *testing.T) {
 		// credential does not resolve. setup must surface that as a failure, not
 		// report "configured" with an advisory doctor warning.
 		out, stderr, code := runWithDeps([]string{"setup", "--compact"},
-			map[string]string{"KORBIT_CLI_HOME": home, "KORBIT_CLI_API_KEY_ID": "KEYID-ENV"},
+			map[string]string{"DIGITALX_CLI_HOME": home, "DIGITALX_CLI_API_KEY_ID": "KEYID-ENV"},
 			healthyWhoami, fakeProbe("203.0.113.7", ""))
 		if code == 0 {
 			t.Fatalf("a partial inline credential must not succeed: %s%s", out, stderr)
@@ -783,7 +783,7 @@ func TestSetupWithInlineCredential(t *testing.T) {
 		if strings.Contains(out, "configuredViaEnvironment") {
 			t.Fatalf("must not claim configured on a partial inline credential: %s", out)
 		}
-		if !strings.Contains(stderr, "KORBIT_CLI_API_KEY_SECRET") {
+		if !strings.Contains(stderr, "DIGITALX_CLI_API_KEY_SECRET") {
 			t.Fatalf("expected the missing-secret config error: %s", stderr)
 		}
 	})
@@ -797,7 +797,7 @@ func TestSetupAPIKeyOnBoundKey(t *testing.T) {
 		home := t.TempDir()
 		seedBoundKey(t, home) // "bot" bound to KEYID-1
 		out, stderr, code := runWithDeps([]string{"setup", "--name", "bot", "--api-key", "KEYID-2", "--compact"},
-			map[string]string{"KORBIT_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""))
+			map[string]string{"DIGITALX_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""))
 		if code != 2 {
 			t.Fatalf("expected a usage error (exit 2), got %d — %s%s", code, out, stderr)
 		}
@@ -814,7 +814,7 @@ func TestSetupAPIKeyOnBoundKey(t *testing.T) {
 		home := t.TempDir()
 		seedBoundKey(t, home)
 		out, stderr, code := runWithDeps([]string{"setup", "--name", "bot", "--api-key", "KEYID-1", "--compact"},
-			map[string]string{"KORBIT_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""))
+			map[string]string{"DIGITALX_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""))
 		if code != 0 {
 			t.Fatalf("re-supplying the same id must succeed: exit %d — %s", code, stderr)
 		}
@@ -833,7 +833,7 @@ func TestSetupAPIKeyDoctorFailureStillSucceeds(t *testing.T) {
 	seedUnboundKey(t, home, "trading-bot")
 	rejecting := routeDoer{whoamiStatus: 401, whoamiBody: `{"success":false,"error":{"code":401,"message":"INVALID_API_KEY"}}`, timeBody: okTime}
 	out, stderr, code := runWithDeps([]string{"setup", "--name", "trading-bot", "--api-key", "KEYID-NEW", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, rejecting, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, rejecting, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("a failing complementary doctor must NOT fail setup: exit = %d — %s", code, stderr)
 	}
@@ -883,7 +883,7 @@ func TestDoctorChecksWebSocket(t *testing.T) {
 		home := t.TempDir()
 		seedBoundKey(t, home)
 		out, _, code := runDoctorWS([]string{"doctor", "--compact"},
-			map[string]string{"KORBIT_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""), dialFrames())
+			map[string]string{"DIGITALX_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""), dialFrames())
 		if code != 0 {
 			t.Fatalf("healthy doctor with reachable WS must exit 0, got %d — %s", code, out)
 		}
@@ -902,7 +902,7 @@ func TestDoctorChecksWebSocket(t *testing.T) {
 			return nil, errors.New("dial tcp: connection refused")
 		}
 		out, _, code := runDoctorWS([]string{"doctor", "--compact"},
-			map[string]string{"KORBIT_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""), deadDial)
+			map[string]string{"DIGITALX_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""), deadDial)
 		if code != 0 {
 			t.Fatalf("an unreachable WS host is non-fatal (exit 0), got %d — %s", code, out)
 		}
@@ -929,7 +929,7 @@ func TestDoctorHumanHeaderShowsEndpoints(t *testing.T) {
 	home := t.TempDir()
 	seedBoundKey(t, home)
 	out, _, code := runDoctorWS([]string{"doctor"}, // human mode (no --compact)
-		map[string]string{"KORBIT_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""), dialFrames())
+		map[string]string{"DIGITALX_CLI_HOME": home}, healthyWhoami, fakeProbe("203.0.113.7", ""), dialFrames())
 	if code != 0 {
 		t.Fatalf("exit=%d out=%s", code, out)
 	}
@@ -960,7 +960,7 @@ func TestDoctorWarnsPerKeyBackendUnavailable(t *testing.T) {
 	}
 
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home},
+		map[string]string{"DIGITALX_CLI_HOME": home},
 		routeDoer{whoamiStatus: 200, whoamiBody: `{"success":true,"data":{"type":"ed25519","status":"activated","permissions":["readBalances"]}}`, timeBody: okTime},
 		fakeProbe("203.0.113.7", ""))
 	if code != 4 {
@@ -983,7 +983,7 @@ func TestDoctorAccountSeqAllowed(t *testing.T) {
 		timeBody:     okTime,
 	}
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("exit = %d, want 0 — %s", code, out)
 	}
@@ -1006,7 +1006,7 @@ func TestDoctorAccountSeqNotAllowed(t *testing.T) {
 		timeBody:     okTime,
 	}
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("exit = %d, want 0 (warning only) — %s", code, out)
 	}
@@ -1026,7 +1026,7 @@ func TestDoctorAccountSeqEmptyAllowedListWarns(t *testing.T) {
 		timeBody:     okTime,
 	}
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("exit = %d, want 0 (warning only) — %s", code, out)
 	}
@@ -1044,10 +1044,10 @@ func TestDoctorInlineAccountSeqWarningDoesNotSuggestStoredKeyCommand(t *testing.
 	}
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
 		map[string]string{
-			"KORBIT_CLI_HOME":           home,
-			"KORBIT_CLI_API_KEY_ID":     "KEYID-ENV",
-			"KORBIT_CLI_API_KEY_SECRET": "secret",
-			"KORBIT_CLI_API_KEY_TYPE":   "hmac-sha256",
+			"DIGITALX_CLI_HOME":           home,
+			"DIGITALX_CLI_API_KEY_ID":     "KEYID-ENV",
+			"DIGITALX_CLI_API_KEY_SECRET": "secret",
+			"DIGITALX_CLI_API_KEY_TYPE":   "hmac-sha256",
 		}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("exit = %d, want 0 (warning only) — %s", code, out)
@@ -1072,7 +1072,7 @@ func TestDoctorAccountSeqMissingFieldSkipsDefensively(t *testing.T) {
 		timeBody:     okTime,
 	}
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("exit = %d, want 0 — %s", code, out)
 	}
@@ -1091,7 +1091,7 @@ func TestDoctorAccountSeqUsesMainWhenNotConfigured(t *testing.T) {
 		timeBody:     okTime,
 	}
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("exit = %d, want 0 — %s", code, out)
 	}
@@ -1110,7 +1110,7 @@ func TestDoctorAccountSeqMainNotAllowed(t *testing.T) {
 		timeBody:     okTime,
 	}
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("exit = %d, want 0 (warning only) — %s", code, out)
 	}

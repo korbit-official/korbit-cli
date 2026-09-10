@@ -52,7 +52,7 @@ func TestKeyAddHMACThenSigns(t *testing.T) {
 	}
 	_, errb, code := runCLI(
 		[]string{"key", "add", "hmac-bot", "--type", "hmac-sha256", "--api-key", "KEYID-7", "--secret-file", secretFile, "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, &stubDoer{})
+		map[string]string{"DIGITALX_CLI_HOME": home}, &stubDoer{})
 	if code != 0 {
 		t.Fatalf("key add hmac exit=%d stderr=%s", code, errb)
 	}
@@ -60,7 +60,7 @@ func TestKeyAddHMACThenSigns(t *testing.T) {
 	doer := &stubDoer{resp: resp(200, `{"success":true,"data":{"krw":{"available":"1"}}}`, nil)}
 	_, errb, code = runCLI(
 		[]string{"balance", "--key", "hmac-bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 0 {
 		t.Fatalf("balance exit=%d stderr=%s", code, errb)
 	}
@@ -76,9 +76,9 @@ func TestKeyAddHMACThenSigns(t *testing.T) {
 func TestInlineHMACCredentialSigns(t *testing.T) {
 	doer := &stubDoer{resp: resp(200, `{"success":true,"data":{"krw":{"available":"1"}}}`, nil)}
 	env := map[string]string{
-		"KORBIT_CLI_API_KEY_ID":     "INLINE-KEY",
-		"KORBIT_CLI_API_KEY_SECRET": cliHMACSecret,
-		"KORBIT_CLI_API_KEY_TYPE":   "hmac-sha256",
+		"DIGITALX_CLI_API_KEY_ID":     "INLINE-KEY",
+		"DIGITALX_CLI_API_KEY_SECRET": cliHMACSecret,
+		"DIGITALX_CLI_API_KEY_TYPE":   "hmac-sha256",
 	}
 	_, errb, code := runCLI([]string{"balance", "--compact"}, env, doer)
 	if code != 0 {
@@ -108,9 +108,9 @@ func TestInlineEd25519CredentialSigns(t *testing.T) {
 
 	doer := &stubDoer{resp: resp(200, `{"success":true,"data":{"krw":{"available":"1"}}}`, nil)}
 	env := map[string]string{
-		"KORBIT_CLI_API_KEY_ID":     "INLINE-ED",
-		"KORBIT_CLI_API_KEY_SECRET": pemStr,
-		"KORBIT_CLI_API_KEY_TYPE":   "ed25519",
+		"DIGITALX_CLI_API_KEY_ID":     "INLINE-ED",
+		"DIGITALX_CLI_API_KEY_SECRET": pemStr,
+		"DIGITALX_CLI_API_KEY_TYPE":   "ed25519",
 	}
 	_, errb, code := runCLI([]string{"balance", "--compact"}, env, doer)
 	if code != 0 {
@@ -136,9 +136,9 @@ func TestInlineEd25519CredentialSigns(t *testing.T) {
 // a usage error (exit 2), enforced before any work.
 func TestInlineAndFlagMutuallyExclusive(t *testing.T) {
 	env := map[string]string{
-		"KORBIT_CLI_API_KEY_ID":     "X",
-		"KORBIT_CLI_API_KEY_SECRET": "s",
-		"KORBIT_CLI_API_KEY_TYPE":   "hmac-sha256",
+		"DIGITALX_CLI_API_KEY_ID":     "X",
+		"DIGITALX_CLI_API_KEY_SECRET": "s",
+		"DIGITALX_CLI_API_KEY_TYPE":   "hmac-sha256",
 	}
 	_, errb, code := runCLI([]string{"balance", "--key", "bot", "--compact"}, env, &stubDoer{})
 	if code != 2 {
@@ -155,14 +155,14 @@ func TestKeyAddHMACRequiresApiKeyAndSecret(t *testing.T) {
 	// Missing --api-key.
 	_, _, code := runCLI(
 		[]string{"key", "add", "h", "--type", "hmac-sha256", "--secret-file", "/dev/null", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, &stubDoer{})
+		map[string]string{"DIGITALX_CLI_HOME": home}, &stubDoer{})
 	if code != 2 {
 		t.Fatalf("missing --api-key should be usage error, got %d", code)
 	}
 	// Missing --secret-file.
 	_, _, code = runCLI(
 		[]string{"key", "add", "h", "--type", "hmac-sha256", "--api-key", "KEYID-7", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, &stubDoer{})
+		map[string]string{"DIGITALX_CLI_HOME": home}, &stubDoer{})
 	if code != 2 {
 		t.Fatalf("missing --secret-file should be usage error, got %d", code)
 	}

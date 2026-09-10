@@ -20,6 +20,7 @@ import (
 	"github.com/korbit-official/korbit-cli/internal/cli/probe"
 	"github.com/korbit-official/korbit-cli/internal/cli/textout"
 	"github.com/korbit-official/korbit-cli/internal/config"
+	"github.com/korbit-official/korbit-cli/internal/envalias"
 	"github.com/korbit-official/korbit-cli/internal/i18n"
 	"github.com/korbit-official/korbit-cli/internal/keys"
 	"github.com/korbit-official/korbit-cli/internal/output"
@@ -112,7 +113,7 @@ type KeyContext struct {
 	// not applicable to the command.
 	Verify func(restURL, wsBaseURL string) probe.EndpointVerification
 	// Getenv reads the process environment; `setup` uses it to detect an inline
-	// credential (KORBIT_CLI_API_KEY_*). May be nil (the check is then skipped).
+	// credential (DIGITALX_CLI_API_KEY_*). May be nil (the check is then skipped).
 	Getenv func(string) string
 	// Doctor, when set, runs the read-only health check for a just-configured
 	// BOUND key and returns its report. It is advisory: setup embeds the report in
@@ -253,11 +254,11 @@ func (ctx KeyContext) linkPerms() int {
 }
 
 // portalURL is the developers-portal base for the registration link and guidance,
-// normally probe.PortalURL. KORBIT_CLI_PORTAL_BASE_URL overrides it (internal
+// normally probe.PortalURL. DIGITALX_CLI_PORTAL_BASE_URL overrides it (internal
 // testing) — deliberately undocumented.
 func (ctx KeyContext) portalURL() string {
 	if ctx.Getenv != nil {
-		if v := strings.TrimSpace(ctx.Getenv("KORBIT_CLI_PORTAL_BASE_URL")); v != "" {
+		if v := strings.TrimSpace(envalias.Lookup(ctx.Getenv, "DIGITALX_CLI_PORTAL_BASE_URL")); v != "" {
 			return strings.TrimRight(v, "/")
 		}
 	}
@@ -390,15 +391,15 @@ func checkBaseURLFlags(ctx KeyContext) error {
 		// A WS pin needs a REST host to anchor to (the key's host comes from the
 		// REST base URL; the WS URL is derived from or pinned alongside it). Reject
 		// the orphan up front — before any key is created — rather than silently
-		// dropping it later. The host may come from --base-url or KORBIT_CLI_BASE_URL
+		// dropping it later. The host may come from --base-url or DIGITALX_CLI_BASE_URL
 		// (the same precedence applyKeyBaseURL resolves).
 		if !ctx.BaseURLSet {
 			envBase := ""
 			if ctx.Getenv != nil {
-				envBase = strings.TrimSpace(ctx.Getenv("KORBIT_CLI_BASE_URL"))
+				envBase = strings.TrimSpace(envalias.Lookup(ctx.Getenv, "DIGITALX_CLI_BASE_URL"))
 			}
 			if envBase == "" {
-				return output.Usagef("--ws-base-url needs --base-url (or KORBIT_CLI_BASE_URL) to anchor the key's host")
+				return output.Usagef("--ws-base-url needs --base-url (or DIGITALX_CLI_BASE_URL) to anchor the key's host")
 			}
 		}
 	}
@@ -408,7 +409,7 @@ func checkBaseURLFlags(ctx KeyContext) error {
 // applyKeyBaseURL persists the REST base URL (and WebSocket URL, else derived from
 // it) as the default endpoint of a just-created key, mirroring `key set-base-url`.
 // The host comes from --base-url, or — when the flag is absent — the
-// KORBIT_CLI_BASE_URL env override, so a key created against an explicit host
+// DIGITALX_CLI_BASE_URL env override, so a key created against an explicit host
 // (whether by `setup` first-creating it or by `key add`) is pinned to that host and
 // keeps working once the env var is gone. A no-op when neither is set. The flag,
 // when present, already won via keyContext. checkBaseURLFlags has validated the
@@ -417,9 +418,9 @@ func applyKeyBaseURL(ctx KeyContext, name string) error {
 	baseURL, baseSet := ctx.BaseURL, ctx.BaseURLSet
 	wsURL, wsSet := ctx.WSBaseURL, ctx.WSBaseURLSet
 	if !baseSet && ctx.Getenv != nil {
-		if envBase := strings.TrimSpace(ctx.Getenv("KORBIT_CLI_BASE_URL")); envBase != "" {
+		if envBase := strings.TrimSpace(envalias.Lookup(ctx.Getenv, "DIGITALX_CLI_BASE_URL")); envBase != "" {
 			baseURL, baseSet = strings.TrimRight(envBase, "/"), true
-			if envWS := strings.TrimSpace(ctx.Getenv("KORBIT_CLI_WS_BASE_URL")); envWS != "" {
+			if envWS := strings.TrimSpace(envalias.Lookup(ctx.Getenv, "DIGITALX_CLI_WS_BASE_URL")); envWS != "" {
 				wsURL, wsSet = strings.TrimRight(envWS, "/"), true
 			}
 		}

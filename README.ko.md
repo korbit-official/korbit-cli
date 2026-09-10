@@ -125,7 +125,7 @@ korbit sandbox stop
 
 ## 키 & 저장소
 
-키를 여러 개 추가할 수 있으며, 명령마다 `--key`로 하나를 선택합니다(기본값은 `korbit key use`로 지정). ED25519와 HMAC-SHA256 키를 모두 지원합니다. 개인키는 기본적으로 디스크에 암호화되어 저장되거나 OS 키체인에 보관되며, 모든 상태는 `~/.korbit-cli/` 아래에 있습니다. 키는 `korbit key …`로 관리하고, 백엔드 간 이동은 `korbit keystore migrate`로 합니다.
+키를 여러 개 추가할 수 있으며, 명령마다 `--key`로 하나를 선택합니다(기본값은 `korbit key use`로 지정). ED25519와 HMAC-SHA256 키를 모두 지원합니다. 개인키는 기본적으로 디스크에 암호화되어 저장되거나 OS 키체인에 보관되며, 모든 상태는 `~/.digitalx-cli/`(이름 변경 전에 설치한 경우에는 `~/.korbit-cli/`) 아래에 있습니다. 키는 `korbit key …`로 관리하고, 백엔드 간 이동은 `korbit keystore migrate`로 합니다.
 
 ## 라이선스
 

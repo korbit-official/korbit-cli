@@ -156,7 +156,7 @@ func TestStartStopWithFakeRuntime(t *testing.T) {
 	// Build the key manager over the home (real file keystore).
 	km := keys.NewManager(home, "file", func() int64 { return 1700000000000 }, nil)
 
-	dbPid := filepath.Join(home, "sandbox", "korbit-sandbox.db-pid")
+	dbPid := filepath.Join(home, "sandbox", "digitalx-sandbox.db-pid")
 	denoBin := fakeDeno(t, dbPid, kp.PrivatePEM, apiKey)
 	denoDir := filepath.Dir(denoBin)
 
@@ -238,7 +238,7 @@ func TestStartReusesRunningInstance(t *testing.T) {
 	}
 	apiKey := keys.SandboxAPIKeyPrefix + "ED25519_KEY_00000001_0000002"
 	km := keys.NewManager(home, "file", func() int64 { return 1700000000000 }, nil)
-	dbPid := filepath.Join(home, "sandbox", "korbit-sandbox.db-pid")
+	dbPid := filepath.Join(home, "sandbox", "digitalx-sandbox.db-pid")
 	denoBin := fakeDeno(t, dbPid, kp.PrivatePEM, apiKey)
 	denoDir := filepath.Dir(denoBin)
 	doer := doerFunc(func(r *http.Request) (*http.Response, error) {
@@ -287,7 +287,7 @@ func TestStartRefusesClobberingRealKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dbPid := filepath.Join(home, "sandbox", "korbit-sandbox.db-pid")
+	dbPid := filepath.Join(home, "sandbox", "digitalx-sandbox.db-pid")
 	denoBin := fakeDeno(t, dbPid, kp.PrivatePEM, keys.SandboxAPIKeyPrefix+"K1")
 	denoDir := filepath.Dir(denoBin)
 	doer := doerFunc(func(r *http.Request) (*http.Response, error) {

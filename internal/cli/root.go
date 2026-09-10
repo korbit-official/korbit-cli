@@ -36,6 +36,7 @@ import (
 	"github.com/korbit-official/korbit-cli/internal/clock"
 	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
 	"github.com/korbit-official/korbit-cli/internal/config"
+	"github.com/korbit-official/korbit-cli/internal/envalias"
 	"github.com/korbit-official/korbit-cli/internal/i18n"
 	"github.com/korbit-official/korbit-cli/internal/keys"
 	"github.com/korbit-official/korbit-cli/internal/logging"
@@ -152,12 +153,12 @@ type runtime struct {
 }
 
 // debugMode reports whether verbose diagnostics and read journaling are
-// on, via the --debug flag or a truthy KORBIT_CLI_DEBUG env var.
+// on, via the --debug flag or a truthy DIGITALX_CLI_DEBUG env var.
 func (rt *runtime) debugMode() bool {
 	if rt.debug {
 		return true
 	}
-	switch rt.deps.Getenv("KORBIT_CLI_DEBUG") {
+	switch envalias.Lookup(rt.deps.Getenv, "DIGITALX_CLI_DEBUG") {
 	case "1", "true", "yes":
 		return true
 	}
@@ -166,12 +167,12 @@ func (rt *runtime) debugMode() bool {
 
 // noFsyncMode reports whether the action journal and the monitor bot database
 // should be opened with PRAGMA synchronous=OFF (no fsync), via the --no-fsync
-// flag or a truthy KORBIT_CLI_NO_FSYNC env var.
+// flag or a truthy DIGITALX_CLI_NO_FSYNC env var.
 func (rt *runtime) noFsyncMode() bool {
 	if rt.noFsync {
 		return true
 	}
-	switch rt.deps.Getenv("KORBIT_CLI_NO_FSYNC") {
+	switch envalias.Lookup(rt.deps.Getenv, "DIGITALX_CLI_NO_FSYNC") {
 	case "1", "true", "yes":
 		return true
 	}
@@ -180,12 +181,12 @@ func (rt *runtime) noFsyncMode() bool {
 
 // experimentalEnabled reports whether opt-in, not-yet-stable features (currently
 // the monitor command's JavaScript bot runtime) are allowed, via the
-// --enable-experimental flag or a truthy KORBIT_CLI_ENABLE_EXPERIMENTAL env var.
+// --enable-experimental flag or a truthy DIGITALX_CLI_ENABLE_EXPERIMENTAL env var.
 func (rt *runtime) experimentalEnabled() bool {
 	if rt.enableExp {
 		return true
 	}
-	switch rt.deps.Getenv("KORBIT_CLI_ENABLE_EXPERIMENTAL") {
+	switch envalias.Lookup(rt.deps.Getenv, "DIGITALX_CLI_ENABLE_EXPERIMENTAL") {
 	case "1", "true", "yes":
 		return true
 	}
@@ -193,16 +194,16 @@ func (rt *runtime) experimentalEnabled() bool {
 }
 
 // timeSyncSetting returns the raw --time-sync request (the flag, else
-// KORBIT_CLI_TIME_SYNC), or "" when neither is set (the auto default).
+// DIGITALX_CLI_TIME_SYNC), or "" when neither is set (the auto default).
 func (rt *runtime) timeSyncSetting() string {
 	if rt.timeSyncFlag != "" {
 		return rt.timeSyncFlag
 	}
-	return rt.deps.Getenv("KORBIT_CLI_TIME_SYNC")
+	return envalias.Lookup(rt.deps.Getenv, "DIGITALX_CLI_TIME_SYNC")
 }
 
 // timeSyncMode resolves the server-clock sync mode (--time-sync /
-// KORBIT_CLI_TIME_SYNC). dispatch validates the value up front, so an
+// DIGITALX_CLI_TIME_SYNC). dispatch validates the value up front, so an
 // unrecognized word falls back to the auto default here.
 func (rt *runtime) timeSyncMode() clienv.TimeSyncMode {
 	m, _ := clienv.ParseTimeSyncMode(rt.timeSyncSetting())
@@ -210,18 +211,18 @@ func (rt *runtime) timeSyncMode() clienv.TimeSyncMode {
 }
 
 // logLevelSetting returns the explicit log-level request (the --log-level flag,
-// else KORBIT_CLI_LOG_LEVEL), or "" when neither is set.
+// else DIGITALX_CLI_LOG_LEVEL), or "" when neither is set.
 func (rt *runtime) logLevelSetting() string {
 	if rt.logLevelFlag != "" {
 		return rt.logLevelFlag
 	}
-	return rt.deps.Getenv("KORBIT_CLI_LOG_LEVEL")
+	return envalias.Lookup(rt.deps.Getenv, "DIGITALX_CLI_LOG_LEVEL")
 }
 
 // logLevel resolves the operational logger threshold. --log-level (or
-// KORBIT_CLI_LOG_LEVEL) controls ONLY the level and wins over --debug when both
+// DIGITALX_CLI_LOG_LEVEL) controls ONLY the level and wins over --debug when both
 // are set; otherwise the level follows debug mode (Debug under
-// --debug/KORBIT_CLI_DEBUG, Error by default — warn-and-below operational logs
+// --debug/DIGITALX_CLI_DEBUG, Error by default — warn-and-below operational logs
 // are opt-in, since failures surface through the program-output error envelope).
 // --debug still
 // independently governs read journaling regardless of --log-level. An
@@ -236,22 +237,22 @@ func (rt *runtime) logLevel() slog.Level {
 	return logging.LevelFor(rt.debugMode())
 }
 
-// logFileSetting returns the explicit --log-file path (else KORBIT_CLI_LOG_FILE),
+// logFileSetting returns the explicit --log-file path (else DIGITALX_CLI_LOG_FILE),
 // or "" when neither is set.
 func (rt *runtime) logFileSetting() string {
 	if rt.logFile != "" {
 		return rt.logFile
 	}
-	return rt.deps.Getenv("KORBIT_CLI_LOG_FILE")
+	return envalias.Lookup(rt.deps.Getenv, "DIGITALX_CLI_LOG_FILE")
 }
 
 // logFormatSetting returns the explicit --log-format request (the --log-format
-// flag, else KORBIT_CLI_LOG_FORMAT), or "" when neither is set (text default).
+// flag, else DIGITALX_CLI_LOG_FORMAT), or "" when neither is set (text default).
 func (rt *runtime) logFormatSetting() string {
 	if rt.logFormat != "" {
 		return rt.logFormat
 	}
-	return rt.deps.Getenv("KORBIT_CLI_LOG_FORMAT")
+	return envalias.Lookup(rt.deps.Getenv, "DIGITALX_CLI_LOG_FORMAT")
 }
 
 // logStyle resolves the operational logger's presentation (see logging.Style):
@@ -1339,12 +1340,12 @@ type depsResolved struct {
 // real-network dial that bypasses them would silently ignore --bind (a leak), so
 // route any new egress through one of them.
 func (rt *runtime) applyNetBinding() error {
-	fam, err := netbind.ParseFamily(rt.firstNonEmpty(rt.family, "KORBIT_CLI_NET_IP_FAMILY"))
+	fam, err := netbind.ParseFamily(rt.firstNonEmpty(rt.family, "DIGITALX_CLI_NET_IP_FAMILY"))
 	if err != nil {
 		return &output.UsageError{Message: err.Error()}
 	}
 	rt.deps.netFamily = fam // caps the ip/doctor probes even with no --bind
-	cfg := netbind.Config{Bind: rt.firstNonEmpty(rt.bind, "KORBIT_CLI_NET_BIND"), Family: fam}
+	cfg := netbind.Config{Bind: rt.firstNonEmpty(rt.bind, "DIGITALX_CLI_NET_BIND"), Family: fam}
 	binder, err := netbind.Resolve(cfg, func(msg string) {
 		fmt.Fprintln(rt.io.Err, progname.Name()+": "+msg)
 	})
@@ -1386,12 +1387,13 @@ func ipProberFor(b *netbind.Binder) apiclient.IPProber {
 	}
 }
 
-// firstNonEmpty returns flagVal if set, else the named environment variable.
+// firstNonEmpty returns flagVal if set, else the named environment variable
+// (envKey is the canonical DIGITALX_CLI_* name; the legacy spelling is accepted).
 func (rt *runtime) firstNonEmpty(flagVal, envKey string) string {
 	if flagVal != "" {
 		return flagVal
 	}
-	return rt.deps.Getenv(envKey)
+	return envalias.Lookup(rt.deps.Getenv, envKey)
 }
 
 func resolveDeps(d Deps) depsResolved {

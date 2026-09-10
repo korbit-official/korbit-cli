@@ -194,7 +194,7 @@ type Resolved struct {
 	Keystore string
 	APIKeyID string
 	// Inline is true when the credential came from inline environment material
-	// (KORBIT_CLI_API_KEY_*) rather than a stored key, mirroring Selection.Inline.
+	// (DIGITALX_CLI_API_KEY_*) rather than a stored key, mirroring Selection.Inline.
 	// It is the supported signal for "is this an inline credential?" — callers
 	// MUST branch on it, never compare Name against InlineDisplayName (a display
 	// string, not a sentinel).
@@ -973,7 +973,7 @@ func (m *Manager) metaFor(explicit string) KeyMeta {
 }
 
 // MetaForSelection returns the per-key metadata for a key selection in one peek,
-// honoring the inline rule: an inline (KORBIT_CLI_API_KEY_*) credential has no
+// honoring the inline rule: an inline (DIGITALX_CLI_API_KEY_*) credential has no
 // stored metadata, so it yields the zero KeyMeta and the per-key base-URL /
 // defaultAccountSeq tiers are skipped. It is the single front door for the
 // command paths (endpoint/tui/monitor) that need several of these at once.

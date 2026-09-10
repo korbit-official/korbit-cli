@@ -186,7 +186,7 @@ func TestIPNoConnectivityIsExit1(t *testing.T) {
 func TestSetupSurfacesIPAllowlist(t *testing.T) {
 	home := t.TempDir()
 	out, stderr, code := runIP([]string{"setup", "--name", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, fakeProbe("203.0.113.7", "2001:db8:1:2:3:4:5:6"))
+		map[string]string{"DIGITALX_CLI_HOME": home}, fakeProbe("203.0.113.7", "2001:db8:1:2:3:4:5:6"))
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, stderr)
 	}
@@ -216,7 +216,7 @@ func TestSetupSurfacesIPAllowlist(t *testing.T) {
 func TestSetupSurvivesIPProbeFailure(t *testing.T) {
 	home := t.TempDir()
 	out, stderr, code := runIP([]string{"setup", "--name", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, fakeProbe("", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, fakeProbe("", ""))
 	if code != 0 {
 		t.Fatalf("setup must succeed even when IP probing fails: exit=%d stderr=%s", code, stderr)
 	}

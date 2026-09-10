@@ -92,7 +92,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string, tuiRun func(tui.Conf
 	}
 	km := cx.KeyManager(home, cfg)
 	// The key in play (the stored key by name, else the default; or inline
-	// KORBIT_CLI_API_KEY_* material) sets the host for the whole session, public
+	// DIGITALX_CLI_API_KEY_* material) sets the host for the whole session, public
 	// (--public) included — so a key pinned to a non-prod base never has its
 	// public market-data traffic silently routed to prod. Stored keys also supply
 	// the default accountSeq; inline credentials have no stored metadata, so those
@@ -478,7 +478,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string, tuiRun func(tui.Conf
 
 // tuiLogging returns the TUI's operational logger and its writer sink. The TUI
 // owns the full-screen alt-screen, so stderr is unusable for diagnostics: it
-// logs only when --log-file (or KORBIT_CLI_LOG_FILE) diverts logs to a file.
+// logs only when --log-file (or DIGITALX_CLI_LOG_FILE) diverts logs to a file.
 // With a file open it returns the centralized logger (cx.Log, writing to the
 // file) and that file sink; otherwise (nil, io.Discard), so the TUI stays silent
 // on stderr and surfaces failures as on-screen toasts.

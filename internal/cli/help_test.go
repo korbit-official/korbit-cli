@@ -56,9 +56,9 @@ func TestHelpGatesExperimentalSurface(t *testing.T) {
 		}
 	})
 
-	t.Run("KORBIT_CLI_ENABLE_EXPERIMENTAL reveals it too", func(t *testing.T) {
+	t.Run("DIGITALX_CLI_ENABLE_EXPERIMENTAL reveals it too", func(t *testing.T) {
 		out, _, code := runCLI([]string{"monitor", "--help"},
-			map[string]string{"KORBIT_CLI_ENABLE_EXPERIMENTAL": "1"}, nil)
+			map[string]string{"DIGITALX_CLI_ENABLE_EXPERIMENTAL": "1"}, nil)
 		if code != 0 {
 			t.Fatalf("exit=%d", code)
 		}

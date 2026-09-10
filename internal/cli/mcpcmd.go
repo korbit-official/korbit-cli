@@ -32,6 +32,7 @@ import (
 	"github.com/korbit-official/korbit-cli/internal/cli/textout"
 	"github.com/korbit-official/korbit-cli/internal/clock"
 	"github.com/korbit-official/korbit-cli/internal/config"
+	"github.com/korbit-official/korbit-cli/internal/envalias"
 	"github.com/korbit-official/korbit-cli/internal/keys"
 	"github.com/korbit-official/korbit-cli/internal/ops"
 	"github.com/korbit-official/korbit-cli/internal/output"
@@ -56,11 +57,11 @@ import (
 // call policy of its own; it is one of the generated frontends over the catalog.
 //
 // Key model: by default ONE server signs with ONE key (resolved at launch from
-// --key/KORBIT_CLI_KEY); multiple accounts = multiple named servers. With
+// --key/DIGITALX_CLI_KEY); multiple accounts = multiple named servers. With
 // --multi-key a single server accepts an optional `key` per authenticated tool.
 
 // mcpBoolFlagOrEnv returns the bool flag's value, or — when the flag was not set
-// — a truthy env var, matching the flag-or-KORBIT_CLI_* idiom of the global
+// — a truthy env var, matching the flag-or-DIGITALX_CLI_* idiom of the global
 // toggles (see runtime.experimentalEnabled). The env form lets the .mcpb Desktop
 // Extension expose --read-only / --multi-key as install-time checkboxes, which
 // MCPB hosts pass through as env vars rather than conditional args.
@@ -68,7 +69,7 @@ func (rt *runtime) mcpBoolFlagOrEnv(cmd *cobra.Command, flag, env string) bool {
 	if v, _ := cmd.Flags().GetBool(flag); v {
 		return true
 	}
-	switch rt.deps.Getenv(env) {
+	switch envalias.Lookup(rt.deps.Getenv, env) {
 	case "1", "true", "yes":
 		return true
 	}
@@ -81,8 +82,8 @@ func (rt *runtime) runMCP(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		return output.Usagef("unexpected argument %q — mcp serve takes no positional arguments; see `%s mcp serve --help`", args[0], progname.Name())
 	}
-	readOnly := rt.mcpBoolFlagOrEnv(cmd, "read-only", "KORBIT_CLI_MCP_READ_ONLY")
-	multiKey := rt.mcpBoolFlagOrEnv(cmd, "multi-key", "KORBIT_CLI_MCP_MULTI_KEY")
+	readOnly := rt.mcpBoolFlagOrEnv(cmd, "read-only", "DIGITALX_CLI_MCP_READ_ONLY")
+	multiKey := rt.mcpBoolFlagOrEnv(cmd, "multi-key", "DIGITALX_CLI_MCP_MULTI_KEY")
 
 	home, cfg, err := rt.LoadConfig()
 	if err != nil {
@@ -90,8 +91,8 @@ func (rt *runtime) runMCP(cmd *cobra.Command, args []string) error {
 	}
 	km := rt.KeyManager(home, cfg)
 
-	// Single key-selection front door: a stored key (--key / KORBIT_CLI_KEY, else
-	// the default) OR inline KORBIT_CLI_API_KEY_* material — mutually exclusive.
+	// Single key-selection front door: a stored key (--key / DIGITALX_CLI_KEY, else
+	// the default) OR inline DIGITALX_CLI_API_KEY_* material — mutually exclusive.
 	// sel.Name is the launch/default key (empty => the registry default, or — when
 	// inline — no stored name at all); a --multi-key tool call still names its own
 	// stored key, resolved separately in buildKeyAPI.
@@ -237,7 +238,7 @@ type mcpServer struct {
 	publicBaseURL string
 	launchKey     string
 	// sel is how the launch/default credential was chosen (stored name vs inline
-	// KORBIT_CLI_API_KEY_* material); buildKeyAPI uses it for the default key.
+	// DIGITALX_CLI_API_KEY_* material); buildKeyAPI uses it for the default key.
 	sel           keys.Selection
 	multiKey      bool
 	timeoutMs     int
@@ -297,7 +298,7 @@ func (s *mcpServer) clientBase() clienv.ClientSpec {
 func (s *mcpServer) buildKeyAPI(name string) *keyAPI {
 	rt := s.rt
 	// The default slot (name "") is the launch credential, which may be inline
-	// KORBIT_CLI_API_KEY_* material; resolve it through the selection. A named key
+	// DIGITALX_CLI_API_KEY_* material; resolve it through the selection. A named key
 	// (a --multi-key tool call) is always a stored key — there is no inline name —
 	// so it resolves through the registry, and an inline credential has no stored
 	// per-key host (keyMeta stays "").

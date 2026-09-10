@@ -75,7 +75,7 @@ func runMonitorCLI(args []string, env map[string]string, doer apiclient.Doer, di
 	// The JavaScript bot runtime is gated behind --enable-experimental; enable it
 	// by default here so the many scripting tests exercise the runtime directly.
 	// The gate's own default-off behavior is covered by TestMonitorExperimentalGate.
-	merged := map[string]string{"KORBIT_CLI_HOME": sharedTestHome(), "KORBIT_CLI_ENABLE_EXPERIMENTAL": "1"}
+	merged := map[string]string{"DIGITALX_CLI_HOME": sharedTestHome(), "DIGITALX_CLI_ENABLE_EXPERIMENTAL": "1"}
 	for k, v := range env {
 		merged[k] = v
 	}
@@ -105,7 +105,7 @@ func TestSetBaseURLVerifies(t *testing.T) {
 		seedBoundKey(t, home)
 		out, _, code := runMonitorCLI(
 			[]string{"key", "set-base-url", "bot", "https://api-test.korbit.co.kr", "--compact"},
-			map[string]string{"KORBIT_CLI_HOME": home}, okDoer, dialFrames())
+			map[string]string{"DIGITALX_CLI_HOME": home}, okDoer, dialFrames())
 		if code != 0 {
 			t.Fatalf("exit=%d out=%q", code, out)
 		}
@@ -134,7 +134,7 @@ func TestSetBaseURLVerifies(t *testing.T) {
 		}
 		out, errb, code := runMonitorCLI(
 			[]string{"key", "set-base-url", "bot", "https://api-test.korbit.co.kr", "--compact"},
-			map[string]string{"KORBIT_CLI_HOME": home}, okDoer, failDial)
+			map[string]string{"DIGITALX_CLI_HOME": home}, okDoer, failDial)
 		if code != 0 {
 			t.Fatalf("an unreachable endpoint must not fail the command: exit=%d", code)
 		}
@@ -160,7 +160,7 @@ func TestSetBaseURLVerifies(t *testing.T) {
 		}
 		humanOut, humanErr, _ := runMonitorCLI(
 			[]string{"key", "set-base-url", "bot", "https://api-test.korbit.co.kr"},
-			map[string]string{"KORBIT_CLI_HOME": home}, okDoer, failDial)
+			map[string]string{"DIGITALX_CLI_HOME": home}, okDoer, failDial)
 		if !strings.Contains(humanOut, "--ws-base-url") || !strings.Contains(humanOut, "key set-base-url bot") {
 			t.Fatalf("fix command not shown on stdout: %s (stderr=%s)", humanOut, humanErr)
 		}
@@ -174,7 +174,7 @@ func TestSetBaseURLVerifies(t *testing.T) {
 		})
 		out, errb, code := runMonitorCLI(
 			[]string{"key", "set-base-url", "bot", "https://api-test.korbit.co.kr", "--compact"},
-			map[string]string{"KORBIT_CLI_HOME": home}, failDoer, dialFrames())
+			map[string]string{"DIGITALX_CLI_HOME": home}, failDoer, dialFrames())
 		if code != 0 {
 			t.Fatalf("an unreachable REST endpoint must not fail the command: exit=%d", code)
 		}
@@ -194,7 +194,7 @@ func TestSetBaseURLVerifies(t *testing.T) {
 		}
 		humanOut, humanErr, _ := runMonitorCLI(
 			[]string{"key", "set-base-url", "bot", "https://api-test.korbit.co.kr"},
-			map[string]string{"KORBIT_CLI_HOME": home}, failDoer, dialFrames())
+			map[string]string{"DIGITALX_CLI_HOME": home}, failDoer, dialFrames())
 		if !strings.Contains(humanOut, "double-check the base URL") {
 			t.Fatalf("REST fix guidance not shown on stdout: %s (stderr=%s)", humanOut, humanErr)
 		}
@@ -210,7 +210,7 @@ func TestSetBaseURLVerifies(t *testing.T) {
 		}
 		out, _, code := runMonitorCLI(
 			[]string{"key", "set-base-url", "bot", "https://api-test.korbit.co.kr", "--no-verify", "--compact"},
-			map[string]string{"KORBIT_CLI_HOME": home}, okDoer, neverDial)
+			map[string]string{"DIGITALX_CLI_HOME": home}, okDoer, neverDial)
 		if code != 0 {
 			t.Fatalf("exit=%d", code)
 		}
@@ -615,14 +615,14 @@ func TestMonitorWSBaseURLResolution(t *testing.T) {
 			want: `"wsPublicUrl":"wss://stream.example.test/v2/public"`,
 		},
 		{
-			name: "KORBIT_CLI_WS_BASE_URL env",
+			name: "DIGITALX_CLI_WS_BASE_URL env",
 			args: []string{"--base-url", "https://api-test.korbit.co.kr"},
-			env:  map[string]string{"KORBIT_CLI_WS_BASE_URL": "wss://env-stream.example.test"},
+			env:  map[string]string{"DIGITALX_CLI_WS_BASE_URL": "wss://env-stream.example.test"},
 			want: `"wsPublicUrl":"wss://env-stream.example.test/v2/public"`,
 		},
 		{
-			name: "derived from KORBIT_CLI_BASE_URL env",
-			env:  map[string]string{"KORBIT_CLI_BASE_URL": "https://apiz.korbit.com"},
+			name: "derived from DIGITALX_CLI_BASE_URL env",
+			env:  map[string]string{"DIGITALX_CLI_BASE_URL": "https://apiz.korbit.com"},
 			want: `"wsPublicUrl":"wss://ws-api.korbit.com/v2/public"`,
 		},
 	}
@@ -647,7 +647,7 @@ func TestMonitorWSBaseURLFromConfig(t *testing.T) {
 	writeConfig(t, home, `{"baseUrl":"https://api-test.korbit.co.kr","wsBaseUrl":"wss://cfg-stream.example.test"}`)
 	out, _, code := runMonitorCLI(
 		[]string{"monitor", "--symbols", "btc_krw", "--ticker", "--dry-run", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, nil, nil)
+		map[string]string{"DIGITALX_CLI_HOME": home}, nil, nil)
 	if code != 0 {
 		t.Fatalf("exit=%d out=%q", code, out)
 	}
@@ -666,7 +666,7 @@ func TestMonitorWSBaseURLFromKey(t *testing.T) {
 		setKeyBaseURL(t, home, "bot", "https://api-test.korbit.co.kr") // empty ws → derived
 		out, _, code := runMonitorCLI(
 			[]string{"monitor", "--symbols", "btc_krw", "--ticker", "--where", "true", "--key", "bot", "--dry-run", "--compact"},
-			map[string]string{"KORBIT_CLI_HOME": home}, nil, nil)
+			map[string]string{"DIGITALX_CLI_HOME": home}, nil, nil)
 		if code != 0 {
 			t.Fatalf("exit=%d out=%q", code, out)
 		}
@@ -683,7 +683,7 @@ func TestMonitorWSBaseURLFromKey(t *testing.T) {
 		}
 		out, _, code := runMonitorCLI(
 			[]string{"monitor", "--symbols", "btc_krw", "--ticker", "--where", "true", "--key", "bot", "--dry-run", "--compact"},
-			map[string]string{"KORBIT_CLI_HOME": home}, nil, nil)
+			map[string]string{"DIGITALX_CLI_HOME": home}, nil, nil)
 		if code != 0 {
 			t.Fatalf("exit=%d out=%q", code, out)
 		}
@@ -739,7 +739,7 @@ func TestMonitorExperimentalGate(t *testing.T) {
 	}
 	for _, args := range gated {
 		// Disable the helper's default opt-in so the gate is in force.
-		_, errb, code := runMonitorCLI(args, map[string]string{"KORBIT_CLI_ENABLE_EXPERIMENTAL": ""}, nil, nil)
+		_, errb, code := runMonitorCLI(args, map[string]string{"DIGITALX_CLI_ENABLE_EXPERIMENTAL": ""}, nil, nil)
 		if code != 2 {
 			t.Fatalf("%v: exit=%d, want 2 (stderr %q)", args, code, errb)
 		}
@@ -753,7 +753,7 @@ func TestMonitorExperimentalGate(t *testing.T) {
 	// added to the gate list by accident. --dry-run keeps it from dialing.
 	_, errb, code := runMonitorCLI(
 		[]string{"monitor", "--symbols", "btc_krw", "--ticker", "--max-events", "1", "--dry-run", "--compact"},
-		map[string]string{"KORBIT_CLI_ENABLE_EXPERIMENTAL": ""}, nil, nil)
+		map[string]string{"DIGITALX_CLI_ENABLE_EXPERIMENTAL": ""}, nil, nil)
 	if code != 0 || strings.Contains(errb, "experimental") {
 		t.Fatalf("plain streaming must not require --enable-experimental, got exit=%d stderr=%q", code, errb)
 	}
@@ -763,7 +763,7 @@ func TestMonitorExperimentalGate(t *testing.T) {
 	// proves we got past the gate into the runtime.
 	_, errb, code = runMonitorCLI(
 		[]string{"monitor", "--symbols", "btc_krw", "--ticker", "--where", "1 +"},
-		map[string]string{"KORBIT_CLI_ENABLE_EXPERIMENTAL": "1"}, nil, dialFrames())
+		map[string]string{"DIGITALX_CLI_ENABLE_EXPERIMENTAL": "1"}, nil, dialFrames())
 	if code != 2 || strings.Contains(errb, "experimental") {
 		t.Fatalf("with the gate open, --where should reach compilation, got exit=%d stderr=%q", code, errb)
 	}
@@ -826,7 +826,7 @@ func TestMonitorPrivateRequiresKey(t *testing.T) {
 	home := t.TempDir()
 	_, errb, code := runMonitorCLI(
 		[]string{"monitor", "--my-assets"},
-		map[string]string{"KORBIT_CLI_HOME": home}, nil, nil)
+		map[string]string{"DIGITALX_CLI_HOME": home}, nil, nil)
 	if code != 4 {
 		t.Fatalf("exit=%d, want 4 (stderr %q)", code, errb)
 	}
@@ -893,7 +893,7 @@ func TestMonitorOnPlacesOrder(t *testing.T) {
 			"--base-url", "https://api.example.test", "--max-events", "1",
 			"--where", `Number(payload.data.close) < 140000000`,
 			"--on", `if (ev.type === "data") { var o = await korbit.order.place({symbol:"btc_krw", side:"buy", orderType:"limit", price:"139000000", qty:"0.001"}); console.log("placed " + o.orderId) }`},
-		map[string]string{"KORBIT_CLI_HOME": home},
+		map[string]string{"DIGITALX_CLI_HOME": home},
 		doer, dialFrames(tickerFrame("100"), tickerFrame("200")))
 	if code != 0 {
 		t.Fatalf("exit=%d (stderr %q)", code, errb)
@@ -912,7 +912,7 @@ func TestMonitorOnPlacesOrder(t *testing.T) {
 	}
 	// The journal recorded the order placement (a write).
 	logsOut, _, logsCode := runCLI([]string{"logs", "--orders", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, newRoutingDoer())
+		map[string]string{"DIGITALX_CLI_HOME": home}, newRoutingDoer())
 	if logsCode != 0 {
 		t.Fatalf("logs exit=%d", logsCode)
 	}
@@ -935,7 +935,7 @@ func TestMonitorOnUnhandledApiErrorExits3(t *testing.T) {
 		[]string{"monitor", "--symbols", "btc_krw", "--ticker", "--key", "bot", "--json",
 			"--base-url", "https://api.example.test",
 			"--on", `await korbit.balance()`},
-		map[string]string{"KORBIT_CLI_HOME": home},
+		map[string]string{"DIGITALX_CLI_HOME": home},
 		doer, dialFrames(tickerFrame("100")))
 	if code != 3 {
 		t.Fatalf("exit=%d, want 3 (stderr %q)", code, errb)
@@ -1024,7 +1024,7 @@ func TestMonitorDBPersistsAcrossEvents(t *testing.T) {
 		[]string{"monitor", "--symbols", "btc_krw", "--ticker", "--db", dbPath, "--json", "--max-events", "2",
 			"--init", `await db.exec("CREATE TABLE IF NOT EXISTS t (n INTEGER)")`,
 			"--on", `if (ev.type === "data") { await db.exec("INSERT INTO t (n) VALUES (?)", Number(payload.data.close)); var r = await db.get("SELECT COUNT(*) AS c FROM t"); console.error("count=" + r.c) }`},
-		map[string]string{"KORBIT_CLI_HOME": home},
+		map[string]string{"DIGITALX_CLI_HOME": home},
 		failingDoer(), dialFrames(tickerFrame("100"), tickerFrame("200")))
 	if code != 0 {
 		t.Fatalf("exit=%d (stderr %q)", code, errb)

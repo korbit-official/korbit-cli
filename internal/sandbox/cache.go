@@ -10,23 +10,54 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/korbit-official/korbit-cli/internal/envalias"
 )
 
-// ResolveCacheDir resolves the shared artifact cache root: KORBIT_CLI_SANDBOX_CACHE
-// if set, else os.UserCacheDir()/korbit-cli. It is decoupled from the CLI home so
+// EnvCacheDir names the environment variable that relocates the shared artifact
+// cache. The legacy KORBIT_CLI_SANDBOX_CACHE spelling is accepted as a fallback
+// (see envalias).
+const EnvCacheDir = "DIGITALX_CLI_SANDBOX_CACHE"
+
+// CacheDirName is the cache directory under os.UserCacheDir();
+// LegacyCacheDirName is the one an installation made under the earlier product
+// name carries. An existing legacy directory keeps being used rather than
+// re-downloading the heavy artifacts into an empty new one beside it.
+const (
+	CacheDirName       = "digitalx-cli"
+	LegacyCacheDirName = "korbit-cli"
+)
+
+// ResolveCacheDir resolves the shared artifact cache root: $DIGITALX_CLI_SANDBOX_CACHE
+// (else the legacy $KORBIT_CLI_SANDBOX_CACHE) when set; otherwise
+// os.UserCacheDir()/digitalx-cli, unless that does not exist and the legacy
+// os.UserCacheDir()/korbit-cli does. It is decoupled from the CLI home so
 // an ephemeral per-agent home doesn't re-download the heavy artifacts, and it is
 // the single resolver both `sandbox` (which fills the cache) and `self uninstall`
 // (which can remove it) share, so the two can't drift onto different directories.
 // getenv reads the process environment (injectable for tests).
 func ResolveCacheDir(getenv func(string) string) (string, error) {
-	if c := getenv("KORBIT_CLI_SANDBOX_CACHE"); c != "" {
+	if c := envalias.Lookup(getenv, EnvCacheDir); c != "" {
 		return c, nil
 	}
 	base, err := os.UserCacheDir()
 	if err != nil {
-		return "", fmt.Errorf("cannot resolve a cache directory (%v) — set KORBIT_CLI_SANDBOX_CACHE", err)
+		return "", fmt.Errorf("cannot resolve a cache directory (%v) — set %s", err, EnvCacheDir)
 	}
-	return filepath.Join(base, "korbit-cli"), nil
+	current := filepath.Join(base, CacheDirName)
+	if isDir(current) {
+		return current, nil
+	}
+	if legacy := filepath.Join(base, LegacyCacheDirName); isDir(legacy) {
+		return legacy, nil
+	}
+	return current, nil
+}
+
+// isDir reports whether path exists and is a directory.
+func isDir(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.IsDir()
 }
 
 // DefaultSandboxURL is the Official Source the sandbox bundle is obtained from.
@@ -91,5 +122,5 @@ terms with ` + "`korbit sandbox license`" + `, obtain the bundle only from the
 Official Source, and keep use conformant (local development and testing only).
 
 Your sandbox database, keys, and logs are NOT here — they live under your
-korbit-cli home (KORBIT_CLI_HOME). Override this cache with KORBIT_CLI_SANDBOX_CACHE.
+korbit-cli home (DIGITALX_CLI_HOME). Override this cache with DIGITALX_CLI_SANDBOX_CACHE.
 `

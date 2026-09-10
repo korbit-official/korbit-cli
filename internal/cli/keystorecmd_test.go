@@ -30,7 +30,7 @@ func TestKeystoreStatusDefault(t *testing.T) {
 	keystore.MockKeychain()
 	home := t.TempDir()
 	seedBoundKey(t, home)
-	out, errb, code := runCLI([]string{"keystore", "status", "--json"}, map[string]string{"KORBIT_CLI_HOME": home}, nil)
+	out, errb, code := runCLI([]string{"keystore", "status", "--json"}, map[string]string{"DIGITALX_CLI_HOME": home}, nil)
 	if code != 0 {
 		t.Fatalf("code=%d err=%s", code, errb)
 	}
@@ -71,7 +71,7 @@ func TestKeystoreMigrateFileToKeychainAndBack(t *testing.T) {
 	keystore.MockKeychain()
 	home := t.TempDir()
 	seedBoundKey(t, home) // "bot" in the file backend
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 
 	// file -> keychain (per key; the new-key default in config stays put)
 	_, errb, code := runCLI([]string{"keystore", "migrate", "keychain", "bot"}, env, nil)
@@ -111,7 +111,7 @@ func TestKeystoreMigrateNamesOrAllRequired(t *testing.T) {
 	keystore.MockKeychain()
 	home := t.TempDir()
 	seedBoundKey(t, home)
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 	// No names and no --all: usage error, nothing moved.
 	if _, _, code := runCLI([]string{"keystore", "migrate", "keychain"}, env, nil); code != 2 {
 		t.Fatalf("expected exit 2 without names/--all, got %d", code)
@@ -133,7 +133,7 @@ func TestKeystoreMigrateOnlyNamedKey(t *testing.T) {
 	keystore.MockKeychain()
 	home := t.TempDir()
 	seedBoundKey(t, home) // "bot"
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 	if _, errb, code := runCLI([]string{"key", "add", "reader"}, env, nil); code != 0 {
 		t.Fatalf("key add: %s", errb)
 	}
@@ -157,7 +157,7 @@ func TestKeystoreMigrateKeepSource(t *testing.T) {
 	keystore.MockKeychain()
 	home := t.TempDir()
 	seedBoundKey(t, home)
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 
 	_, errb, code := runCLI([]string{"keystore", "migrate", "keychain", "--all", "--keep-source"}, env, nil)
 	if code != 0 {
@@ -178,7 +178,7 @@ func TestKeystoreMigrateSameBackendIsNoop(t *testing.T) {
 	keystore.MockKeychain()
 	home := t.TempDir()
 	seedBoundKey(t, home)
-	out, errb, code := runCLI([]string{"keystore", "migrate", "file", "bot", "--compact"}, map[string]string{"KORBIT_CLI_HOME": home}, nil)
+	out, errb, code := runCLI([]string{"keystore", "migrate", "file", "bot", "--compact"}, map[string]string{"DIGITALX_CLI_HOME": home}, nil)
 	if code != 0 { // idempotent: re-running a migration is a clean no-op
 		t.Fatalf("same-backend migrate should succeed as a no-op: code=%d err=%s", code, errb)
 	}
@@ -189,7 +189,7 @@ func TestKeystoreMigrateSameBackendIsNoop(t *testing.T) {
 
 func TestKeystoreMigrateUnknownBackend(t *testing.T) {
 	home := t.TempDir()
-	_, _, code := runCLI([]string{"keystore", "migrate", "redis", "--all"}, map[string]string{"KORBIT_CLI_HOME": home}, nil)
+	_, _, code := runCLI([]string{"keystore", "migrate", "redis", "--all"}, map[string]string{"DIGITALX_CLI_HOME": home}, nil)
 	if code != 2 { // UsageError -> exit 2
 		t.Fatalf("expected exit 2 for unknown backend, got %d", code)
 	}
@@ -199,7 +199,7 @@ func TestKeystoreMigrateAbortsWhenTargetUnavailable(t *testing.T) {
 	keystore.MockKeychainUnavailable(errors.New("no secret service"))
 	home := t.TempDir()
 	seedBoundKey(t, home)
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 
 	_, errb, code := runCLI([]string{"keystore", "migrate", "keychain", "--all"}, env, nil)
 	if code != 4 {
@@ -230,7 +230,7 @@ func TestKeystoreMigrateRecoversWhenSourceUnavailable(t *testing.T) {
 	if err := keys.NewManager(home, "file", nil, nil).SetKeystoreBackend("bot", "keychain"); err != nil {
 		t.Fatal(err)
 	}
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 
 	out, errb, code := runCLI([]string{"keystore", "migrate", "file", "bot", "--compact"}, env, nil)
 	if code != 0 {
@@ -261,7 +261,7 @@ func TestKeystoreMigrateSkipsUnknownBackendKey(t *testing.T) {
 	keystore.MockKeychain()
 	home := t.TempDir()
 	seedBoundKey(t, home) // "bot" in the file backend
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 	if _, errb, code := runCLI([]string{"key", "add", "future"}, env, nil); code != 0 {
 		t.Fatalf("key add: %s", errb)
 	}
@@ -297,7 +297,7 @@ func TestKeystoreMigrateSkipsUnknownBackendKey(t *testing.T) {
 func TestKeystoreDefaultCommand(t *testing.T) {
 	keystore.MockKeychain()
 	home := t.TempDir()
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 
 	out, errb, code := runCLI([]string{"keystore", "default", "keychain", "--json"}, env, nil)
 	if code != 0 {
@@ -331,7 +331,7 @@ func TestKeystoreDefaultCommand(t *testing.T) {
 func TestKeyAddKeystoreFlag(t *testing.T) {
 	keystore.MockKeychain()
 	home := t.TempDir()
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 
 	out, errb, code := runCLI([]string{"key", "add", "hot", "--keystore", "keychain", "--json"}, env, nil)
 	if code != 0 {
@@ -368,7 +368,7 @@ func TestKeyAddKeystoreFlag(t *testing.T) {
 func TestKeystoreStatusReportsUnavailableKeychain(t *testing.T) {
 	keystore.MockKeychainUnavailable(errors.New("no secret service"))
 	home := t.TempDir()
-	out, _, code := runCLI([]string{"keystore", "status"}, map[string]string{"KORBIT_CLI_HOME": home}, nil)
+	out, _, code := runCLI([]string{"keystore", "status"}, map[string]string{"DIGITALX_CLI_HOME": home}, nil)
 	if code != 0 {
 		t.Fatalf("status should not fail: code=%d", code)
 	}

@@ -17,7 +17,7 @@ import (
 // deriving the WebSocket companion from it.
 func TestKeyAddPinsBaseURL(t *testing.T) {
 	home := t.TempDir()
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 	_, stderr, code := runCLI([]string{"key", "add", "bot", "--base-url", "https://api-test.korbit.co.kr/", "--compact"}, env, &stubDoer{})
 	if code != 0 {
 		t.Fatalf("key add --base-url exit=%d — %s", code, stderr)
@@ -33,7 +33,7 @@ func TestKeyAddPinsBaseURL(t *testing.T) {
 // rather than derived.
 func TestKeyAddPinsExplicitWSBaseURL(t *testing.T) {
 	home := t.TempDir()
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 	_, stderr, code := runCLI([]string{"key", "add", "bot",
 		"--base-url", "https://api-test.korbit.co.kr", "--ws-base-url", "wss://stream.example.test/", "--compact"}, env, &stubDoer{})
 	if code != 0 {
@@ -49,7 +49,7 @@ func TestKeyAddPinsExplicitWSBaseURL(t *testing.T) {
 // also pins --base-url.
 func TestKeyAddHMACPinsBaseURL(t *testing.T) {
 	home := t.TempDir()
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 	secretFile := filepath.Join(t.TempDir(), "secret")
 	if err := os.WriteFile(secretFile, []byte("a-shared-secret\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -69,7 +69,7 @@ func TestKeyAddHMACPinsBaseURL(t *testing.T) {
 // front (usage error) and creates no key.
 func TestKeyAddInvalidBaseURLRejectedBeforeCreate(t *testing.T) {
 	home := t.TempDir()
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 	_, stderr, code := runCLI([]string{"key", "add", "bot", "--base-url", "ftp://nope", "--compact"}, env, &stubDoer{})
 	if code != 2 {
 		t.Fatalf("invalid --base-url must be a usage error (exit 2), got %d — %s", code, stderr)
@@ -84,7 +84,7 @@ func TestKeyAddInvalidBaseURLRejectedBeforeCreate(t *testing.T) {
 // not silently dropped with a stderr-only note an stdout consumer would miss.
 func TestKeyAddWSBaseURLWithoutBaseURL(t *testing.T) {
 	home := t.TempDir()
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 	out, stderr, code := runCLI([]string{"key", "add", "bot", "--ws-base-url", "wss://stream.example.test", "--compact"}, env, &stubDoer{})
 	if code != 2 {
 		t.Fatalf("--ws-base-url without --base-url must be a usage error, exit=%d out=%s stderr=%s", code, out, stderr)
@@ -102,7 +102,7 @@ func TestKeyAddWSBaseURLWithoutBaseURL(t *testing.T) {
 // creates the key.
 func TestSetupPinsBaseURLOnCreate(t *testing.T) {
 	home := t.TempDir()
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 	_, stderr, code := runWithDeps([]string{"setup", "--name", "fresh", "--base-url", "https://api-test.korbit.co.kr", "--compact"},
 		env, nil, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
@@ -118,7 +118,7 @@ func TestSetupPinsBaseURLOnCreate(t *testing.T) {
 // change its base URL — pinning applies only on first create.
 func TestSetupReRunIgnoresBaseURL(t *testing.T) {
 	home := t.TempDir()
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 	seedUnboundKey(t, home, "default") // exists, no base URL
 	_, stderr, code := runWithDeps([]string{"setup", "--base-url", "https://api-test.korbit.co.kr", "--compact"},
 		env, nil, fakeProbe("203.0.113.7", ""))

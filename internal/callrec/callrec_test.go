@@ -128,12 +128,12 @@ func TestReadyFailsOnlyWhenRecording(t *testing.T) {
 	if !errors.As(err, &ce) {
 		t.Fatalf("Ready error should be a ConfigError, got %T", err)
 	}
-	if got := err.Error(); !contains(got, "cannot open the action journal") || !contains(got, "KORBIT_CLI_NO_JOURNAL=1") {
+	if got := err.Error(); !contains(got, "cannot open the action journal") || !contains(got, "DIGITALX_CLI_NO_JOURNAL=1") {
 		t.Fatalf("open error text changed: %q", got)
 	}
 }
 
-// TestNoJournalShortCircuits: KORBIT_CLI_NO_JOURNAL (disabled=true) declines to
+// TestNoJournalShortCircuits: DIGITALX_CLI_NO_JOURNAL (disabled=true) declines to
 // record even an auth call, and never opens the DB — even on a broken path.
 func TestNoJournalShortCircuits(t *testing.T) {
 	home := t.TempDir()
@@ -469,7 +469,7 @@ func TestBeginHardGateFailsPreSend(t *testing.T) {
 	if !errors.As(err, &ce) {
 		t.Fatalf("Begin error should be a ConfigError, got %T", err)
 	}
-	if got := err.Error(); !contains(got, "cannot open the action journal") || !contains(got, "KORBIT_CLI_NO_JOURNAL=1") {
+	if got := err.Error(); !contains(got, "cannot open the action journal") || !contains(got, "DIGITALX_CLI_NO_JOURNAL=1") {
 		t.Fatalf("open error text changed: %q", got)
 	}
 }

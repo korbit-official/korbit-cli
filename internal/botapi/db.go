@@ -22,7 +22,7 @@ import (
 // in --init); we never migrate or version it.
 type botDB struct {
 	path    string
-	noFsync bool // synchronous=OFF (the --no-fsync/KORBIT_CLI_NO_FSYNC opt-in)
+	noFsync bool // synchronous=OFF (the --no-fsync/DIGITALX_CLI_NO_FSYNC opt-in)
 	mu      sync.Mutex
 	db      *sql.DB
 }

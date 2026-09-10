@@ -29,9 +29,9 @@ func skillFixture() fstest.MapFS {
 // and a temp HOME, so installs land under the supported agent skill dirs.
 func runSkillCLI(args []string, home string, src fs.FS) (string, string, int) {
 	env := map[string]string{
-		"HOME":            home,
-		"USERPROFILE":     home, // windows
-		"KORBIT_CLI_HOME": filepath.Join(home, ".korbit-cli"),
+		"HOME":              home,
+		"USERPROFILE":       home, // windows
+		"DIGITALX_CLI_HOME": filepath.Join(home, ".digitalx-cli"),
 	}
 	var out, errb bytes.Buffer
 	code := cli.Execute(args, cli.Deps{

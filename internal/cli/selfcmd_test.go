@@ -15,15 +15,15 @@ import (
 	"github.com/korbit-official/korbit-cli/internal/version"
 )
 
-// selfEnv points HOME/KORBIT_CLI_HOME at a temp dir with the binary dir absent
+// selfEnv points HOME/DIGITALX_CLI_HOME at a temp dir with the binary dir absent
 // from PATH, so the install exercises the "instructions" PATH branch.
 func selfEnv(home string) map[string]string {
 	return map[string]string{
-		"HOME":                 home,
-		"USERPROFILE":          home,
-		"KORBIT_CLI_HOME":      filepath.Join(home, ".korbit-cli"),
-		"PATH":                 "/usr/bin:/bin",
-		"KORBIT_CLI_LOG_LEVEL": "off",
+		"HOME":                   home,
+		"USERPROFILE":            home,
+		"DIGITALX_CLI_HOME":      filepath.Join(home, ".digitalx-cli"),
+		"PATH":                   "/usr/bin:/bin",
+		"DIGITALX_CLI_LOG_LEVEL": "off",
 	}
 }
 
@@ -72,7 +72,7 @@ func TestSelfInstallDoctorAndRepair(t *testing.T) {
 	if _, err := os.Stat(inst.Executable); err != nil {
 		t.Errorf("binary not created: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(env["KORBIT_CLI_HOME"], "install.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(env["DIGITALX_CLI_HOME"], "install.json")); err != nil {
 		t.Errorf("manifest not written: %v", err)
 	}
 	if inst.Path.Action != "instructions" {
@@ -197,7 +197,7 @@ func TestSelfUninstallDoesNotDestroyBeforeManagedGate(t *testing.T) {
 	withVersion(t, "v9.9.9")
 	home := t.TempDir()
 	env := selfEnv(home)
-	cliHome := env["KORBIT_CLI_HOME"]
+	cliHome := env["DIGITALX_CLI_HOME"]
 	if err := os.MkdirAll(cliHome, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +228,7 @@ func TestSelfUninstallDryRun(t *testing.T) {
 	withVersion(t, "v9.9.9")
 	home := t.TempDir()
 	env := selfEnv(home)
-	cliHome := env["KORBIT_CLI_HOME"]
+	cliHome := env["DIGITALX_CLI_HOME"]
 	if err := os.MkdirAll(cliHome, 0o755); err != nil {
 		t.Fatal(err)
 	}

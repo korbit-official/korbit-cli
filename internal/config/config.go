@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/korbit-official/korbit-cli/internal/envalias"
 	"github.com/korbit-official/korbit-cli/internal/fslock"
 	"github.com/korbit-official/korbit-cli/internal/logging"
 	"github.com/korbit-official/korbit-cli/internal/output"
@@ -71,13 +72,43 @@ type Config struct {
 var httpURL = regexp.MustCompile(`^https?://`)
 var wsURL = regexp.MustCompile(`^wss?://`)
 
-// Home returns the CLI home directory: $KORBIT_CLI_HOME, else ~/.korbit-cli.
+// EnvHome names the environment variable that relocates the CLI home. The
+// legacy KORBIT_CLI_HOME spelling is accepted as a fallback (see envalias).
+const EnvHome = "DIGITALX_CLI_HOME"
+
+// DirName is the CLI home directory under the user's home; LegacyDirName is the
+// directory an installation made under the earlier product name carries. Home
+// keeps using an existing LegacyDirName rather than starting an empty new one
+// beside it, so keys, config, and the journal stay where they already are.
+const (
+	DirName       = ".digitalx-cli"
+	LegacyDirName = ".korbit-cli"
+)
+
+// Home returns the CLI home directory: $DIGITALX_CLI_HOME (else the legacy
+// $KORBIT_CLI_HOME) when set; otherwise ~/.digitalx-cli, unless that does not
+// exist and ~/.korbit-cli does, in which case the existing directory is used.
+// The chosen directory need not exist — the write paths create it.
 func Home(getenv func(string) string) string {
-	if h := getenv("KORBIT_CLI_HOME"); h != "" {
+	if h := envalias.Lookup(getenv, EnvHome); h != "" {
 		return h
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".korbit-cli")
+	current := filepath.Join(home, DirName)
+	if isDir(current) {
+		return current
+	}
+	if legacy := filepath.Join(home, LegacyDirName); isDir(legacy) {
+		return legacy
+	}
+	return current
+}
+
+// isDir reports whether path exists and is a directory (a plain file by that
+// name is not a CLI home).
+func isDir(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.IsDir()
 }
 
 // Path is the config.json path under home.

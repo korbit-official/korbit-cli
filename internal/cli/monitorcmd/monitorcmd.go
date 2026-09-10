@@ -30,8 +30,10 @@ import (
 	"github.com/korbit-official/korbit-cli/internal/cli/probe"
 	"github.com/korbit-official/korbit-cli/internal/clock"
 	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
+	"github.com/korbit-official/korbit-cli/internal/fslock"
 	"github.com/korbit-official/korbit-cli/internal/jqfilter"
 	"github.com/korbit-official/korbit-cli/internal/keys"
+	"github.com/korbit-official/korbit-cli/internal/legacyfile"
 	"github.com/korbit-official/korbit-cli/internal/logging"
 	"github.com/korbit-official/korbit-cli/internal/ops"
 	"github.com/korbit-official/korbit-cli/internal/output"
@@ -95,8 +97,68 @@ func (r *rateLimiter) allow(nowMs int64) bool {
 
 // botDBFileName is the default script-local database under the CLI home —
 // deliberately separate from the action journal file (a bot script must never
-// touch the journal).
-const botDBFileName = "korbit-bot.db"
+// touch the journal). legacyBotDBFileName is the name a home created under the
+// earlier product name carries; the default path adopts it (see botDBPath) so a
+// script's own tables survive.
+const (
+	botDBFileName       = "digitalx-bot.db"
+	legacyBotDBFileName = "korbit-bot.db"
+)
+
+// botDBSidecars are the write-ahead-log files SQLite keeps beside the bot
+// database; they move with it when the legacy name is adopted.
+var botDBSidecars = []string{"-wal", "-shm"}
+
+// botDBPath is the default bot-database path under home, adopting a database
+// left under the earlier product name and returning the path to actually open.
+// It is called only when the JavaScript runtime needs the DEFAULT database: an
+// explicit --db is used verbatim, and a plain streaming run never touches the
+// bot database at all.
+//
+// A rename that FAILS returns the legacy path, so this run keeps using the
+// database that exists. Returning the current path instead would create an empty
+// database there, and the next run would see the current name present and never
+// retry — orphaning the script's tables for good.
+//
+// The rename is serialized against concurrent CLI processes by the database's
+// own sidecar lock (the fslock convention "<datafile>.lock") — a long-running
+// bot plus an ad-hoc command is the expected concurrency here. No other code
+// acquires it, so it has no ordering constraint; a lock that cannot be taken is
+// not fatal.
+func botDBPath(home string, log *slog.Logger) string {
+	l := logging.Or(log)
+	path := filepath.Join(home, botDBFileName)
+	legacy := filepath.Join(home, legacyBotDBFileName)
+	if unlock, err := fslock.Lock(path + ".lock"); err == nil {
+		defer unlock()
+	} else {
+		l.Debug("bot database adoption lock unavailable — proceeding unlocked", "lock", path+".lock", "err", err)
+	}
+	adopted, err := legacyfile.Adopt(path, legacy, botDBSidecars...)
+	switch {
+	case err == nil:
+		return path
+	case !adopted:
+		l.Warn("could not adopt the existing bot database — using it under its existing name",
+			"from", legacy, "to", path, "err", err)
+		return legacy
+	default:
+		l.Warn("adopted the bot database but left a sidecar behind",
+			"from", legacy, "to", path, "err", err)
+		return path
+	}
+}
+
+// LegacyBotDBPaths returns the bot-database files a home created under the
+// earlier product name carries, for a caller removing the CLI's data.
+func LegacyBotDBPaths(home string) []string {
+	legacy := filepath.Join(home, legacyBotDBFileName)
+	paths := []string{legacy}
+	for _, sidecar := range botDBSidecars {
+		paths = append(paths, legacy+sidecar)
+	}
+	return paths
+}
 
 // monitorQueueCap is the dispatcher's bounded FIFO between the stream session
 // and the consumer goroutine. When the consumer (a jq program or the JS
@@ -118,7 +180,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 
 	// The JavaScript bot runtime (--where/--on/--init and its --db/--max-concurrency
 	// helpers) is an experimental, not-yet-stable surface — gate it behind
-	// --enable-experimental / KORBIT_CLI_ENABLE_EXPERIMENTAL so it cannot be reached
+	// --enable-experimental / DIGITALX_CLI_ENABLE_EXPERIMENTAL so it cannot be reached
 	// by accident. This is the REAL enforcement; hiding these flags from plain
 	// `--help` (their Experimental bit in the spec) is only cosmetic, so the check
 	// here must stand on its own. Plain streaming (channel flags, --duration,
@@ -126,7 +188,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 	if !cx.Modes.Experimental {
 		for _, f := range []string{"where", "on", "init", "db", "max-concurrency", "stateful"} {
 			if cmd.Flags().Changed(f) {
-				return output.Usagef("--%s is part of monitor's experimental JavaScript bot runtime, which is not yet stable — pass --enable-experimental (or set KORBIT_CLI_ENABLE_EXPERIMENTAL=1) to use it", f)
+				return output.Usagef("--%s is part of monitor's experimental JavaScript bot runtime, which is not yet stable — pass --enable-experimental (or set DIGITALX_CLI_ENABLE_EXPERIMENTAL=1) to use it", f)
 			}
 		}
 	}
@@ -241,16 +303,21 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	dbPath := filepath.Join(home, botDBFileName)
+	// --db is validated here so a bad value is a usage error before any work,
+	// but the DEFAULT path is resolved only where the JavaScript runtime actually
+	// opens it (below): resolving it may rename a database left under the earlier
+	// product name, and a plain streaming run has no business touching the bot
+	// database at all.
+	dbOverride := ""
 	if cmd.Flags().Changed("db") {
 		raw, _ := cmd.Flags().GetString("db")
 		if strings.TrimSpace(raw) == "" {
 			return output.Usagef("--db must not be empty")
 		}
-		dbPath = raw
+		dbOverride = raw
 	}
 	// The key in play (the stored key by name, else the default; or inline
-	// KORBIT_CLI_API_KEY_* material) sets the host for the whole session — public
+	// DIGITALX_CLI_API_KEY_* material) sets the host for the whole session — public
 	// stream + backfill included — so a key pinned to a non-prod base never has
 	// its public traffic silently routed to prod. An inline credential has no
 	// stored host, so the per-key tier does not apply to it.
@@ -488,6 +555,10 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 		api.RetryBudgetMs = retryBudgetMs
 		api.Stderr = cx.IO.Err
 		api.Journal = rec
+		dbPath := dbOverride
+		if dbPath == "" {
+			dbPath = botDBPath(home, cx.Log)
+		}
 		bot, err = botapi.New(botapi.Options{
 			Where:          where,
 			On:             onSrc,

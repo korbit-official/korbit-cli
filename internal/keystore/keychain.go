@@ -5,7 +5,9 @@
 package keystore
 
 import (
+	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 
 	"github.com/korbit-official/korbit-cli/internal/logging"
@@ -15,12 +17,22 @@ import (
 // keychainService is the service name under which every key's secret is stored
 // in the OS keychain. Each key occupies one generic-password item keyed by this
 // service plus the key name as the account.
-const keychainService = "korbit-cli"
+//
+// legacyKeychainService is the service an installation made under the earlier
+// product name wrote under. Writes go to keychainService only; reads and deletes
+// consult both, so a key stored before the rename keeps signing and is fully
+// removed when deleted. There is no bulk migration: moving a keychain item means
+// re-adding it, which on macOS re-binds its access-control list and can prompt,
+// so each item moves only when it is next written.
+const (
+	keychainService       = "digitalx-cli"
+	legacyKeychainService = "korbit-cli"
+)
 
 // probeAccount is a sentinel account used only by the read-only reachability
 // probe. It is never written, so looking it up returns "not found" on a healthy
 // keychain without prompting or mutating anything.
-const probeAccount = "__korbit_cli_probe__"
+const probeAccount = "__digitalx_cli_probe__"
 
 // keychainProvider is the OS-keychain operation set the "keychain" backend
 // needs. The platform build files install the real provider in their init():
@@ -32,13 +44,13 @@ const probeAccount = "__korbit_cli_probe__"
 // non-nil err is reserved for a real backend failure — the same "miss is not an
 // error" contract the Keystore interface exposes.
 type keychainProvider interface {
-	set(account, secret string) error
-	get(account string) (secret string, found bool, err error)
-	del(account string) error
+	set(service, account, secret string) error
+	get(service, account string) (secret string, found bool, err error)
+	del(service, account string) error
 	// probe is the read-only reachability check behind ProbeKeyring. It must
 	// not write and must not trigger an interactive OS prompt. A nil return
 	// means the keychain is usable.
-	probe() error
+	probe(service string) error
 }
 
 // keychain is the active provider, installed by the platform build file's
@@ -79,36 +91,55 @@ func account(name string) string { return "key:" + name }
 func (k *KeyringKeystore) Set(name, secret string) error {
 	acct := account(name)
 	k.log().Debug("keychain set", "backend", "keychain", "service", keychainService, "account", acct)
-	if err := keychain.set(acct, secret); err != nil {
+	if err := keychain.set(keychainService, acct, secret); err != nil {
 		k.log().Warn("keychain set failed", "backend", "keychain", "service", keychainService, "account", acct, "err", err)
 		return output.Configf("failed to store the key in the OS keychain: %v", err)
 	}
 	return nil
 }
 
+// Get reads a key's secret, looking under the current service first and falling
+// back to the legacy one so a key stored before the rename still resolves. A
+// backend failure on the current service is reported straight away rather than
+// masked by a legacy lookup — the fallback is for a MISS, not for a broken
+// keychain.
 func (k *KeyringKeystore) Get(name string) (string, error) {
 	acct := account(name)
-	k.log().Debug("keychain get", "backend", "keychain", "service", keychainService, "account", acct)
-	secret, found, err := keychain.get(acct)
-	if err != nil {
-		k.log().Warn("keychain get failed", "backend", "keychain", "service", keychainService, "account", acct, "err", err)
-		return "", output.Configf("failed to read the key from the OS keychain: %v", err)
+	for _, service := range []string{keychainService, legacyKeychainService} {
+		k.log().Debug("keychain get", "backend", "keychain", "service", service, "account", acct)
+		secret, found, err := keychain.get(service, acct)
+		if err != nil {
+			k.log().Warn("keychain get failed", "backend", "keychain", "service", service, "account", acct, "err", err)
+			return "", output.Configf("failed to read the key from the OS keychain: %v", err)
+		}
+		if found {
+			// Found: log only that an item was returned, never its bytes.
+			k.log().Debug("keychain get: found", "backend", "keychain", "service", service, "account", acct)
+			return secret, nil
+		}
+		k.log().Debug("keychain get: not found", "backend", "keychain", "service", service, "account", acct)
 	}
-	if !found {
-		k.log().Debug("keychain get: not found", "backend", "keychain", "service", keychainService, "account", acct)
-		return "", nil
-	}
-	// Found: log only that an item was returned, never its bytes.
-	k.log().Debug("keychain get: found", "backend", "keychain", "service", keychainService, "account", acct)
-	return secret, nil
+	return "", nil
 }
 
+// Delete removes the key's item under BOTH services, and ATTEMPTS both even
+// when the first fails. Deleting only the current one — or giving up on it —
+// would leave a legacy item that Get's fallback then resurrects, so a key the
+// user removed would come back. A plain miss on either side is not an error (the
+// providers report it as success), so only a real backend failure surfaces, and
+// every failure is reported together rather than the first one hiding the rest.
 func (k *KeyringKeystore) Delete(name string) error {
 	acct := account(name)
-	k.log().Debug("keychain delete", "backend", "keychain", "service", keychainService, "account", acct)
-	if err := keychain.del(acct); err != nil {
-		k.log().Warn("keychain delete failed", "backend", "keychain", "service", keychainService, "account", acct, "err", err)
-		return output.Configf("failed to delete the key from the OS keychain: %v", err)
+	var failures []string
+	for _, service := range []string{keychainService, legacyKeychainService} {
+		k.log().Debug("keychain delete", "backend", "keychain", "service", service, "account", acct)
+		if err := keychain.del(service, acct); err != nil {
+			k.log().Warn("keychain delete failed", "backend", "keychain", "service", service, "account", acct, "err", err)
+			failures = append(failures, fmt.Sprintf("%s: %v", service, err))
+		}
+	}
+	if len(failures) > 0 {
+		return output.Configf("failed to delete the key from the OS keychain (%s)", strings.Join(failures, "; "))
 	}
 	return nil
 }
@@ -127,7 +158,7 @@ func (k *KeyringKeystore) Delete(name string) error {
 // write failure is caught and rolled back by migration instead. That keeps
 // `keystore status`/`doctor` prompt-free.
 func ProbeKeyring() error {
-	if err := keychain.probe(); err != nil {
+	if err := keychain.probe(keychainService); err != nil {
 		return output.Configf(
 			"the OS keychain is not available on this machine (%v) — keep the default `file` keystore, or run this on a host with a working keychain", err)
 	}
@@ -143,28 +174,32 @@ type memKeychain struct {
 	probeErr error // non-nil makes probe() (and thus the backend) report unavailable
 }
 
-func (k *memKeychain) set(account, secret string) error {
+// memEntryKey namespaces an in-memory entry by service, the way the real
+// keychain does, so the legacy-service fallback is exercisable under the fake.
+func memEntryKey(service, account string) string { return service + "\x00" + account }
+
+func (k *memKeychain) set(service, account, secret string) error {
 	k.mu.Lock()
 	defer k.mu.Unlock()
-	k.entries[account] = secret
+	k.entries[memEntryKey(service, account)] = secret
 	return nil
 }
 
-func (k *memKeychain) get(account string) (string, bool, error) {
+func (k *memKeychain) get(service, account string) (string, bool, error) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
-	secret, ok := k.entries[account]
+	secret, ok := k.entries[memEntryKey(service, account)]
 	return secret, ok, nil
 }
 
-func (k *memKeychain) del(account string) error {
+func (k *memKeychain) del(service, account string) error {
 	k.mu.Lock()
 	defer k.mu.Unlock()
-	delete(k.entries, account)
+	delete(k.entries, memEntryKey(service, account))
 	return nil
 }
 
-func (k *memKeychain) probe() error { return k.probeErr }
+func (k *memKeychain) probe(string) error { return k.probeErr }
 
 // MockKeychain replaces the OS keychain with a fresh in-memory store for the
 // duration of a test. It is the analogue of the real backend being present and

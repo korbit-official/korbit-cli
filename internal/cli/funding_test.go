@@ -27,7 +27,7 @@ func TestFundingHistoryTruncationInBand(t *testing.T) {
 
 	out, stderr, code := runCLI(
 		[]string{"deposit", "history", "btc", "--key", "bot", "--json"},
-		map[string]string{"KORBIT_CLI_HOME": home}, &stubDoer{resp: resp(200, body, nil)})
+		map[string]string{"DIGITALX_CLI_HOME": home}, &stubDoer{resp: resp(200, body, nil)})
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, stderr)
 	}
@@ -48,7 +48,7 @@ func TestFundingHistoryTruncationInBand(t *testing.T) {
 
 	human, _, code2 := runCLI(
 		[]string{"deposit", "history", "btc", "--key", "bot"},
-		map[string]string{"KORBIT_CLI_HOME": home}, &stubDoer{resp: resp(200, body, nil)})
+		map[string]string{"DIGITALX_CLI_HOME": home}, &stubDoer{resp: resp(200, body, nil)})
 	if code2 != 0 {
 		t.Fatalf("exit=%d", code2)
 	}
@@ -67,7 +67,7 @@ func TestDepositHistorySignsAndQueries(t *testing.T) {
 	doer := &stubDoer{resp: resp(200, `{"success":true,"data":[{"id":1,"currency":"btc","status":"done","quantity":"1.5"}]}`, nil)}
 	out, stderr, code := runCLI(
 		[]string{"deposit", "history", "btc", "--limit", "50", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, stderr)
 	}
@@ -95,7 +95,7 @@ func TestWithdrawRequestDryRunIsPOST(t *testing.T) {
 		[]string{"withdraw", "request", "BTC", "--amount", "0.025",
 			"--address", "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", "--network", "BTC",
 			"--key", "bot", "--dry-run", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, &stubDoer{})
+		map[string]string{"DIGITALX_CLI_HOME": home}, &stubDoer{})
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
@@ -117,7 +117,7 @@ func TestWithdrawCancelIsDELETE(t *testing.T) {
 	doer := &stubDoer{resp: resp(200, `{"success":true}`, nil)}
 	out, _, code := runCLI(
 		[]string{"withdraw", "cancel", "--id", "1234", "--key", "bot"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
@@ -137,7 +137,7 @@ func TestWithdrawCancelRequiresID(t *testing.T) {
 	seedBoundKey(t, home)
 	_, _, code := runCLI(
 		[]string{"withdraw", "cancel", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, &stubDoer{})
+		map[string]string{"DIGITALX_CLI_HOME": home}, &stubDoer{})
 	if code != 2 {
 		t.Fatalf("missing --id should be a usage error (exit 2), got %d", code)
 	}
@@ -150,7 +150,7 @@ func TestFundingRejectsBadCurrency(t *testing.T) {
 	doer := &stubDoer{}
 	_, stderr, code := runCLI(
 		[]string{"deposit", "history", "btc_krw", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 2 {
 		t.Fatalf("invalid currency should be exit 2, got %d (%s)", code, stderr)
 	}
@@ -179,7 +179,7 @@ func permFromSetupOutput(t *testing.T, out string) string {
 func TestSetupDefaultPermissionsExcludeTransfers(t *testing.T) {
 	home := t.TempDir()
 	out, _, code := runWithDeps([]string{"setup", "--name", "trade", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
@@ -191,7 +191,7 @@ func TestSetupDefaultPermissionsExcludeTransfers(t *testing.T) {
 func TestSetupWithTransfersWidensPermissions(t *testing.T) {
 	home := t.TempDir()
 	out, _, code := runWithDeps([]string{"setup", "--name", "xfer", "--with-transfers", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
@@ -207,7 +207,7 @@ func TestKrwDepositPushAndAck(t *testing.T) {
 	doer := &stubDoer{resp: resp(200, `{"success":true}`, nil)}
 	out, _, code := runCLI(
 		[]string{"krw", "deposit", "request", "50000", "--key", "bot"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
@@ -231,7 +231,7 @@ func TestKrwDepositsHumanTable(t *testing.T) {
 		`{"success":true,"data":[{"id":1234,"status":"done","quantity":"50000","createdAt":1700000000000}]}`, nil)}
 	out, _, code := runCLI(
 		[]string{"krw", "deposit", "history", "--key", "bot"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}

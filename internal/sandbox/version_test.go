@@ -135,7 +135,7 @@ func versionGateManager(t *testing.T, skip bool, logs *[]string) *Manager {
 	}
 	apiKey := keys.SandboxAPIKeyPrefix + "ED25519_KEY_00000001_0000002"
 	km := keys.NewManager(home, "file", func() int64 { return 1700000000000 }, nil)
-	dbPid := filepath.Join(home, "sandbox", "korbit-sandbox.db-pid")
+	dbPid := filepath.Join(home, "sandbox", "digitalx-sandbox.db-pid")
 	stateFile := filepath.Join(cacheDir, "version_state") // defaults to "old" (absent)
 	denoBin := fakeDenoVersioned(t, dbPid, stateFile, kp.PrivatePEM, apiKey)
 	denoDir := filepath.Dir(denoBin)
@@ -159,8 +159,8 @@ func TestWithRuntimeEnvControlsSandboxNamespace(t *testing.T) {
 	// plus an ambient non-sandbox var that must be forwarded untouched.
 	t.Setenv(MinVersionEnv, "99.0.0")
 	t.Setenv(sandboxEnvPrefix+"STRAY", "boom")
-	t.Setenv("KORBIT_CLI_SANDBOX_NOT_PREFIXED", "keep") // not the bundle prefix
-	t.Setenv("LANG", "ko_KR.UTF-8")                     // ambient: must pass through
+	t.Setenv("DIGITALX_CLI_SANDBOX_NOT_PREFIXED", "keep") // not the bundle prefix
+	t.Setenv("LANG", "ko_KR.UTF-8")                       // ambient: must pass through
 
 	// Non-gated invocation (extra carries no bundle vars): every inherited
 	// KORBIT_SANDBOX_* var is dropped, so the CLI fully controls that namespace.
@@ -174,7 +174,7 @@ func TestWithRuntimeEnvControlsSandboxNamespace(t *testing.T) {
 		switch e {
 		case "LANG=ko_KR.UTF-8":
 			sawLang = true
-		case "KORBIT_CLI_SANDBOX_NOT_PREFIXED=keep":
+		case "DIGITALX_CLI_SANDBOX_NOT_PREFIXED=keep":
 			sawNotPrefixed = true
 		}
 	}
@@ -242,7 +242,7 @@ func TestLicenseSetsFooterCommandEnv(t *testing.T) {
 	// own command. Reuse the standard fake (its license branch echoes the env).
 	home := t.TempDir()
 	cacheDir := t.TempDir()
-	dbPid := filepath.Join(home, "sandbox", "korbit-sandbox.db-pid")
+	dbPid := filepath.Join(home, "sandbox", "digitalx-sandbox.db-pid")
 	denoBin := fakeDeno(t, dbPid, "pem", "SANDBOX_K")
 	denoDir := filepath.Dir(denoBin)
 	m := New(Config{Home: home, CacheDir: cacheDir, RuntimePref: "deno"}, Deps{

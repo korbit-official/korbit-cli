@@ -68,7 +68,7 @@ func TestTimeSyncProactivelyCorrectsTimestamp(t *testing.T) {
 	// --debug surfaces it. See TestDiagnosticsAreDebugGated for the gating rule.
 	_, stderr, code := runCLI(
 		[]string{"balance", "--time-sync", "on", "--key", "bot", "--compact", "--debug"},
-		map[string]string{"KORBIT_CLI_HOME": home}, d)
+		map[string]string{"DIGITALX_CLI_HOME": home}, d)
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, stderr)
 	}
@@ -86,7 +86,7 @@ func TestTimeSyncProactivelyCorrectsTimestamp(t *testing.T) {
 	}
 }
 
-// TestTimeSyncOnViaEnv: KORBIT_CLI_TIME_SYNC=on enables proactive correction
+// TestTimeSyncOnViaEnv: DIGITALX_CLI_TIME_SYNC=on enables proactive correction
 // just like the flag (the env twin documented on the global flag).
 func TestTimeSyncOnViaEnv(t *testing.T) {
 	home := t.TempDir()
@@ -100,7 +100,7 @@ func TestTimeSyncOnViaEnv(t *testing.T) {
 	}
 	_, stderr, code := runCLI(
 		[]string{"balance", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home, "KORBIT_CLI_TIME_SYNC": "on"}, d)
+		map[string]string{"DIGITALX_CLI_HOME": home, "DIGITALX_CLI_TIME_SYNC": "on"}, d)
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, stderr)
 	}
@@ -127,7 +127,7 @@ func TestAutoRetryCorrectsOnExceedTimeWindow(t *testing.T) {
 	}
 	out, stderr, code := runCLI(
 		[]string{"balance", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, d)
+		map[string]string{"DIGITALX_CLI_HOME": home}, d)
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%s out=%s", code, stderr, out)
 	}
@@ -154,7 +154,7 @@ func TestTimeSyncOffDisablesReactiveResync(t *testing.T) {
 	}
 	_, stderr, code := runCLI(
 		[]string{"balance", "--time-sync", "off", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, d)
+		map[string]string{"DIGITALX_CLI_HOME": home}, d)
 	if code == 0 {
 		t.Fatalf("expected a non-zero exit for the uncorrected EXCEED_TIME_WINDOW; stderr=%s", stderr)
 	}
@@ -175,7 +175,7 @@ func TestTimeSyncInvalidValueIsUsageError(t *testing.T) {
 	seedBoundKey(t, home)
 	_, stderr, code := runCLI(
 		[]string{"balance", "--time-sync", "sometimes", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, &stubDoer{})
+		map[string]string{"DIGITALX_CLI_HOME": home}, &stubDoer{})
 	if code != 2 {
 		t.Fatalf("exit=%d, want 2 for a bad --time-sync value; stderr=%s", code, stderr)
 	}
@@ -193,7 +193,7 @@ func TestMoneyMoverNotAutoRetried(t *testing.T) {
 	_, _, code := runCLI(
 		[]string{"withdraw", "request", "btc", "--amount", "0.001",
 			"--address", "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, d)
+		map[string]string{"DIGITALX_CLI_HOME": home}, d)
 	if code == 0 {
 		t.Fatal("expected a non-zero exit for the 503")
 	}
@@ -257,7 +257,7 @@ func TestOrderPlaceAutoResyncsOnExceedTimeWindow(t *testing.T) {
 	out, stderr, code := runCLI(
 		[]string{"order", "place", "--symbol", "btc_krw", "--side", "buy", "--type", "limit",
 			"--price", "100000000", "--qty", "0.001", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, d)
+		map[string]string{"DIGITALX_CLI_HOME": home}, d)
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%s out=%s", code, stderr, out)
 	}
@@ -288,7 +288,7 @@ func TestSingleShotWriteNotResyncedOnExceedTimeWindow(t *testing.T) {
 	_, _, code := runCLI(
 		[]string{"withdraw", "request", "btc", "--amount", "0.001",
 			"--address", "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, cd)
+		map[string]string{"DIGITALX_CLI_HOME": home}, cd)
 	if code == 0 {
 		t.Fatal("expected a non-zero exit for the EXCEED_TIME_WINDOW rejection")
 	}

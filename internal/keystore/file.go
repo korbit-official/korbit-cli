@@ -29,6 +29,11 @@ import (
 // this CLI, because the encryption key below intentionally ships inside the
 // CLI. For OS-enforced at-rest protection, switch to the keychain backend with
 // `korbit-cli keystore migrate keychain` (which moves existing keys for you).
+//
+// The seed string is an OPAQUE v1 domain constant, not a name to keep in step
+// with the product: it derives the AES key every existing keystore.json was
+// encrypted under, so changing a single byte of it makes every stored key
+// undecryptable. Leave it exactly as it is.
 var obfuscationKey = sha256.Sum256([]byte("korbit-cli/keystore/v1:embedded-obfuscation-key:7f3a9d52c8e14b06"))
 
 // FileKeystore encrypts each secret with AES-256-GCM and stores it in
@@ -69,6 +74,12 @@ type storeFile struct {
 
 // aad binds each ciphertext to its key name, so entries cannot be copied or
 // swapped between names without failing authentication.
+//
+// The "korbit-cli:" prefix is an OPAQUE v1 domain constant, not a name to keep
+// in step with the product: it is authenticated data covering every entry ever
+// written, so changing a single byte of it makes every existing keystore.json
+// fail authentication and every stored key unreadable. Leave it exactly as it
+// is.
 func aad(name string) []byte { return []byte("korbit-cli:" + name) }
 
 func (k *FileKeystore) load() (storeFile, error) {

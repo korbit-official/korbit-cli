@@ -111,7 +111,7 @@ internal/
   logging/     leveled diagnostic logger (log/slog), distinct from program output — see logging/doc.go
   i18n/        display-language decisions + localized-string lookup — see the package doc in i18n/i18n.go
   output/      stdout/stderr contract, JSON emit, error taxonomy -> exit codes
-  config/      config.json + CLI home resolution (KORBIT_CLI_HOME)
+  config/      config.json + CLI home resolution (DIGITALX_CLI_HOME)
   fslock/      advisory cross-process file lock serializing read-modify-write over on-disk state — see the package doc in fslock/fslock.go
   progname/    the program's invoked name (set once at startup; read by help/examples/guidance) — see the package doc in progname/progname.go
   ids/         UUIDv7 minting + clientOrderId charset
@@ -171,7 +171,7 @@ documented at the top of `cli/catalog.go` — that comment is authoritative.
 ### Marking a feature experimental
 
 An opt-in, not-yet-stable feature is gated behind the global
-`--enable-experimental` flag (or `KORBIT_CLI_ENABLE_EXPERIMENTAL`). Mark it
+`--enable-experimental` flag (or `DIGITALX_CLI_ENABLE_EXPERIMENTAL`). Mark it
 **structurally**, never with inline `[experimental]` text in a `Desc`:
 
 1. Set `Experimental: true` on the `cmdmeta.Param`.
@@ -270,7 +270,7 @@ Extend all of them additively. Incomplete paged results say so in-band via the
 
 ### Base-URL & key selection
 
-- **Base-URL precedence** (highest first): `--base-url` flag → `KORBIT_CLI_BASE_URL`
+- **Base-URL precedence** (highest first): `--base-url` flag → `DIGITALX_CLI_BASE_URL`
   → the signing key's per-key `baseUrl` → `config.json` `baseUrl` → the built-in
   production host. The parallel WebSocket precedence and the stored-tier guards
   are documented at `resolveBaseURL` / `resolveWSBaseURL` in `cli/endpoint.go`
@@ -337,7 +337,7 @@ rule, the `clientOrderId`-UNIQUE upsert with sticky `accepted` status, and the
 WAL/`busy_timeout`/single-connection concurrency model are all documented in
 `callrec/doc.go` and the package doc + `StartOrder`/`FinishOrder`/`Open` comments
 in `journal/journal.go`. The cli wires every recorder through one site,
-`rt.NewRecorder` (`cli/client.go`). `KORBIT_CLI_NO_JOURNAL=1` opts out;
+`rt.NewRecorder` (`cli/client.go`). `DIGITALX_CLI_NO_JOURNAL=1` opts out;
 `--no-fsync` trades crash-durability for speed (and also opens the monitor bot DB
 with `synchronous=OFF`).
 
@@ -490,7 +490,7 @@ key-setup flow, the funding gates, or the journal/`logs` debugging playbook.
 
 `internal/**/*_test.go`, table-driven where it fits. CLI behavior is tested
 end-to-end through `cli.Execute(args, Deps{...})` with injected
-`Getenv`/`Stdout`/`Stderr`/`Doer` and a temp `KORBIT_CLI_HOME` — **no process
+`Getenv`/`Stdout`/`Stderr`/`Doer` and a temp `DIGITALX_CLI_HOME` — **no process
 spawning**. Signature tests verify the actual wire bytes the way the server does
 (strip the `signature` segment, verify over the rest, in sent order). When you
 change the command surface or wire handling, add the test in the matching

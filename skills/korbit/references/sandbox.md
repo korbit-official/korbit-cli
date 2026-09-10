@@ -10,7 +10,7 @@ order placement and any untested strategy logic) before running it live.
 ## Spin up → test → tear down
 
 ```sh
-export KORBIT_CLI_HOME=$(mktemp -d)    # isolate this run (also lets parallel agents not collide)
+export DIGITALX_CLI_HOME=$(mktemp -d)    # isolate this run (also lets parallel agents not collide)
 
 korbit sandbox start --fresh           # run the mock detached on a CLEAN database, import a seeded key
                                        # (drop --fresh to keep an existing sandbox's balances/orders)

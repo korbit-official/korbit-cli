@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/korbit-official/korbit-cli/internal/config"
@@ -216,4 +217,151 @@ func indexOf(b []byte, s string) int {
 		}
 	}
 	return -1
+}
+
+// TestKeyringReadsLegacyService pins the dual-read path: a secret stored under
+// the service an installation made before the product rename still resolves, and
+// the current service wins when both carry an item for the same key.
+func TestKeyringReadsLegacyService(t *testing.T) {
+	MockKeychain()
+	ks := NewKeyring()
+
+	// Only the legacy service has the item: it must still be found.
+	if err := keychain.set(legacyKeychainService, account("old"), "legacy-secret"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ks.Get("old")
+	if err != nil || got != "legacy-secret" {
+		t.Fatalf("Get(old) = %q, %v; want the legacy item", got, err)
+	}
+
+	// Both services carry an item: the current service wins.
+	if err := ks.Set("old", "current-secret"); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := ks.Get("old"); err != nil || got != "current-secret" {
+		t.Fatalf("Get(old) = %q, %v; want the current-service item", got, err)
+	}
+
+	// A miss on both services is "" with no error, not a failure.
+	if got, err := ks.Get("absent"); err != nil || got != "" {
+		t.Fatalf("Get(absent) = %q, %v; want \"\", nil", got, err)
+	}
+}
+
+// TestKeyringSetWritesCurrentServiceOnly pins that new items never land under
+// the legacy service — the legacy name is read-and-clean-up only.
+func TestKeyringSetWritesCurrentServiceOnly(t *testing.T) {
+	MockKeychain()
+	if err := NewKeyring().Set("fresh", "s"); err != nil {
+		t.Fatal(err)
+	}
+	if _, found, _ := keychain.get(keychainService, account("fresh")); !found {
+		t.Fatal("Set did not write under the current service")
+	}
+	if _, found, _ := keychain.get(legacyKeychainService, account("fresh")); found {
+		t.Fatal("Set wrote under the legacy service")
+	}
+}
+
+// TestKeyringDeleteRemovesLegacyItem pins that Delete clears BOTH services —
+// leaving the legacy item behind would let Get's fallback resurrect a key the
+// user removed.
+func TestKeyringDeleteRemovesLegacyItem(t *testing.T) {
+	MockKeychain()
+	ks := NewKeyring()
+	if err := keychain.set(legacyKeychainService, account("old"), "legacy-secret"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ks.Set("old", "current-secret"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ks.Delete("old"); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := ks.Get("old"); err != nil || got != "" {
+		t.Fatalf("Get after Delete = %q, %v; want the key gone from both services", got, err)
+	}
+}
+
+// TestProbeAccountIsNeverWritten pins the probe sentinel's contract: it names an
+// account no write path ever uses, so ProbeKeyring stays read-only.
+func TestProbeAccountIsNeverWritten(t *testing.T) {
+	MockKeychain()
+	if err := NewKeyring().Set("someone", "s"); err != nil {
+		t.Fatal(err)
+	}
+	if _, found, _ := keychain.get(keychainService, probeAccount); found {
+		t.Fatal("the probe sentinel account was written")
+	}
+	if err := ProbeKeyring(); err != nil {
+		t.Fatalf("ProbeKeyring on a healthy keychain: %v", err)
+	}
+}
+
+// recordingKeychain is a keychainProvider that records which services a
+// delete was attempted against and can be made to fail for a chosen service.
+type recordingKeychain struct {
+	entries     map[string]string
+	delFailFor  string
+	delAttempts []string
+}
+
+func (k *recordingKeychain) set(service, account, secret string) error {
+	k.entries[service+"\x00"+account] = secret
+	return nil
+}
+
+func (k *recordingKeychain) get(service, account string) (string, bool, error) {
+	s, ok := k.entries[service+"\x00"+account]
+	return s, ok, nil
+}
+
+func (k *recordingKeychain) del(service, account string) error {
+	k.delAttempts = append(k.delAttempts, service)
+	if service == k.delFailFor {
+		return errors.New("backend refused")
+	}
+	delete(k.entries, service+"\x00"+account)
+	return nil
+}
+
+func (k *recordingKeychain) probe(string) error { return nil }
+
+// TestKeyringDeleteAttemptsBothServicesOnFailure: a failure deleting the
+// current-service item must not stop the legacy one from being removed. Giving
+// up early would leave the legacy item behind for Get's fallback to resurrect,
+// so a key the user deleted would come back on the next command.
+func TestKeyringDeleteAttemptsBothServicesOnFailure(t *testing.T) {
+	fake := &recordingKeychain{entries: map[string]string{}, delFailFor: keychainService}
+	prev := keychain
+	keychain = fake
+	t.Cleanup(func() { keychain = prev })
+
+	if err := fake.set(keychainService, account("old"), "current-secret"); err != nil {
+		t.Fatal(err)
+	}
+	if err := fake.set(legacyKeychainService, account("old"), "legacy-secret"); err != nil {
+		t.Fatal(err)
+	}
+
+	err := NewKeyring().Delete("old")
+	if err == nil {
+		t.Fatal("a backend failure must be reported")
+	}
+	if !strings.Contains(err.Error(), keychainService) {
+		t.Fatalf("the error should name the failing service: %v", err)
+	}
+	want := []string{keychainService, legacyKeychainService}
+	if len(fake.delAttempts) != len(want) {
+		t.Fatalf("delete attempts = %v, want both services tried", fake.delAttempts)
+	}
+	for i := range want {
+		if fake.delAttempts[i] != want[i] {
+			t.Fatalf("delete attempts = %v, want %v", fake.delAttempts, want)
+		}
+	}
+	if _, found, _ := fake.get(legacyKeychainService, account("old")); found {
+		t.Fatal("the legacy item survived — Get's fallback would resurrect the key")
+	}
 }

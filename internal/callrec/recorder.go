@@ -27,8 +27,8 @@ import (
 // several Do calls race (the monitor surface drives this concurrently).
 type Recorder struct {
 	path     string
-	disabled bool       // KORBIT_CLI_NO_JOURNAL — short-circuits with no open
-	noFsync  bool       // --no-fsync/KORBIT_CLI_NO_FSYNC — opens the journal with synchronous=OFF
+	disabled bool       // DIGITALX_CLI_NO_JOURNAL — short-circuits with no open
+	noFsync  bool       // --no-fsync/DIGITALX_CLI_NO_FSYNC — opens the journal with synchronous=OFF
 	policy   PolicyFunc // the single source of journaling policy
 
 	// onPostFailure is the sink for every POST-call journal-write failure — the
@@ -61,9 +61,9 @@ type Recorder struct {
 }
 
 // New builds a Recorder writing to the journal at path. disabled mirrors
-// journal.Disabled (KORBIT_CLI_NO_JOURNAL): when true every Decision is
+// journal.Disabled (DIGITALX_CLI_NO_JOURNAL): when true every Decision is
 // short-circuited to "don't record" and the DB is never opened. noFsync mirrors
-// the --no-fsync/KORBIT_CLI_NO_FSYNC opt-in: the journal is opened with
+// the --no-fsync/DIGITALX_CLI_NO_FSYNC opt-in: the journal is opened with
 // synchronous=OFF (faster writes, weaker crash-durability). policy is the
 // (swappable) journaling policy; clock is the caller's injectable (system) wall
 // clock for every journal time column (nil = time.Now().UnixMilli()); onPostFailure
@@ -81,7 +81,7 @@ func New(path string, disabled, noFsync bool, policy PolicyFunc, clock func() in
 // log returns the recorder's operational logger, never nil (logging.Or).
 func (r *Recorder) log() *slog.Logger { return logging.Or(r.Log) }
 
-// decide computes the journaling Decision for a call. KORBIT_CLI_NO_JOURNAL
+// decide computes the journaling Decision for a call. DIGITALX_CLI_NO_JOURNAL
 // short-circuits to "don't record" before the policy is consulted, so opting out
 // never opens the DB. It is a pure function of info (no stashing between Ready
 // and Record), which keeps the Recorder concurrency-safe.
@@ -208,7 +208,7 @@ func (r *Recorder) postFailure(d Decision, err error) {
 // (the pre-send hard guarantee), opening the journal if needed. Its failure is
 // fatal — nothing has been sent yet — and is reported with output.Configf so
 // the error and its exit-4 classification are preserved.
-// Returns the order row id for a later FinishOrder. KORBIT_CLI_NO_JOURNAL
+// Returns the order row id for a later FinishOrder. DIGITALX_CLI_NO_JOURNAL
 // (disabled) short-circuits to (0, nil) without opening the DB; the matching
 // FinishOrder then no-ops, so opting out skips the order rows exactly as it
 // skips api_calls.
@@ -225,11 +225,11 @@ func (r *Recorder) StartOrder(o journal.OrderStart) (int64, error) {
 	if jl == nil {
 		// Recorder closed: this is a pre-send hard-guarantee write, so refuse
 		// rather than silently skipping the row and letting the caller send.
-		return 0, output.Configf("cannot record the order to the action journal at %s: journal closed — set KORBIT_CLI_NO_JOURNAL=1 to disable journaling", r.path)
+		return 0, output.Configf("cannot record the order to the action journal at %s: journal closed — set DIGITALX_CLI_NO_JOURNAL=1 to disable journaling", r.path)
 	}
 	id, err := jl.StartOrder(o)
 	if err != nil {
-		return 0, output.Configf("cannot record the order to the action journal at %s: %v — set KORBIT_CLI_NO_JOURNAL=1 to disable journaling", r.path, err)
+		return 0, output.Configf("cannot record the order to the action journal at %s: %v — set DIGITALX_CLI_NO_JOURNAL=1 to disable journaling", r.path, err)
 	}
 	return id, nil
 }
@@ -280,7 +280,7 @@ func (r *Recorder) Close() error {
 // terminal no-op — returns (nil, nil) so a late caller cleanly skips its write
 // instead of reopening the journal (the open-then-write callers nil-check the
 // returned handle). An open failure returns the output.Configf "cannot open the
-// action journal" message with the KORBIT_CLI_NO_JOURNAL hint, preserving the
+// action journal" message with the DIGITALX_CLI_NO_JOURNAL hint, preserving the
 // hard-guarantee error text.
 func (r *Recorder) ensureOpen() (*journal.Logger, error) {
 	r.mu.Lock()
@@ -294,7 +294,7 @@ func (r *Recorder) ensureOpen() (*journal.Logger, error) {
 	r.log().Debug("lazily opening journal", "path", r.path)
 	jl, err := journal.Open(r.path, r.noFsync, r.Log)
 	if err != nil {
-		return nil, output.Configf("cannot open the action journal at %s: %v — fix the path/permissions or set KORBIT_CLI_NO_JOURNAL=1 to disable journaling", r.path, err)
+		return nil, output.Configf("cannot open the action journal at %s: %v — fix the path/permissions or set DIGITALX_CLI_NO_JOURNAL=1 to disable journaling", r.path, err)
 	}
 	r.jl = jl
 	return jl, nil

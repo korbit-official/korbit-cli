@@ -35,7 +35,7 @@ func TestDoctorReactivelyCorrectsClock(t *testing.T) {
 		},
 	}
 	out, _, code := runWithDeps([]string{"doctor", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("doctor should auto-correct the clock and pass: exit=%d — %s", code, out)
 	}
@@ -62,7 +62,7 @@ func TestDoctorTimeSyncOnProactivelySyncs(t *testing.T) {
 		onEndpoint: func(int) (*http.Response, error) { return resp(200, whoamiOKBody, nil), nil },
 	}
 	out, _, code := runWithDeps([]string{"doctor", "--compact", "--time-sync", "on"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("exit=%d — %s", code, out)
 	}
@@ -92,7 +92,7 @@ func TestDoctorTimeSyncOffSurfacesETW(t *testing.T) {
 		onEndpoint: func(int) (*http.Response, error) { return resp(400, etwBody, nil), nil },
 	}
 	out, _, code := runWithDeps([]string{"doctor", "--compact", "--time-sync", "off"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code == 0 {
 		t.Fatalf("--time-sync off must not auto-correct: expected a failing report, got exit 0 — %s", out)
 	}

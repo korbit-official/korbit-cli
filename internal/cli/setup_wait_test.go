@@ -39,7 +39,7 @@ func TestSetupWaitClaimsAndBindsHeadless(t *testing.T) {
 		whoami: func(int, *http.Request) *http.Response { return resp(200, whoamiActivatedRaw, nil) },
 	}
 	out, stderr, code := runWithDeps([]string{"setup", "--wait"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("headless --wait setup must succeed: exit=%d — %s", code, stderr)
 	}
@@ -74,7 +74,7 @@ func TestSetupWaitStopFallsBackToResume(t *testing.T) {
 		whoami: func(int, *http.Request) *http.Response { return resp(200, whoamiActivatedRaw, nil) },
 	}
 	out, stderr, code := runWithDeps([]string{"setup", "--wait"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("a stop must still exit 0 (resumable): exit=%d — %s", code, stderr)
 	}
@@ -107,7 +107,7 @@ func TestSetupWaitTimesOutResumes(t *testing.T) {
 		whoami: func(int, *http.Request) *http.Response { return resp(200, whoamiActivatedRaw, nil) },
 	}
 	out, stderr, code := runWithDeps([]string{"setup", "--wait", "--wait-timeout", "1s"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("a timeout must exit 0 (resumable): exit=%d — %s", code, stderr)
 	}
@@ -135,7 +135,7 @@ func TestSetupWaitHardRejectResumes(t *testing.T) {
 		whoami: func(int, *http.Request) *http.Response { return resp(401, deBody, nil) },
 	}
 	_, stderr, code := runWithDeps([]string{"setup", "--wait"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("a hard reject must still exit 0 (resumable): exit=%d — %s", code, stderr)
 	}
@@ -168,7 +168,7 @@ func TestSetupWaitOverridesInteractiveUIOnTTY(t *testing.T) {
 		return nil
 	}
 	out, stderr, code := runWithSetupUI([]string{"setup", "--wait"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), stub)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), stub)
 	if code != 0 {
 		t.Fatalf("exit=%d — %s", code, stderr)
 	}
@@ -195,7 +195,7 @@ func TestSetupWaitWithNoInteractiveStillWaits(t *testing.T) {
 		whoami: func(int, *http.Request) *http.Response { return resp(200, whoamiActivatedRaw, nil) },
 	}
 	out, stderr, code := runWithDeps([]string{"setup", "--wait", "--no-interactive"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("--wait --no-interactive must work, not error: exit=%d — %s", code, stderr)
 	}
@@ -222,7 +222,7 @@ func TestSetupWaitIsNoOpOnBoundKey(t *testing.T) {
 		whoami: func(int, *http.Request) *http.Response { return resp(200, whoamiActivatedRaw, nil) },
 	}
 	out, stderr, code := runWithDeps([]string{"setup", "--name", "bot", "--wait"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("exit=%d — %s", code, stderr)
 	}
@@ -235,7 +235,7 @@ func TestSetupWaitIsNoOpOnBoundKey(t *testing.T) {
 }
 
 // TestSetupWaitIsNoOpWithInlineCredential: an inline credential
-// (KORBIT_CLI_API_KEY_*) is a "finished" state — there is no stored key to claim,
+// (DIGITALX_CLI_API_KEY_*) is a "finished" state — there is no stored key to claim,
 // so --wait is a silent no-op: setup reports the env credential and never polls.
 func TestSetupWaitIsNoOpWithInlineCredential(t *testing.T) {
 	defer cli.SetClaimTimingForTest(5, 5, 2, 200*time.Millisecond)()
@@ -249,10 +249,10 @@ func TestSetupWaitIsNoOpWithInlineCredential(t *testing.T) {
 	}
 	out, stderr, code := runWithDeps([]string{"setup", "--wait"},
 		map[string]string{
-			"KORBIT_CLI_HOME":           home,
-			"KORBIT_CLI_API_KEY_ID":     "KEYID-ENV",
-			"KORBIT_CLI_API_KEY_SECRET": "secret",
-			"KORBIT_CLI_API_KEY_TYPE":   "hmac-sha256",
+			"DIGITALX_CLI_HOME":           home,
+			"DIGITALX_CLI_API_KEY_ID":     "KEYID-ENV",
+			"DIGITALX_CLI_API_KEY_SECRET": "secret",
+			"DIGITALX_CLI_API_KEY_TYPE":   "hmac-sha256",
 		}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("exit=%d — %s", code, stderr)
@@ -265,7 +265,7 @@ func TestSetupWaitIsNoOpWithInlineCredential(t *testing.T) {
 	}
 }
 
-// TestSetupPinsKeyToEnvBaseURL: a key created while KORBIT_CLI_BASE_URL is set is
+// TestSetupPinsKeyToEnvBaseURL: a key created while DIGITALX_CLI_BASE_URL is set is
 // pinned to that host (like --base-url), so later commands reach it without the env
 // var. (Applies to setup generally, exercised here via the non-interactive create.)
 func TestSetupPinsKeyToEnvBaseURL(t *testing.T) {
@@ -276,7 +276,7 @@ func TestSetupPinsKeyToEnvBaseURL(t *testing.T) {
 		whoami: func(int, *http.Request) *http.Response { return resp(200, whoamiActivatedRaw, nil) },
 	}
 	_, stderr, code := runWithDeps([]string{"setup", "--name", "uatkey", "--no-interactive"},
-		map[string]string{"KORBIT_CLI_HOME": home, "KORBIT_CLI_BASE_URL": base},
+		map[string]string{"DIGITALX_CLI_HOME": home, "DIGITALX_CLI_BASE_URL": base},
 		doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("exit=%d — %s", code, stderr)
@@ -288,7 +288,7 @@ func TestSetupPinsKeyToEnvBaseURL(t *testing.T) {
 }
 
 // TestKeyAddPinsKeyToEnvBaseURL: `key add` also pins a newly created key to the
-// KORBIT_CLI_BASE_URL env override (not just setup), so the env-host workflow is
+// DIGITALX_CLI_BASE_URL env override (not just setup), so the env-host workflow is
 // consistent across both create commands.
 func TestKeyAddPinsKeyToEnvBaseURL(t *testing.T) {
 	home := t.TempDir()
@@ -298,7 +298,7 @@ func TestKeyAddPinsKeyToEnvBaseURL(t *testing.T) {
 		whoami: func(int, *http.Request) *http.Response { return resp(200, whoamiActivatedRaw, nil) },
 	}
 	_, stderr, code := runWithDeps([]string{"key", "add", "addedkey"},
-		map[string]string{"KORBIT_CLI_HOME": home, "KORBIT_CLI_BASE_URL": base},
+		map[string]string{"DIGITALX_CLI_HOME": home, "DIGITALX_CLI_BASE_URL": base},
 		doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("exit=%d — %s", code, stderr)
@@ -309,7 +309,7 @@ func TestKeyAddPinsKeyToEnvBaseURL(t *testing.T) {
 	}
 }
 
-// TestSetupPortalBaseURLOverride: KORBIT_CLI_PORTAL_BASE_URL redirects the
+// TestSetupPortalBaseURLOverride: DIGITALX_CLI_PORTAL_BASE_URL redirects the
 // registration link/guidance to an internal portal host (undocumented, internal
 // testing) instead of the production developers portal.
 func TestSetupPortalBaseURLOverride(t *testing.T) {
@@ -320,7 +320,7 @@ func TestSetupPortalBaseURLOverride(t *testing.T) {
 		whoami: func(int, *http.Request) *http.Response { return resp(200, whoamiActivatedRaw, nil) },
 	}
 	out, stderr, code := runWithDeps([]string{"setup", "--no-interactive"},
-		map[string]string{"KORBIT_CLI_HOME": home, "KORBIT_CLI_PORTAL_BASE_URL": portal},
+		map[string]string{"DIGITALX_CLI_HOME": home, "DIGITALX_CLI_PORTAL_BASE_URL": portal},
 		doer, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("exit=%d — %s", code, stderr)
@@ -343,7 +343,7 @@ func TestSetupWaitConflictsWithApiKey(t *testing.T) {
 		whoami: func(int, *http.Request) *http.Response { return resp(200, whoamiActivatedRaw, nil) },
 	}
 	_, stderr, code := runWithDeps([]string{"setup", "--wait", "--api-key", "KEYID-X"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 2 {
 		t.Fatalf("--wait + --api-key must be a usage error (exit 2), got %d", code)
 	}
@@ -364,7 +364,7 @@ func TestSetupWaitTimeoutRequiresWait(t *testing.T) {
 		whoami: func(int, *http.Request) *http.Response { return resp(200, whoamiActivatedRaw, nil) },
 	}
 	_, stderr, code := runWithDeps([]string{"setup", "--wait-timeout", "5m"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""))
 	if code != 2 {
 		t.Fatalf("--wait-timeout without --wait must be a usage error (exit 2), got %d", code)
 	}

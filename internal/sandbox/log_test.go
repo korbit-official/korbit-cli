@@ -33,7 +33,7 @@ func TestStartLogsLifecycleMilestones(t *testing.T) {
 	apiKey := keys.SandboxAPIKeyPrefix + "ED25519_KEY_00000001_0000002"
 	km := keys.NewManager(home, "file", func() int64 { return 1700000000000 }, nil)
 
-	dbPid := filepath.Join(home, "sandbox", "korbit-sandbox.db-pid")
+	dbPid := filepath.Join(home, "sandbox", "digitalx-sandbox.db-pid")
 	denoBin := fakeDeno(t, dbPid, kp.PrivatePEM, apiKey)
 	denoDir := filepath.Dir(denoBin)
 

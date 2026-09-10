@@ -32,7 +32,7 @@ import (
 // (and, like any command, needs a writable home).
 func (rt *runtime) openJournalForRead() (*journal.Logger, error) {
 	if journal.Disabled(rt.deps.Getenv) {
-		return nil, output.Configf("journaling is disabled (KORBIT_CLI_NO_JOURNAL is set) — unset it to record and view activity")
+		return nil, output.Configf("journaling is disabled (DIGITALX_CLI_NO_JOURNAL is set) — unset it to record and view activity")
 	}
 	path := journal.DefaultPath(config.Home(rt.deps.Getenv))
 	jl, err := journal.Open(path, false, rt.logger()) // read path: synchronous mode is irrelevant
@@ -225,7 +225,7 @@ type bundleSummary struct {
 }
 
 func defaultBundlePath(home string, nowMs int64) string {
-	return filepath.Join(home, fmt.Sprintf("korbit-cli-debug-%d.json", nowMs))
+	return filepath.Join(home, fmt.Sprintf("digitalx-cli-debug-%d.json", nowMs))
 }
 
 // whenUTC formats a unix-ms timestamp for the human log tables.

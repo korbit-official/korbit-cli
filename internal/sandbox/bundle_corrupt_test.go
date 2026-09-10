@@ -128,7 +128,7 @@ func corruptBundleManager(t *testing.T, logs *[]string, banner io.Writer) (*Mana
 	}
 	apiKey := keys.SandboxAPIKeyPrefix + "ED25519_KEY_00000001_0000002"
 	km := keys.NewManager(home, "file", func() int64 { return 1700000000000 }, nil)
-	dbPid := filepath.Join(home, "sandbox", "korbit-sandbox.db-pid")
+	dbPid := filepath.Join(home, "sandbox", "digitalx-sandbox.db-pid")
 	stateFile := filepath.Join(cacheDir, "corrupt_state") // absent ⇒ "bad"
 	runCount := filepath.Join(cacheDir, "run_count")
 	denoBin := fakeDenoCorrupt(t, dbPid, stateFile, runCount, kp.PrivatePEM, apiKey)

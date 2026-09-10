@@ -26,7 +26,7 @@ import (
 
 // runTUICLI is runCLI plus the WebSocket dial and TUI runner seams.
 func runTUICLI(args []string, env map[string]string, doer apiclient.Doer, dial stream.Dialer, tuiRun func(tui.Config) error) (string, string, int) {
-	merged := map[string]string{"KORBIT_CLI_HOME": sharedTestHome()}
+	merged := map[string]string{"DIGITALX_CLI_HOME": sharedTestHome()}
 	for k, v := range env {
 		merged[k] = v
 	}
@@ -144,7 +144,7 @@ func TestTUIDryRunPlans(t *testing.T) {
 func TestTUIPrivateRequiresKey(t *testing.T) {
 	called := false
 	_, errb, code := runTUICLI([]string{"tui", "--symbols", "btc_krw"},
-		map[string]string{"KORBIT_CLI_HOME": t.TempDir()},
+		map[string]string{"DIGITALX_CLI_HOME": t.TempDir()},
 		nil, nil, func(tui.Config) error { called = true; return nil })
 	if code != 4 {
 		t.Fatalf("exit=%d, want 4 (stderr %q)", code, errb)
@@ -277,7 +277,7 @@ func TestTUIPublicReadsJournaling(t *testing.T) {
 		// captured seam INSIDE the runner, while the recorder is still open.
 		_, errb, code := runTUICLI(
 			[]string{"tui", "--public", "--debug", "--base-url", "http://127.0.0.1:9999"},
-			map[string]string{"KORBIT_CLI_HOME": home},
+			map[string]string{"DIGITALX_CLI_HOME": home},
 			publicDoer(), dialFrames(),
 			func(cfg tui.Config) error {
 				if cfg.Candles == nil {
@@ -314,7 +314,7 @@ func TestTUIPublicReadsJournaling(t *testing.T) {
 		home := t.TempDir()
 		_, errb, code := runTUICLI(
 			[]string{"tui", "--public", "--base-url", "http://127.0.0.1:9999"},
-			map[string]string{"KORBIT_CLI_HOME": home},
+			map[string]string{"DIGITALX_CLI_HOME": home},
 			publicDoer(), dialFrames(),
 			func(cfg tui.Config) error {
 				if _, err := cfg.Candles("btc_krw", "60", 100, 0); err != nil {
@@ -458,7 +458,7 @@ func TestTUIPreflightBlocksBeforeAltScreen(t *testing.T) {
 			ran := false
 			_, errb, code := runTUICLI(
 				[]string{"tui", "--symbols", "btc_krw", "--key", "bot", "--base-url", "http://127.0.0.1:9999"},
-				map[string]string{"KORBIT_CLI_HOME": home},
+				map[string]string{"DIGITALX_CLI_HOME": home},
 				keyInfoDoer(tc.status, tc.body), dialFrames(),
 				func(tui.Config) error { ran = true; return nil },
 			)
@@ -504,7 +504,7 @@ func TestTUIMultiAccountResolvesSubscribeSet(t *testing.T) {
 		var got tui.Config
 		_, errb, code := runTUICLI(
 			[]string{"tui", "--symbols", "btc_krw", "--key", "bot", "--base-url", "http://127.0.0.1:9999"},
-			map[string]string{"KORBIT_CLI_HOME": home},
+			map[string]string{"DIGITALX_CLI_HOME": home},
 			multiAccountDoer(`[3,1,2]`), dialFrames(),
 			func(cfg tui.Config) error { got = cfg; return nil })
 		if code != 0 {
@@ -523,7 +523,7 @@ func TestTUIMultiAccountResolvesSubscribeSet(t *testing.T) {
 		var got tui.Config
 		_, errb, code := runTUICLI(
 			[]string{"tui", "--symbols", "btc_krw", "--key", "bot", "--account-seq", "2,3", "--base-url", "http://127.0.0.1:9999"},
-			map[string]string{"KORBIT_CLI_HOME": home},
+			map[string]string{"DIGITALX_CLI_HOME": home},
 			multiAccountDoer(`[1,2,3]`), dialFrames(),
 			func(cfg tui.Config) error { got = cfg; return nil })
 		if code != 0 {
@@ -554,7 +554,7 @@ func TestTUIOmittedAccountSeqRefusesWhenKeyInfoFails(t *testing.T) {
 	ran := false
 	_, errb, code := runTUICLI(
 		[]string{"tui", "--symbols", "btc_krw", "--key", "bot", "--base-url", "http://127.0.0.1:9999"},
-		map[string]string{"KORBIT_CLI_HOME": home},
+		map[string]string{"DIGITALX_CLI_HOME": home},
 		doer, dialFrames(),
 		func(tui.Config) error { ran = true; return nil })
 	if ran {
@@ -576,7 +576,7 @@ func TestTUITraderPlacesValidatesAndCancels(t *testing.T) {
 	ran := false
 	_, errb, code := runTUICLI(
 		[]string{"tui", "--symbols", "btc_krw", "--key", "bot", "--base-url", "http://127.0.0.1:9999"},
-		map[string]string{"KORBIT_CLI_HOME": home},
+		map[string]string{"DIGITALX_CLI_HOME": home},
 		doer, dialFrames(),
 		func(cfg tui.Config) error {
 			ran = true
@@ -626,7 +626,7 @@ func TestTUITraderPlacesValidatesAndCancels(t *testing.T) {
 
 	// The action journal recorded the placement (hard guarantee).
 	out, _, code := runCLI([]string{"logs", "--orders", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, &stubDoer{})
+		map[string]string{"DIGITALX_CLI_HOME": home}, &stubDoer{})
 	if code != 0 {
 		t.Fatalf("logs exit=%d", code)
 	}

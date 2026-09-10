@@ -22,6 +22,7 @@ import (
 	"github.com/korbit-official/korbit-cli/internal/clock"
 	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
 	"github.com/korbit-official/korbit-cli/internal/config"
+	"github.com/korbit-official/korbit-cli/internal/envalias"
 	"github.com/korbit-official/korbit-cli/internal/keys"
 	"github.com/korbit-official/korbit-cli/internal/ops"
 	"github.com/korbit-official/korbit-cli/internal/output"
@@ -140,7 +141,7 @@ func (rt *runtime) runEndpoint(sc surfaceCmd, cmd *cobra.Command, args []string)
 	}
 
 	// Resolve which key is in play (the single key-selection front door:
-	// --key / KORBIT_CLI_KEY else the default, OR inline KORBIT_CLI_API_KEY_*
+	// --key / DIGITALX_CLI_KEY else the default, OR inline DIGITALX_CLI_API_KEY_*
 	// material — mutually exclusive, enforced here so a contradictory invocation
 	// fails before any work) and peek its stored metadata — endpoint override plus
 	// defaultAccountSeq, no secret access. The key's host is honored for every
@@ -239,7 +240,7 @@ func (rt *runtime) runEndpoint(sc surfaceCmd, cmd *cobra.Command, args []string)
 	// in --debug, a post-success failure fatal — lives in callrec.DefaultPolicy
 	// rather than inline here. The DB is opened lazily (only when a call actually
 	// records), so a read-only command without --debug never touches a read-only
-	// home, and KORBIT_CLI_NO_JOURNAL short-circuits before any open.
+	// home, and DIGITALX_CLI_NO_JOURNAL short-circuits before any open.
 	rec := rt.NewRecorder(home, log, func(mode callrec.FailMode, err error) {
 		if mode == callrec.Fail {
 			journalRecErr = err
@@ -704,7 +705,7 @@ const (
 )
 
 // resolveBaseURL applies the base-URL precedence shared by every command, from
-// highest to lowest: --base-url flag > KORBIT_CLI_BASE_URL env > the signing
+// highest to lowest: --base-url flag > DIGITALX_CLI_BASE_URL env > the signing
 // key's own baseUrl (keyBaseURL, "" when not applicable) > config.json baseUrl >
 // prod. Per-invocation overrides (flag/env) thus always win over anything
 // stored; the global config.json default is the lowest configured tier, above
@@ -715,8 +716,8 @@ func (rt *runtime) resolveBaseURL(cmd *cobra.Command, cfg config.Config, keyBase
 	switch {
 	case cmd.Flags().Changed("base-url"):
 		baseURL, tier = rt.baseURL, tierFlag
-	case rt.deps.Getenv("KORBIT_CLI_BASE_URL") != "":
-		baseURL, tier = rt.deps.Getenv("KORBIT_CLI_BASE_URL"), tierEnv
+	case envalias.Lookup(rt.deps.Getenv, "DIGITALX_CLI_BASE_URL") != "":
+		baseURL, tier = envalias.Lookup(rt.deps.Getenv, "DIGITALX_CLI_BASE_URL"), tierEnv
 	case keyBaseURL != "":
 		baseURL, tier = keyBaseURL, tierPerKey
 	case cfg.BaseURL != "":
@@ -726,7 +727,7 @@ func (rt *runtime) resolveBaseURL(cmd *cobra.Command, cfg config.Config, keyBase
 }
 
 // resolveWSBaseURL resolves the effective WebSocket base URL with a precedence
-// that mirrors resolveBaseURL: --ws-base-url flag > KORBIT_CLI_WS_BASE_URL env >
+// that mirrors resolveBaseURL: --ws-base-url flag > DIGITALX_CLI_WS_BASE_URL env >
 // the per-key wsBaseUrl (only when the REST base also resolved from the per-key
 // tier) > config.json wsBaseUrl (only when REST resolved from config or the prod
 // default) > derived from the resolved REST base URL. keyWSBaseURL is the
@@ -735,8 +736,8 @@ func (rt *runtime) resolveWSBaseURL(cmd *cobra.Command, cfg config.Config, keyWS
 	switch {
 	case cmd.Flags().Changed("ws-base-url"):
 		return strings.TrimRight(rt.wsBaseURL, "/"), nil
-	case rt.deps.Getenv("KORBIT_CLI_WS_BASE_URL") != "":
-		return strings.TrimRight(rt.deps.Getenv("KORBIT_CLI_WS_BASE_URL"), "/"), nil
+	case envalias.Lookup(rt.deps.Getenv, "DIGITALX_CLI_WS_BASE_URL") != "":
+		return strings.TrimRight(envalias.Lookup(rt.deps.Getenv, "DIGITALX_CLI_WS_BASE_URL"), "/"), nil
 	case restTier == tierPerKey && keyWSBaseURL != "":
 		return strings.TrimRight(keyWSBaseURL, "/"), nil
 	case restTier <= tierConfig && cfg.WSBaseURL != "":

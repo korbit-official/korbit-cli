@@ -30,12 +30,26 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/korbit-official/korbit-cli/internal/envalias"
+	"github.com/korbit-official/korbit-cli/internal/fslock"
+	"github.com/korbit-official/korbit-cli/internal/legacyfile"
 	"github.com/korbit-official/korbit-cli/internal/logging"
 	_ "modernc.org/sqlite" // pure-Go SQLite driver (no cgo — keeps cross-compiles working)
 )
 
-// FileName is the journal database file under the CLI home.
-const FileName = "korbit-cli.db"
+// FileName is the journal database file under the CLI home; LegacyFileName is
+// the name a home created under the earlier product name carries. Open adopts
+// an existing legacy database (see adoptLegacy) so the recorded history stays
+// readable instead of being replaced by an empty file beside it.
+const (
+	FileName       = "digitalx-cli.db"
+	LegacyFileName = "korbit-cli.db"
+)
+
+// sqliteSidecars are the write-ahead-log files SQLite keeps beside a database.
+// They move with it: a database renamed without its -wal would strand the
+// committed-but-uncheckpointed tail of the log.
+var sqliteSidecars = []string{"-wal", "-shm"}
 
 // schemaVersion is the journal schema version, stamped into the SQLite file
 // header via PRAGMA user_version (see Open). Bump it whenever the schema below
@@ -51,11 +65,69 @@ const schemaVersion = 2
 // DefaultPath returns the journal database path under home.
 func DefaultPath(home string) string { return filepath.Join(home, FileName) }
 
+// LegacyPaths returns the journal files a home created under the earlier
+// product name carries — the database and its SQLite sidecars. Open adopts them
+// onto the current name; a caller removing the CLI's data (`self uninstall`)
+// lists them alongside DefaultPath so a home that was never opened since the
+// rename is still cleaned up.
+func LegacyPaths(home string) []string {
+	legacy := filepath.Join(home, LegacyFileName)
+	paths := []string{legacy}
+	for _, sidecar := range sqliteSidecars {
+		paths = append(paths, legacy+sidecar)
+	}
+	return paths
+}
+
+// adoptLegacy moves a journal database written under the earlier product name
+// onto the current one, sidecars included, and returns the path Open should
+// actually use. It applies only to the default file name under a home — an
+// explicitly supplied path is used verbatim.
+//
+// A rename that FAILS returns the legacy path, so this run keeps recording into
+// the database that exists. Returning the current path instead would have
+// sql.Open create an empty database there, and the next run would see the
+// current name present and never retry — orphaning the recorded history for
+// good. That is the realistic Windows case: renaming a file another process
+// holds open fails.
+//
+// The rename is serialized against concurrent CLI processes by the journal's own
+// sidecar lock (the fslock convention "<datafile>.lock"). Two processes racing
+// here would otherwise both see "current absent, legacy present" and the loser's
+// rename would fail for no reason. The lock is taken only around the rename —
+// no other code acquires it, so it has no ordering constraint against the
+// registry/vault/config locks. A lock that cannot be taken is not fatal: the
+// adoption is attempted unlocked rather than failing the command.
+func adoptLegacy(path string, log *slog.Logger) string {
+	if filepath.Base(path) != FileName {
+		return path
+	}
+	legacy := filepath.Join(filepath.Dir(path), LegacyFileName)
+	if unlock, err := fslock.Lock(path + ".lock"); err == nil {
+		defer unlock()
+	} else {
+		log.Debug("journal adoption lock unavailable — proceeding unlocked", "lock", path+".lock", "err", err)
+	}
+	adopted, err := legacyfile.Adopt(path, legacy, sqliteSidecars...)
+	switch {
+	case err == nil:
+		return path
+	case !adopted:
+		log.Warn("could not adopt the existing action journal — recording into it under its existing name",
+			"from", legacy, "to", path, "err", err)
+		return legacy
+	default:
+		log.Warn("adopted the action journal but left a sidecar behind",
+			"from", legacy, "to", path, "err", err)
+		return path
+	}
+}
+
 // Disabled reports whether journaling has been turned off via the environment
-// (KORBIT_CLI_NO_JOURNAL=1/true/yes). The escape hatch lets a caller run
+// (DIGITALX_CLI_NO_JOURNAL=1/true/yes). The escape hatch lets a caller run
 // against a read-only home, or opt out of local logging entirely.
 func Disabled(getenv func(string) string) bool {
-	switch getenv("KORBIT_CLI_NO_JOURNAL") {
+	switch envalias.Lookup(getenv, "DIGITALX_CLI_NO_JOURNAL") {
 	case "1", "true", "yes":
 		return true
 	}
@@ -160,6 +232,7 @@ func Open(path string, noFsync bool, log *slog.Logger) (*Logger, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, fmt.Errorf("create journal directory: %w", err)
 	}
+	path = adoptLegacy(path, log)
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, err

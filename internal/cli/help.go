@@ -290,6 +290,7 @@ func RenderRootHelp() string {
 		}
 		l = append(l, "  "+pad(head, 28)+g.Desc)
 	}
+	l = append(l, "", spec.GlobalEnvNote)
 
 	l = append(l, "", "Output: stdout is human-readable by default; pass --json (or --compact) for the",
 		`machine-readable JSON result. Diagnostics and structured errors ({"error": {...}},`,

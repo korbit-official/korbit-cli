@@ -5,13 +5,17 @@
 package journal
 
 import (
+	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
+
+	"github.com/korbit-official/korbit-cli/internal/logging"
 )
 
 func openTemp(t *testing.T) *Logger {
 	t.Helper()
-	l, err := Open(filepath.Join(t.TempDir(), "korbit-cli.db"), false, nil)
+	l, err := Open(filepath.Join(t.TempDir(), "digitalx-cli.db"), false, nil)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -43,7 +47,7 @@ func TestOpenNoFsync(t *testing.T) {
 		noFsync bool
 		want    int
 	}{{false, 2}, {true, 0}} {
-		l, err := Open(filepath.Join(t.TempDir(), "korbit-cli.db"), tc.noFsync, nil)
+		l, err := Open(filepath.Join(t.TempDir(), "digitalx-cli.db"), tc.noFsync, nil)
 		if err != nil {
 			t.Fatalf("Open(noFsync=%v): %v", tc.noFsync, err)
 		}
@@ -73,7 +77,7 @@ func TestFreshDBStampsCurrentVersion(t *testing.T) {
 // reset (dropped + recreated) on open rather than failing — the journal is a
 // recreatable log, not a system of record.
 func TestRecreateOnVersionMismatch(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "korbit-cli.db")
+	path := filepath.Join(t.TempDir(), "digitalx-cli.db")
 	// Hand-build a v1-shaped database: a stale api_calls table with the old
 	// command_key column, stamped user_version=1.
 	old, err := Open(path, false, nil) // creates v2; we then forcibly downgrade it below
@@ -347,10 +351,143 @@ func TestDisabled(t *testing.T) {
 	if Disabled(get(map[string]string{})) {
 		t.Fatal("should be enabled by default")
 	}
-	if !Disabled(get(map[string]string{"KORBIT_CLI_NO_JOURNAL": "1"})) {
+	if !Disabled(get(map[string]string{"DIGITALX_CLI_NO_JOURNAL": "1"})) {
 		t.Fatal("=1 should disable")
 	}
-	if !Disabled(get(map[string]string{"KORBIT_CLI_NO_JOURNAL": "true"})) {
+	if !Disabled(get(map[string]string{"DIGITALX_CLI_NO_JOURNAL": "true"})) {
 		t.Fatal("=true should disable")
+	}
+}
+
+// TestOpenAdoptsLegacyDatabase: a home created under the earlier product name
+// carries its journal under the legacy file name. Opening the default path moves
+// it — recorded history stays readable instead of being shadowed by an empty
+// database beside it.
+func TestOpenAdoptsLegacyDatabase(t *testing.T) {
+	dir := t.TempDir()
+	legacy := filepath.Join(dir, LegacyFileName)
+
+	old, err := Open(legacy, false, nil)
+	if err != nil {
+		t.Fatalf("Open(legacy): %v", err)
+	}
+	if _, err := old.db.Exec(
+		`INSERT INTO operations (started_at_ms, op_id, surface, outcome) VALUES (1, 'order place', 'cli', 'ok')`); err != nil {
+		t.Fatalf("seed row: %v", err)
+	}
+	old.Close()
+
+	l, err := Open(DefaultPath(dir), false, nil)
+	if err != nil {
+		t.Fatalf("Open(current): %v", err)
+	}
+	defer l.Close()
+
+	var n int
+	if err := l.db.QueryRow(`SELECT count(*) FROM operations`).Scan(&n); err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("adopted journal has %d operations, want the seeded 1", n)
+	}
+	if _, err := os.Stat(legacy); !os.IsNotExist(err) {
+		t.Fatalf("legacy database still present: %v", err)
+	}
+}
+
+// TestOpenLeavesAnExplicitPathAlone: adoption is scoped to the default file name
+// under a home; an explicitly supplied path is used verbatim.
+func TestOpenLeavesAnExplicitPathAlone(t *testing.T) {
+	dir := t.TempDir()
+	legacy := filepath.Join(dir, LegacyFileName)
+	old, err := Open(legacy, false, nil)
+	if err != nil {
+		t.Fatalf("Open(legacy): %v", err)
+	}
+	old.Close()
+
+	l, err := Open(filepath.Join(dir, "custom.db"), false, nil)
+	if err != nil {
+		t.Fatalf("Open(custom): %v", err)
+	}
+	l.Close()
+	if _, err := os.Stat(legacy); err != nil {
+		t.Fatalf("legacy database was moved by an explicit-path open: %v", err)
+	}
+}
+
+// TestLegacyPathsListsTheDatabaseAndItsSidecars pins the list `self uninstall`
+// removes for a home that was never opened since the rename.
+func TestLegacyPathsListsTheDatabaseAndItsSidecars(t *testing.T) {
+	got := LegacyPaths("/home/u/.digitalx-cli")
+	want := []string{
+		filepath.Join("/home/u/.digitalx-cli", LegacyFileName),
+		filepath.Join("/home/u/.digitalx-cli", LegacyFileName) + "-wal",
+		filepath.Join("/home/u/.digitalx-cli", LegacyFileName) + "-shm",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("LegacyPaths = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("LegacyPaths[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+// readOnlyDirWithLegacyJournal builds a directory holding only the legacy
+// journal database and makes it unwritable, so the adopting rename fails the way
+// it does when another process holds the file open on Windows.
+func readOnlyDirWithLegacyJournal(t *testing.T) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("directory permissions do not gate rename on Windows")
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores directory permissions")
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, LegacyFileName), []byte("data"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Skipf("cannot drop directory permissions here: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	return dir
+}
+
+// TestAdoptLegacyKeepsTheLegacyPathWhenTheRenameFails: a failed rename must send
+// the caller to the database that EXISTS. Returning the current path would have
+// sql.Open create an empty database there, and the next run would then see the
+// current name present and never retry — orphaning the recorded history.
+func TestAdoptLegacyKeepsTheLegacyPathWhenTheRenameFails(t *testing.T) {
+	dir := readOnlyDirWithLegacyJournal(t)
+
+	got := adoptLegacy(DefaultPath(dir), logging.Or(nil))
+	if want := filepath.Join(dir, LegacyFileName); got != want {
+		t.Fatalf("adoptLegacy = %q, want the legacy path %q", got, want)
+	}
+	if _, err := os.Stat(DefaultPath(dir)); !os.IsNotExist(err) {
+		t.Fatalf("nothing may be created under the current name: %v", err)
+	}
+}
+
+// TestAdoptLegacyRetriesOnTheNextRun: because the failed run never created a
+// file under the current name, a later run whose rename CAN succeed still
+// adopts the database.
+func TestAdoptLegacyRetriesOnTheNextRun(t *testing.T) {
+	dir := readOnlyDirWithLegacyJournal(t)
+	adoptLegacy(DefaultPath(dir), logging.Or(nil)) // fails, returns legacy
+
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	got, want := adoptLegacy(DefaultPath(dir), logging.Or(nil)), DefaultPath(dir)
+	if got != want {
+		t.Fatalf("adoptLegacy = %q, want %q on the retry", got, want)
+	}
+	if b, err := os.ReadFile(want); err != nil || string(b) != "data" {
+		t.Fatalf("adopted database = %q, %v", b, err)
 	}
 }

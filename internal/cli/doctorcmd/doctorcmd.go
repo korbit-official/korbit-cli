@@ -169,8 +169,8 @@ func Assess(cx *clienv.Cmd, cmd *cobra.Command, forceKey string) (Report, int, e
 		rep.Checks = append(rep.Checks, Check{Name: name, Status: status, Detail: detail, Fix: fix})
 	}
 
-	// Single key-selection front door: a stored key (--key / KORBIT_CLI_KEY, else
-	// the default/sole key) OR inline KORBIT_CLI_API_KEY_* material — mutually
+	// Single key-selection front door: a stored key (--key / DIGITALX_CLI_KEY, else
+	// the default/sole key) OR inline DIGITALX_CLI_API_KEY_* material — mutually
 	// exclusive.
 	sel, err := keys.Select(cx.Key, cx.Getenv)
 	if err != nil {
@@ -210,7 +210,7 @@ func doctorConfigChecks(cx *clienv.Cmd, cmd *cobra.Command, rep *Report, add fun
 			return nil, "", nil
 		}
 		rep.Key = resolved.Name
-		add("credential", CheckOK, "using inline key material from the environment ($KORBIT_CLI_API_KEY_*)", "")
+		add("credential", CheckOK, "using inline key material from the environment ($DIGITALX_CLI_API_KEY_*)", "")
 		return &resolved, resolved.Name, nil
 	}
 
@@ -226,7 +226,7 @@ func doctorConfigChecks(cx *clienv.Cmd, cmd *cobra.Command, rep *Report, add fun
 	}
 	add("keys", CheckOK, fmt.Sprintf("%d key(s) configured", len(list)), "")
 
-	// Resolve which key to check: the selected stored key (--key / KORBIT_CLI_KEY),
+	// Resolve which key to check: the selected stored key (--key / DIGITALX_CLI_KEY),
 	// else the default, else the sole key. Never silently pick among several (keys
 	// may be different accounts).
 	explicit := sel.Name
@@ -365,7 +365,7 @@ func doctorTail(cx *clienv.Cmd, cmd *cobra.Command, rep *Report, add func(name, 
 // which the tail maps to ExitInternal. iprep is the already-probed public IP,
 // reused for the allowlist fix. baseURL is the REST endpoint this credential
 // targets, already refined for a stored key's per-key host. Shared by the
-// stored-key path and the inline (KORBIT_CLI_API_KEY_*) path, so both verify
+// stored-key path and the inline (DIGITALX_CLI_API_KEY_*) path, so both verify
 // identically.
 func doctorSigned(cx *clienv.Cmd, cmd *cobra.Command, rep *Report, add func(name, status, detail, fix string), home, baseURL, name string, resolved keys.Resolved, km *keys.Manager, iprep probe.Report) bool {
 	signer, err := resolved.Signer()

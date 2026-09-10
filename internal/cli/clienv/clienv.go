@@ -155,13 +155,13 @@ type Modes struct {
 	DryRun bool
 	// JSONMode is the effective machine-output mode (--json or --compact).
 	JSONMode bool
-	// TimeSync is --time-sync / KORBIT_CLI_TIME_SYNC: the server-clock sync mode
+	// TimeSync is --time-sync / DIGITALX_CLI_TIME_SYNC: the server-clock sync mode
 	// (auto default, on, or off).
 	TimeSync TimeSyncMode
-	// NoFsync is --no-fsync / KORBIT_CLI_NO_FSYNC: open the journal and bot DB
+	// NoFsync is --no-fsync / DIGITALX_CLI_NO_FSYNC: open the journal and bot DB
 	// with synchronous=OFF.
 	NoFsync bool
-	// Experimental is --enable-experimental / KORBIT_CLI_ENABLE_EXPERIMENTAL: the
+	// Experimental is --enable-experimental / DIGITALX_CLI_ENABLE_EXPERIMENTAL: the
 	// opt-in gate for not-yet-stable features (the monitor JS bot runtime).
 	Experimental bool
 }

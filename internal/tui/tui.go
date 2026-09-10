@@ -34,6 +34,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/korbit-official/korbit-cli/internal/candles"
+	"github.com/korbit-official/korbit-cli/internal/envalias"
 	"github.com/korbit-official/korbit-cli/internal/ops"
 	"github.com/korbit-official/korbit-cli/internal/stream"
 )
@@ -223,16 +224,16 @@ type Config struct {
 // eventCoalesceMs bounds how often coalesced stream events are delivered to the
 // program (≈16fps). Market data redraws at this rate at most; input is handled
 // immediately between batches. Ticking numbers read fine at this rate, and the
-// lower redraw frequency keeps steady-state CPU down; KORBIT_CLI_TUI_COALESCE_MS
+// lower redraw frequency keeps steady-state CPU down; DIGITALX_CLI_TUI_COALESCE_MS
 // overrides it.
 const eventCoalesceMs = 60
 
 // coalesceInterval is the stream-batch flush interval: eventCoalesceMs by
-// default, overridable via KORBIT_CLI_TUI_COALESCE_MS (milliseconds, clamped to
+// default, overridable via DIGITALX_CLI_TUI_COALESCE_MS (milliseconds, clamped to
 // 10..1000) to gauge how much of the redraw cost is frame-rate driven.
 func coalesceInterval() time.Duration {
 	ms := eventCoalesceMs
-	if v := os.Getenv("KORBIT_CLI_TUI_COALESCE_MS"); v != "" {
+	if v := envalias.Lookup(os.Getenv, "DIGITALX_CLI_TUI_COALESCE_MS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n >= 10 && n <= 1000 {
 			ms = n
 		}

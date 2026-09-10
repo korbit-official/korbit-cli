@@ -155,7 +155,7 @@ func TestAutoClaimPendingThenReadyBinds(t *testing.T) {
 	}
 	var got []setupui.ClaimUpdate
 	out, stderr, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), driveAutoClaim(&got))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), driveAutoClaim(&got))
 	if code != 0 {
 		t.Fatalf("auto-claim setup must succeed: exit=%d — %s", code, stderr)
 	}
@@ -181,7 +181,7 @@ func TestAutoClaimPendingThenReadyBinds(t *testing.T) {
 }
 
 // TestAutoClaimUsesConfiguredBaseURL: the claim poll and the post-bind
-// wait/health-check must hit the configured base URL (KORBIT_CLI_BASE_URL here),
+// wait/health-check must hit the configured base URL (DIGITALX_CLI_BASE_URL here),
 // not the prod default — same resolution the advisory doctor uses.
 func TestAutoClaimUsesConfiguredBaseURL(t *testing.T) {
 	defer cli.SetClaimTimingForTest(5, 5, 2, 200*time.Millisecond)()
@@ -194,7 +194,7 @@ func TestAutoClaimUsesConfiguredBaseURL(t *testing.T) {
 	}
 	var got []setupui.ClaimUpdate
 	_, stderr, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home, "KORBIT_CLI_BASE_URL": base},
+		map[string]string{"DIGITALX_CLI_HOME": home, "DIGITALX_CLI_BASE_URL": base},
 		doer, fakeProbe("203.0.113.7", ""), driveAutoClaim(&got))
 	if code != 0 {
 		t.Fatalf("exit=%d — %s", code, stderr)
@@ -225,7 +225,7 @@ func TestAutoClaimUsesKeyPinnedBaseURL(t *testing.T) {
 	}
 	var got []setupui.ClaimUpdate
 	_, stderr, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, // no KORBIT_CLI_BASE_URL, no --base-url
+		map[string]string{"DIGITALX_CLI_HOME": home}, // no DIGITALX_CLI_BASE_URL, no --base-url
 		doer, fakeProbe("203.0.113.7", ""), driveAutoClaim(&got))
 	if code != 0 {
 		t.Fatalf("exit=%d — %s", code, stderr)
@@ -271,7 +271,7 @@ func TestAutoClaimConflictFallsBackToPaste(t *testing.T) {
 		return nil
 	}
 	out, stderr, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), stub)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), stub)
 	if code != 0 {
 		t.Fatalf("exit=%d — %s", code, stderr)
 	}
@@ -304,7 +304,7 @@ func TestAutoClaimNonTransientErrorStops(t *testing.T) {
 	}
 	var got []setupui.ClaimUpdate
 	_, _, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), driveAutoClaim(&got))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), driveAutoClaim(&got))
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
@@ -331,7 +331,7 @@ func TestAutoClaimIPNotAllowedStops(t *testing.T) {
 	}
 	var got []setupui.ClaimUpdate
 	_, _, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), driveAutoClaim(&got))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), driveAutoClaim(&got))
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
@@ -364,7 +364,7 @@ func TestAutoClaimDeactivatedStops(t *testing.T) {
 	}
 	var got []setupui.ClaimUpdate
 	_, _, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), driveAutoClaim(&got))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), driveAutoClaim(&got))
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
@@ -392,7 +392,7 @@ func TestAutoClaimPrefillsIdWhenKeyGoesBadAfterClaim(t *testing.T) {
 	}
 	var got []setupui.ClaimUpdate
 	_, _, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), driveAutoClaim(&got))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), driveAutoClaim(&got))
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
@@ -452,7 +452,7 @@ func TestAutoClaimExitDuringDoctorReportsConfigured(t *testing.T) {
 		return nil // ≈ Esc "finish later" while the health check runs
 	}
 	out, stderr, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), stub)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), stub)
 	if code != 0 {
 		t.Fatalf("exit=%d — %s", code, stderr)
 	}
@@ -484,7 +484,7 @@ func TestAutoClaim429BacksOffThenBinds(t *testing.T) {
 	}
 	var got []setupui.ClaimUpdate
 	_, stderr, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), driveAutoClaim(&got))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), driveAutoClaim(&got))
 	if code != 0 {
 		t.Fatalf("exit=%d — %s", code, stderr)
 	}
@@ -514,7 +514,7 @@ func TestAutoClaimWaitsForKeyBeforeDoctor(t *testing.T) {
 	}
 	var got []setupui.ClaimUpdate
 	out, stderr, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), driveAutoClaim(&got))
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), driveAutoClaim(&got))
 	if code != 0 {
 		t.Fatalf("exit=%d — %s", code, stderr)
 	}
@@ -578,7 +578,7 @@ func TestAutoClaimWaitForKeyHonorsCancel(t *testing.T) {
 		return setupui.ErrInterrupted
 	}
 	_, _, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), stub)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), stub)
 	if code != 0 {
 		t.Fatalf("a canceled session must exit 0: %d", code)
 	}
@@ -615,7 +615,7 @@ func TestAutoClaimCancelIsClean(t *testing.T) {
 		return setupui.ErrInterrupted // a cancel maps to the Ctrl-C abort
 	}
 	out, _, code := runWithSetupUI([]string{"setup"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), stub)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer, fakeProbe("203.0.113.7", ""), stub)
 	if code != 0 {
 		t.Fatalf("a canceled session must exit 0: %d", code)
 	}

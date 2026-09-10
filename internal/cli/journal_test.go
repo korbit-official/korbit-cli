@@ -72,7 +72,7 @@ func TestOrderPlaceRecordsToJournal(t *testing.T) {
 	out, _, code := runCLI(
 		[]string{"order", "place", "--symbol", "btc_krw", "--side", "buy", "--type", "limit",
 			"--price", "100000000", "--qty", "0.001", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 0 {
 		t.Fatalf("exit=%d out=%s", code, out)
 	}
@@ -136,7 +136,7 @@ func TestOrderPlaceFailureRecordsError(t *testing.T) {
 	_, _, code := runCLI(
 		[]string{"order", "place", "--symbol", "btc_krw", "--side", "buy", "--type", "limit",
 			"--price", "100000000", "--qty", "0.001", "--key", "bot"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 3 {
 		t.Fatalf("want exit 3, got %d", code)
 	}
@@ -172,7 +172,7 @@ func TestOrderPlaceDuplicateResolvesToOrder(t *testing.T) {
 	out, _, code := runCLI(
 		[]string{"order", "place", "--symbol", "btc_krw", "--side", "buy", "--type", "limit",
 			"--price", "100000000", "--qty", "0.001", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 0 {
 		t.Fatalf("a duplicate that resolves must succeed, exit=%d out=%s", code, out)
 	}
@@ -206,7 +206,7 @@ func TestOrderPlaceDuplicateUnreadableSurfacesGuidance(t *testing.T) {
 	_, stderr, code := runCLI(
 		[]string{"order", "place", "--symbol", "btc_krw", "--side", "buy", "--type", "limit",
 			"--price", "100000000", "--qty", "0.001", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 3 {
 		t.Fatalf("want exit 3, got %d", code)
 	}
@@ -227,7 +227,7 @@ func TestOrderPlaceUnknownSurfacesGuidance(t *testing.T) {
 	_, stderr, code := runCLI(
 		[]string{"order", "place", "--symbol", "btc_krw", "--side", "buy", "--type", "limit",
 			"--price", "100000000", "--qty", "0.001", "--key", "bot", "--retry-timeout", "0", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 3 {
 		t.Fatalf("want exit 3 (5xx ApiError), got %d", code)
 	}
@@ -245,7 +245,7 @@ func TestOrderPlaceNoReconcileIsSingleShot(t *testing.T) {
 	out, _, code := runCLI(
 		[]string{"order", "place", "--symbol", "btc_krw", "--side", "buy", "--type", "limit",
 			"--price", "100000000", "--qty", "0.001", "--key", "bot", "--no-reconcile", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 0 {
 		t.Fatalf("exit=%d out=%s", code, out)
 	}
@@ -279,7 +279,7 @@ func TestOrderPlaceParamsJSONInsertionOrder(t *testing.T) {
 	out, _, code := runCLI(
 		[]string{"order", "place", "--symbol", "btc_krw", "--side", "buy", "--type", "limit",
 			"--price", "100000000", "--qty", "0.001", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 0 {
 		t.Fatalf("exit=%d out=%s", code, out)
 	}
@@ -313,7 +313,7 @@ func TestSignedGetParamsJSONInsertionOrder(t *testing.T) {
 	doer := &stubDoer{resp: resp(200, `{"success":true,"data":[]}`, nil)}
 	if _, _, code := runCLI(
 		[]string{"order", "open", "--symbol", "btc_krw", "--limit", "10", "--key", "bot", "--compact", "--debug"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer); code != 0 {
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer); code != 0 {
 		t.Fatalf("order open exit=%d", code)
 	}
 	jl := openJournal(t, home)
@@ -364,7 +364,7 @@ func TestOrderPlaceStartOrderBeforeSend(t *testing.T) {
 	_, _, code := runCLI(
 		[]string{"order", "place", "--symbol", "btc_krw", "--side", "buy", "--type", "limit",
 			"--price", "100000000", "--qty", "0.001", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
@@ -378,7 +378,7 @@ func TestJournalTimingUsesInjectableClock(t *testing.T) {
 	seedBoundKey(t, home)
 	doer := &stubDoer{resp: resp(200, `{"success":true,"data":[]}`, nil)}
 	if _, _, code := runCLI([]string{"balance", "--key", "bot", "--debug"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer); code != 0 {
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer); code != 0 {
 		t.Fatalf("balance exit=%d", code)
 	}
 	jl := openJournal(t, home)
@@ -406,7 +406,7 @@ func TestDoctorDoesNotJournal(t *testing.T) {
 	doer := &stubDoer{resp: resp(200,
 		`{"success":true,"data":{"type":"trading","status":"activated","permissions":["writeOrders"]}}`, nil)}
 	_, _, code := runCLI([]string{"doctor", "--key", "bot"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	// doctor exits 0 (healthy) or 1 (network) — never mind the code; what matters
 	// is the journal stayed untouched.
 	_ = code
@@ -418,7 +418,7 @@ func TestDoctorDoesNotJournal(t *testing.T) {
 func TestLogsCommand(t *testing.T) {
 	home := t.TempDir()
 	seedBoundKey(t, home)
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 	doer := &stubDoer{resp: resp(200, `{"success":true,"data":[]}`, nil)}
 	if _, _, code := runCLI([]string{"balance", "--key", "bot", "--debug"}, env, doer); code != 0 {
 		t.Fatalf("balance exit=%d", code)
@@ -455,7 +455,7 @@ func TestLogsCommand(t *testing.T) {
 func TestPublicCallNotJournaledByDefault(t *testing.T) {
 	home := t.TempDir()
 	doer := &stubDoer{resp: resp(200, `{"success":true,"data":{"timestamp":1}}`, nil)}
-	if _, _, code := runCLI([]string{"time"}, map[string]string{"KORBIT_CLI_HOME": home}, doer); code != 0 {
+	if _, _, code := runCLI([]string{"time"}, map[string]string{"DIGITALX_CLI_HOME": home}, doer); code != 0 {
 		t.Fatalf("time exit=%d", code)
 	}
 	if _, err := os.Stat(journal.DefaultPath(home)); !os.IsNotExist(err) {
@@ -471,7 +471,7 @@ func TestAuthReadNotJournaledByDefault(t *testing.T) {
 	seedBoundKey(t, home)
 	doer := &stubDoer{resp: resp(200, `{"success":true,"data":[]}`, nil)}
 	if _, _, code := runCLI([]string{"balance", "--key", "bot"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer); code != 0 {
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer); code != 0 {
 		t.Fatalf("balance exit=%d", code)
 	}
 	if _, err := os.Stat(journal.DefaultPath(home)); !os.IsNotExist(err) {
@@ -479,7 +479,7 @@ func TestAuthReadNotJournaledByDefault(t *testing.T) {
 	}
 }
 
-// TestDebugModeJournalsPublicCalls: --debug (and KORBIT_CLI_DEBUG) journal
+// TestDebugModeJournalsPublicCalls: --debug (and DIGITALX_CLI_DEBUG) journal
 // public calls and emit verbose stderr diagnostics.
 func TestDebugModeJournalsPublicCalls(t *testing.T) {
 	cases := []struct {
@@ -488,12 +488,12 @@ func TestDebugModeJournalsPublicCalls(t *testing.T) {
 		env  map[string]string
 	}{
 		{"flag", []string{"time", "--debug"}, nil},
-		{"env", []string{"time"}, map[string]string{"KORBIT_CLI_DEBUG": "1"}},
+		{"env", []string{"time"}, map[string]string{"DIGITALX_CLI_DEBUG": "1"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			home := t.TempDir()
-			env := map[string]string{"KORBIT_CLI_HOME": home}
+			env := map[string]string{"DIGITALX_CLI_HOME": home}
 			for k, v := range tc.env {
 				env[k] = v
 			}
@@ -517,7 +517,7 @@ func TestDebugModeJournalsPublicCalls(t *testing.T) {
 func TestDebugBundleNoSecrets(t *testing.T) {
 	home := t.TempDir()
 	seedBoundKey(t, home)
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 	// Make one signed call so the bundle has activity (--debug journals the read).
 	runCLI([]string{"balance", "--key", "bot", "--debug"}, env,
 		&stubDoer{resp: resp(200, `{"success":true,"data":[]}`, nil)})
@@ -567,7 +567,7 @@ func TestJournalOpenFailureFailsCommand(t *testing.T) {
 	// A recorded call opens the journal before sending; --debug records this read,
 	// so the open is attempted (and fails) before anything is sent.
 	_, stderr, code := runCLI([]string{"balance", "--key", "bot", "--debug"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 4 {
 		t.Fatalf("want exit 4 (config), got %d", code)
 	}
@@ -583,7 +583,7 @@ func TestJournalOptOut(t *testing.T) {
 	home := t.TempDir()
 	seedBoundKey(t, home)
 	// --debug would normally journal this read; NO_JOURNAL suppresses it.
-	env := map[string]string{"KORBIT_CLI_HOME": home, "KORBIT_CLI_NO_JOURNAL": "1"}
+	env := map[string]string{"DIGITALX_CLI_HOME": home, "DIGITALX_CLI_NO_JOURNAL": "1"}
 	doer := &stubDoer{resp: resp(200, `{"success":true,"data":[]}`, nil)}
 	if _, _, code := runCLI([]string{"balance", "--key", "bot", "--debug"}, env, doer); code != 0 {
 		t.Fatalf("balance exit=%d", code)

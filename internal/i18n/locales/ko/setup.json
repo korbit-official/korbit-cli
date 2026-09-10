@@ -1,6 +1,6 @@
 {
-  "A credential is configured via the environment (KORBIT_CLI_API_KEY_*) — there is no stored key to set up. To create and manage a stored key instead, unset those variables.": "환경 변수로 자격 증명이 설정되어 있습니다 (KORBIT_CLI_API_KEY_*) — 설정할 저장된 키가 없습니다. 대신 저장된 키를 생성·관리하려면 해당 변수를 해제하세요.",
-  "A credential is configured via the environment (apiKeyId %s) — there is no stored key to set up. To create and manage a stored key instead, unset the KORBIT_CLI_API_KEY_* variables.": "환경 변수로 자격 증명이 설정되어 있습니다 (apiKeyId %s) — 설정할 저장된 키가 없습니다. 대신 저장된 키를 생성·관리하려면 KORBIT_CLI_API_KEY_* 변수를 해제하세요.",
+  "A credential is configured via the environment (DIGITALX_CLI_API_KEY_*) — there is no stored key to set up. To create and manage a stored key instead, unset those variables.": "환경 변수로 자격 증명이 설정되어 있습니다 (DIGITALX_CLI_API_KEY_*) — 설정할 저장된 키가 없습니다. 대신 저장된 키를 생성·관리하려면 해당 변수를 해제하세요.",
+  "A credential is configured via the environment (apiKeyId %s) — there is no stored key to set up. To create and manage a stored key instead, unset the DIGITALX_CLI_API_KEY_* variables.": "환경 변수로 자격 증명이 설정되어 있습니다 (apiKeyId %s) — 설정할 저장된 키가 없습니다. 대신 저장된 키를 생성·관리하려면 DIGITALX_CLI_API_KEY_* 변수를 해제하세요.",
   "Auto-claim was blocked by the key's IP allowlist. Add this machine's public IP to the key's allowlist.": "키의 IP 화이트리스트에 의해 자동 감지가 차단되었습니다. 이 컴퓨터의 공인 IP를 키의 IP 화이트리스트에 추가하세요.",
   "Auto-claim was blocked by the key's IP allowlist. Korbit sees you from: %s — add these to the key's allowlist.": "키의 IP 화이트리스트에 의해 자동 감지가 차단되었습니다. Korbit에 보이는 IP: %s — 이 IP를 키의 IP 화이트리스트에 추가하세요.",
   "Automatic detection failed (%s).": "자동 감지 실패 (%s).",

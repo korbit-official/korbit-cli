@@ -72,7 +72,7 @@ func resp(status int, body string, header map[string]string) *http.Response {
 
 // sharedTestHome is a process-wide temp CLI home, used to keep tests that pass a
 // nil env (mostly public endpoints) from journaling into the developer's real
-// ~/.korbit-cli. Tests that need their own keys override KORBIT_CLI_HOME.
+// ~/.digitalx-cli. Tests that need their own keys override DIGITALX_CLI_HOME.
 var (
 	sharedTestHomeOnce sync.Once
 	sharedTestHomeDir  string
@@ -80,7 +80,7 @@ var (
 
 func sharedTestHome() string {
 	sharedTestHomeOnce.Do(func() {
-		dir, err := os.MkdirTemp("", "korbit-cli-test-home-")
+		dir, err := os.MkdirTemp("", "digitalx-cli-test-home-")
 		if err != nil {
 			panic(err)
 		}
@@ -90,9 +90,9 @@ func sharedTestHome() string {
 }
 
 func runCLI(args []string, env map[string]string, doer apiclient.Doer) (string, string, int) {
-	// Always provide a temp KORBIT_CLI_HOME so journaling never touches the real
+	// Always provide a temp DIGITALX_CLI_HOME so journaling never touches the real
 	// user home; any explicit env entry from the caller still overrides it.
-	merged := map[string]string{"KORBIT_CLI_HOME": sharedTestHome()}
+	merged := map[string]string{"DIGITALX_CLI_HOME": sharedTestHome()}
 	for k, v := range env {
 		merged[k] = v
 	}
@@ -112,7 +112,7 @@ func runCLI(args []string, env map[string]string, doer apiclient.Doer) (string, 
 // interactive uninstall flow is exercisable in-process (it forces the
 // interactive path on, bypassing the TTY gate, and never reads real stdin).
 func runCLIConfirm(args []string, env map[string]string, doer apiclient.Doer, confirm func(string, bool) (bool, error)) (string, string, int) {
-	merged := map[string]string{"KORBIT_CLI_HOME": sharedTestHome()}
+	merged := map[string]string{"DIGITALX_CLI_HOME": sharedTestHome()}
 	for k, v := range env {
 		merged[k] = v
 	}
@@ -133,7 +133,7 @@ func runCLIConfirm(args []string, env map[string]string, doer apiclient.Doer, co
 // confirmer, so the install flow is exercisable in-process without reaching a
 // real /dev/tty (which, run interactively, would prompt the developer).
 func runCLIInstallConfirm(args []string, env map[string]string, doer apiclient.Doer, confirm func(string, bool) (bool, error)) (string, string, int) {
-	merged := map[string]string{"KORBIT_CLI_HOME": sharedTestHome()}
+	merged := map[string]string{"DIGITALX_CLI_HOME": sharedTestHome()}
 	for k, v := range env {
 		merged[k] = v
 	}
@@ -197,7 +197,7 @@ func TestDiagnosticsAreDebugGated(t *testing.T) {
 	// Default invocation: the result and disclosure show; the Debug log is hidden.
 	stdout, stderr, code := runCLI(
 		[]string{"balance", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, newDoer())
+		map[string]string{"DIGITALX_CLI_HOME": home}, newDoer())
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, stderr)
 	}
@@ -214,7 +214,7 @@ func TestDiagnosticsAreDebugGated(t *testing.T) {
 	// --debug lowers the threshold so the Debug request-target log appears.
 	_, stderr, code = runCLI(
 		[]string{"balance", "--key", "bot", "--compact", "--debug"},
-		map[string]string{"KORBIT_CLI_HOME": home}, newDoer())
+		map[string]string{"DIGITALX_CLI_HOME": home}, newDoer())
 	if code != 0 {
 		t.Fatalf("debug exit=%d stderr=%s", code, stderr)
 	}
@@ -238,7 +238,7 @@ func TestLogLevelControlsLevelSeparately(t *testing.T) {
 	// --log-level debug raises verbosity WITHOUT --debug: the Debug log appears.
 	_, stderr, code := runCLI(
 		[]string{"balance", "--key", "bot", "--compact", "--log-level", "debug"},
-		map[string]string{"KORBIT_CLI_HOME": home}, newDoer())
+		map[string]string{"DIGITALX_CLI_HOME": home}, newDoer())
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, stderr)
 	}
@@ -250,7 +250,7 @@ func TestLogLevelControlsLevelSeparately(t *testing.T) {
 	// but the signing disclosure still shows.
 	_, stderr, code = runCLI(
 		[]string{"balance", "--key", "bot", "--compact", "--debug", "--log-level", "off"},
-		map[string]string{"KORBIT_CLI_HOME": home}, newDoer())
+		map[string]string{"DIGITALX_CLI_HOME": home}, newDoer())
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, stderr)
 	}
@@ -264,18 +264,18 @@ func TestLogLevelControlsLevelSeparately(t *testing.T) {
 	// The env var resolves the same way as the flag (and the flag wins over it).
 	_, stderr, code = runCLI(
 		[]string{"balance", "--key", "bot", "--compact", "--debug"},
-		map[string]string{"KORBIT_CLI_HOME": home, "KORBIT_CLI_LOG_LEVEL": "off"}, newDoer())
+		map[string]string{"DIGITALX_CLI_HOME": home, "DIGITALX_CLI_LOG_LEVEL": "off"}, newDoer())
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, stderr)
 	}
 	if strings.Contains(stderr, "korbit-cli: debug:") {
-		t.Fatalf("KORBIT_CLI_LOG_LEVEL=off must override --debug, got %q", stderr)
+		t.Fatalf("DIGITALX_CLI_LOG_LEVEL=off must override --debug, got %q", stderr)
 	}
 
 	// An unrecognized level is a clean usage error (exit 2) before anything runs.
 	_, stderr, code = runCLI(
 		[]string{"balance", "--key", "bot", "--compact", "--log-level", "loud"},
-		map[string]string{"KORBIT_CLI_HOME": home}, newDoer())
+		map[string]string{"DIGITALX_CLI_HOME": home}, newDoer())
 	if code != 2 {
 		t.Fatalf("bad --log-level should exit 2, got %d (stderr=%q)", code, stderr)
 	}
@@ -291,7 +291,7 @@ func TestLogFileRedirectsOperationalLogs(t *testing.T) {
 
 	_, stderr, code := runCLI(
 		[]string{"balance", "--key", "bot", "--compact", "--debug", "--log-file", logPath},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, stderr)
 	}
@@ -318,7 +318,7 @@ func TestLogFileRedirectsOperationalLogs(t *testing.T) {
 	// An unwritable --log-file path is a clean usage error (exit 2).
 	_, stderr, code = runCLI(
 		[]string{"balance", "--key", "bot", "--compact", "--log-file", filepath.Join(logPath, "nope")},
-		map[string]string{"KORBIT_CLI_HOME": home}, &stubDoer{resp: resp(200, `{"success":true,"data":{}}`, nil)})
+		map[string]string{"DIGITALX_CLI_HOME": home}, &stubDoer{resp: resp(200, `{"success":true,"data":{}}`, nil)})
 	if code != 2 {
 		t.Fatalf("an unopenable --log-file should exit 2, got %d (stderr=%q)", code, stderr)
 	}
@@ -340,7 +340,7 @@ func TestLogFormatJSON(t *testing.T) {
 	// own line — so only lines beginning with `{` are log records.)
 	_, stderr, code := runCLI(
 		[]string{"balance", "--key", "bot", "--compact", "--log-level", "debug", "--log-format", "json"},
-		map[string]string{"KORBIT_CLI_HOME": home}, newDoer())
+		map[string]string{"DIGITALX_CLI_HOME": home}, newDoer())
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, stderr)
 	}
@@ -370,18 +370,18 @@ func TestLogFormatJSON(t *testing.T) {
 	// The env var resolves the same way as the flag.
 	_, stderr, code = runCLI(
 		[]string{"balance", "--key", "bot", "--compact", "--log-level", "debug"},
-		map[string]string{"KORBIT_CLI_HOME": home, "KORBIT_CLI_LOG_FORMAT": "json"}, newDoer())
+		map[string]string{"DIGITALX_CLI_HOME": home, "DIGITALX_CLI_LOG_FORMAT": "json"}, newDoer())
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, stderr)
 	}
 	if !regexp.MustCompile(`(?m)^\{.*"msg":"GET /v2/balance`).MatchString(stderr) {
-		t.Fatalf("KORBIT_CLI_LOG_FORMAT=json should emit JSON logs, got %q", stderr)
+		t.Fatalf("DIGITALX_CLI_LOG_FORMAT=json should emit JSON logs, got %q", stderr)
 	}
 
 	// An unrecognized format is a clean usage error (exit 2) before anything runs.
 	_, stderr, code = runCLI(
 		[]string{"balance", "--key", "bot", "--compact", "--log-format", "yaml"},
-		map[string]string{"KORBIT_CLI_HOME": home}, newDoer())
+		map[string]string{"DIGITALX_CLI_HOME": home}, newDoer())
 	if code != 2 {
 		t.Fatalf("bad --log-format should exit 2, got %d (stderr=%q)", code, stderr)
 	}
@@ -393,7 +393,7 @@ func TestPrivateRequestSignsAndVerifies(t *testing.T) {
 	doer := &stubDoer{resp: resp(200, `{"success":true,"data":{"krw":{"available":"1000"}}}`, nil)}
 	_, stderr, code := runCLI(
 		[]string{"balance", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home},
+		map[string]string{"DIGITALX_CLI_HOME": home},
 		doer,
 	)
 	if code != 0 {
@@ -432,7 +432,7 @@ func TestPrivateRequestHonorsExplicitAccountSeq(t *testing.T) {
 	doer := &stubDoer{resp: resp(200, `{"success":true,"data":{"krw":{"available":"1000"}}}`, nil)}
 	_, stderr, code := runCLI(
 		[]string{"balance", "--account-seq", "2", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home},
+		map[string]string{"DIGITALX_CLI_HOME": home},
 		doer,
 	)
 	if code != 0 {
@@ -455,7 +455,7 @@ func TestOrderPlaceEchoesClientOrderID(t *testing.T) {
 	out, _, code := runCLI(
 		[]string{"order", "place", "--symbol", "btc_krw", "--side", "buy", "--type", "limit",
 			"--price", "100000000", "--qty", "0.001", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home},
+		map[string]string{"DIGITALX_CLI_HOME": home},
 		doer,
 	)
 	if code != 0 {
@@ -485,7 +485,7 @@ func TestAPIErrorEnvelope(t *testing.T) {
 	seedBoundKey(t, home)
 	_, stderr, code := runCLI(
 		[]string{"order", "get", "--symbol", "btc_krw", "--order-id", "1", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 3 {
 		t.Fatalf("exit=%d", code)
 	}
@@ -650,7 +650,7 @@ func TestPlaceDryRunJournalsPreflightOnlyInDebug(t *testing.T) {
 
 	// Normal dry-run: no journal DB is created.
 	plain := t.TempDir()
-	if _, _, code := runCLI(args, map[string]string{"KORBIT_CLI_HOME": plain}, &stubDoer{resp: resp(200, book, nil)}); code != 0 {
+	if _, _, code := runCLI(args, map[string]string{"DIGITALX_CLI_HOME": plain}, &stubDoer{resp: resp(200, book, nil)}); code != 0 {
 		t.Fatalf("plain dry-run exit=%d", code)
 	}
 	if _, err := os.Stat(journal.DefaultPath(plain)); !os.IsNotExist(err) {
@@ -659,7 +659,7 @@ func TestPlaceDryRunJournalsPreflightOnlyInDebug(t *testing.T) {
 
 	// --debug dry-run: the preflight orderbook read is journaled.
 	dbg := t.TempDir()
-	env := map[string]string{"KORBIT_CLI_HOME": dbg}
+	env := map[string]string{"DIGITALX_CLI_HOME": dbg}
 	if _, _, code := runCLI(append(append([]string{}, args...), "--debug"), env, &stubDoer{resp: resp(200, book, nil)}); code != 0 {
 		t.Fatalf("debug dry-run exit=%d", code)
 	}
@@ -780,7 +780,7 @@ func TestOrderPlacePOSTBodyIsSigned(t *testing.T) {
 	_, _, code := runCLI(
 		[]string{"order", "place", "--symbol", "btc_krw", "--side", "sell", "--type", "market",
 			"--qty", "0.001", "--key", "bot", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
@@ -812,11 +812,11 @@ func TestBaseURLResolution(t *testing.T) {
 		t.Fatalf("base-url loopback: %s (%d)", out, code)
 	}
 	// env
-	if out, code := dry(nil, map[string]string{"KORBIT_CLI_BASE_URL": "https://env.example"}); code != 0 || !strings.Contains(out, `"baseUrl":"https://env.example"`) {
+	if out, code := dry(nil, map[string]string{"DIGITALX_CLI_BASE_URL": "https://env.example"}); code != 0 || !strings.Contains(out, `"baseUrl":"https://env.example"`) {
 		t.Fatalf("env: %s (%d)", out, code)
 	}
 	// --base-url overrides env, and trailing slash trimmed
-	if out, code := dry([]string{"--base-url", "https://flag.example/"}, map[string]string{"KORBIT_CLI_BASE_URL": "https://env.example"}); code != 0 || !strings.Contains(out, `"baseUrl":"https://flag.example"`) {
+	if out, code := dry([]string{"--base-url", "https://flag.example/"}, map[string]string{"DIGITALX_CLI_BASE_URL": "https://env.example"}); code != 0 || !strings.Contains(out, `"baseUrl":"https://flag.example"`) {
 		t.Fatalf("flag override: %s (%d)", out, code)
 	}
 }
@@ -827,7 +827,7 @@ func TestPlaintextBaseURLRefusedWhenSigning(t *testing.T) {
 	doer := &stubDoer{err: io.ErrUnexpectedEOF} // must not be called
 	_, stderr, code := runCLI(
 		[]string{"balance", "--key", "bot", "--base-url", "http://evil.example", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 2 {
 		t.Fatalf("plaintext signed request should be refused (exit 2), got %d", code)
 	}
@@ -1082,7 +1082,7 @@ func TestNetworkFailureIsExit1(t *testing.T) {
 
 func TestKeyUseRemoveThroughMain(t *testing.T) {
 	home := t.TempDir()
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 	runCLI([]string{"key", "add", "a", "--compact"}, env, &stubDoer{})
 	runCLI([]string{"key", "add", "b", "--compact"}, env, &stubDoer{})
 
@@ -1110,7 +1110,7 @@ func TestKeyUseRemoveThroughMain(t *testing.T) {
 // warning, and the warning is carried in stdout.
 func TestKeyRemoveForceStrandedKeyThroughMain(t *testing.T) {
 	home := t.TempDir()
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 	// Plant a stranded record by hand — `key add` would reject an unknown backend.
 	stranded := `{"version":1,"defaultKey":"stranded","keys":{"stranded":{"type":"ed25519","keystore":"hardware","apiKeyId":"KEYID-1","publicKey":"p","createdAt":1}}}`
 	if err := os.WriteFile(filepath.Join(home, "keys.json"), []byte(stranded), 0o600); err != nil {
@@ -1151,7 +1151,7 @@ func TestKeyRemoveForceStrandedKeyThroughMain(t *testing.T) {
 
 func TestKeyLifecycleThroughMain(t *testing.T) {
 	home := t.TempDir()
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 	out, _, code := runCLI([]string{"key", "add", "bot", "--compact"}, env, &stubDoer{})
 	if code != 0 {
 		t.Fatalf("add exit=%d", code)
@@ -1171,7 +1171,7 @@ func TestKeyLifecycleThroughMain(t *testing.T) {
 // before creating anything).
 func TestKeyAddSandboxIDRequiresSandboxName(t *testing.T) {
 	home := t.TempDir()
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 	_, errOut, code := runCLI([]string{"key", "add", "prod", "--api-key", keys.SandboxAPIKeyPrefix + "K1", "--compact"}, env, &stubDoer{})
 	if code == 0 || !strings.Contains(errOut, "sandbox") {
 		t.Fatalf("expected a sandbox-naming refusal, got exit=%d err=%q", code, errOut)
@@ -1221,7 +1221,7 @@ func TestPerKeyBaseURLPrecedence(t *testing.T) {
 		if setup != nil {
 			setup(home)
 		}
-		e := map[string]string{"KORBIT_CLI_HOME": home}
+		e := map[string]string{"DIGITALX_CLI_HOME": home}
 		for k, v := range env {
 			e[k] = v
 		}
@@ -1256,14 +1256,14 @@ func TestPerKeyBaseURLPrecedence(t *testing.T) {
 		t.Fatalf("config not used: %s", got)
 	}
 	// env beats per-key
-	if got := hostFor(t, nil, map[string]string{"KORBIT_CLI_BASE_URL": "https://env.example.test"}, func(home string) {
+	if got := hostFor(t, nil, map[string]string{"DIGITALX_CLI_BASE_URL": "https://env.example.test"}, func(home string) {
 		setKeyBaseURL(t, home, "bot", "https://perkey.example.test")
 	}); got.Host != "env.example.test" {
 		t.Fatalf("env should beat per-key: %s", got)
 	}
 	// --base-url beats per-key (and env)
 	if got := hostFor(t, []string{"--base-url", "https://flag.example.test"},
-		map[string]string{"KORBIT_CLI_BASE_URL": "https://env.example.test"}, func(home string) {
+		map[string]string{"DIGITALX_CLI_BASE_URL": "https://env.example.test"}, func(home string) {
 			setKeyBaseURL(t, home, "bot", "https://perkey.example.test")
 		}); got.Host != "flag.example.test" {
 		t.Fatalf("flag should beat per-key: %s", got)
@@ -1282,7 +1282,7 @@ func TestPublicCommandHonorsPerKeyBaseURL(t *testing.T) {
 		setup(home)
 		doer := &stubDoer{resp: resp(200, `{"success":true,"data":{"last":"100"}}`, nil)}
 		_, stderr, code := runCLI(append([]string{"ticker", "btc_krw", "--compact"}, args...),
-			map[string]string{"KORBIT_CLI_HOME": home}, doer)
+			map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 		if code != 0 {
 			t.Fatalf("exit=%d stderr=%s", code, stderr)
 		}
@@ -1319,7 +1319,7 @@ func TestDryRunReflectsPerKeyBaseURL(t *testing.T) {
 	seedBoundKey(t, home)
 	setKeyBaseURL(t, home, "bot", "https://perkey.example.test")
 	out, _, code := runCLI([]string{"balance", "--key", "bot", "--dry-run", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, &stubDoer{})
+		map[string]string{"DIGITALX_CLI_HOME": home}, &stubDoer{})
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
@@ -1331,7 +1331,7 @@ func TestDryRunReflectsPerKeyBaseURL(t *testing.T) {
 func TestSetBaseURLCommand(t *testing.T) {
 	home := t.TempDir()
 	seedBoundKey(t, home)
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 
 	// set (trailing slash trimmed); the WS companion is derived from the host.
 	// --no-verify keeps the test offline (the smoke test is covered separately).
@@ -1384,7 +1384,7 @@ func TestSetBaseURLCommand(t *testing.T) {
 func TestSetDefaultAccountSeqCommand(t *testing.T) {
 	home := t.TempDir()
 	seedBoundKey(t, home)
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 
 	// Set a valid accountSeq.
 	out, _, code := runCLI([]string{"key", "set-default-account-seq", "bot", "3", "--compact"}, env, &stubDoer{})
@@ -1426,7 +1426,7 @@ func TestSetDefaultAccountSeqCommand(t *testing.T) {
 func TestSetDefaultAccountSeqValidation(t *testing.T) {
 	home := t.TempDir()
 	seedBoundKey(t, home)
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 
 	cases := []struct {
 		name string
@@ -1453,7 +1453,7 @@ func TestSetDefaultAccountSeqValidation(t *testing.T) {
 func TestPerKeyDefaultAccountSeqInSignedRequest(t *testing.T) {
 	home := t.TempDir()
 	seedBoundKey(t, home)
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 
 	// Set per-key default to 5.
 	if _, _, code := runCLI([]string{"key", "set-default-account-seq", "bot", "5", "--compact"}, env, &stubDoer{}); code != 0 {
@@ -1494,7 +1494,7 @@ func TestPerKeyDefaultAccountSeqInSignedRequest(t *testing.T) {
 func TestPerKeyDefaultAccountSeqInDryRun(t *testing.T) {
 	home := t.TempDir()
 	seedBoundKey(t, home)
-	env := map[string]string{"KORBIT_CLI_HOME": home}
+	env := map[string]string{"DIGITALX_CLI_HOME": home}
 
 	// Set per-key default to 4.
 	if _, _, code := runCLI([]string{"key", "set-default-account-seq", "bot", "4", "--compact"}, env, &stubDoer{}); code != 0 {

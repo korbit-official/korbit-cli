@@ -58,7 +58,7 @@ func (r *Recorder) Begin(o ops.OpStart) (ops.OpHandle, error) {
 		// placement send without its pre-send operations/intent row (the hard
 		// guarantee). Refuse pre-send, exactly as an open/insert failure does, so
 		// beginOp aborts the operation before anything is sent.
-		return nil, output.Configf("cannot record the operation to the action journal at %s: journal closed — set KORBIT_CLI_NO_JOURNAL=1 to disable journaling", r.path)
+		return nil, output.Configf("cannot record the operation to the action journal at %s: journal closed — set DIGITALX_CLI_NO_JOURNAL=1 to disable journaling", r.path)
 	}
 	id, err := jl.StartOperation(journal.OperationStart{
 		StartedAtMs: r.clock(),
@@ -70,7 +70,7 @@ func (r *Recorder) Begin(o ops.OpStart) (ops.OpHandle, error) {
 		CLIVersion:  version.Version,
 	})
 	if err != nil {
-		return nil, output.Configf("cannot record the operation to the action journal at %s: %v — set KORBIT_CLI_NO_JOURNAL=1 to disable journaling", r.path, err)
+		return nil, output.Configf("cannot record the operation to the action journal at %s: %v — set DIGITALX_CLI_NO_JOURNAL=1 to disable journaling", r.path, err)
 	}
 	return &OpHandle{
 		parent: r, recording: true, failMode: d.PostFailure, operationID: id,
@@ -134,7 +134,7 @@ func (h *OpHandle) StartOrder(in ops.OrderIntent) (ops.OrderFinishFunc, error) {
 	if jl == nil {
 		// The journal raced shut (TUI shutdown) before this pre-send row. This is
 		// the hard-guarantee path, so refuse rather than send an unrecorded order.
-		return nil, output.Configf("cannot record the order to the action journal at %s: journal closed — set KORBIT_CLI_NO_JOURNAL=1 to disable journaling", h.parent.path)
+		return nil, output.Configf("cannot record the order to the action journal at %s: journal closed — set DIGITALX_CLI_NO_JOURNAL=1 to disable journaling", h.parent.path)
 	}
 	rowID, err := jl.StartOrder(journal.OrderStart{
 		CreatedAtMs:   h.parent.clock(),
@@ -152,7 +152,7 @@ func (h *OpHandle) StartOrder(in ops.OrderIntent) (ops.OrderFinishFunc, error) {
 		APIKeyID:      h.apiKeyID,
 	})
 	if err != nil {
-		return nil, output.Configf("cannot record the order to the action journal at %s: %v — set KORBIT_CLI_NO_JOURNAL=1 to disable journaling", h.parent.path, err)
+		return nil, output.Configf("cannot record the order to the action journal at %s: %v — set DIGITALX_CLI_NO_JOURNAL=1 to disable journaling", h.parent.path, err)
 	}
 	return func(status, orderID, errCode string, attempts int) {
 		fin := journal.OrderFinish{

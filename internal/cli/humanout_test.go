@@ -55,7 +55,7 @@ func TestBalanceHumanDefault(t *testing.T) {
 	doer := &stubDoer{resp: resp(200,
 		`{"success":true,"data":[{"currency":"krw","balance":"1000000","available":"700000","tradeInUse":"300000","withdrawalInUse":"0"}]}`, nil)}
 	out, _, code := runCLI([]string{"balance", "--key", "bot"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
@@ -73,7 +73,7 @@ func TestOrderGetHumanDefault(t *testing.T) {
 	doer := &stubDoer{resp: resp(200,
 		`{"success":true,"data":{"orderId":1234,"symbol":"btc_krw","side":"buy","orderType":"limit","status":"partiallyFilled","price":"5000","qty":"10","filledQty":"1"}}`, nil)}
 	out, _, code := runCLI([]string{"order", "get", "--symbol", "btc_krw", "--order-id", "1234", "--key", "bot"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
@@ -171,7 +171,7 @@ func TestLocalCommandsHumanByDefault(t *testing.T) {
 	t.Run("key list", func(t *testing.T) {
 		home := t.TempDir()
 		seedBoundKey(t, home)
-		out, _, code := runCLI([]string{"key", "list"}, map[string]string{"KORBIT_CLI_HOME": home}, &stubDoer{})
+		out, _, code := runCLI([]string{"key", "list"}, map[string]string{"DIGITALX_CLI_HOME": home}, &stubDoer{})
 		if code != 0 {
 			t.Fatalf("exit=%d", code)
 		}
@@ -184,7 +184,7 @@ func TestLocalCommandsHumanByDefault(t *testing.T) {
 	t.Run("key show", func(t *testing.T) {
 		home := t.TempDir()
 		seedBoundKey(t, home)
-		out, _, code := runCLI([]string{"key", "show", "bot"}, map[string]string{"KORBIT_CLI_HOME": home}, &stubDoer{})
+		out, _, code := runCLI([]string{"key", "show", "bot"}, map[string]string{"DIGITALX_CLI_HOME": home}, &stubDoer{})
 		if code != 0 {
 			t.Fatalf("exit=%d", code)
 		}
@@ -197,7 +197,7 @@ func TestLocalCommandsHumanByDefault(t *testing.T) {
 	t.Run("setup", func(t *testing.T) {
 		home := t.TempDir()
 		out, _, code := runWithDeps([]string{"setup", "--name", "fresh"},
-			map[string]string{"KORBIT_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""))
+			map[string]string{"DIGITALX_CLI_HOME": home}, nil, fakeProbe("203.0.113.7", ""))
 		if code != 0 {
 			t.Fatalf("exit=%d", code)
 		}
@@ -211,7 +211,7 @@ func TestLocalCommandsHumanByDefault(t *testing.T) {
 
 	t.Run("ip", func(t *testing.T) {
 		out, _, code := runWithDeps([]string{"ip"},
-			map[string]string{"KORBIT_CLI_HOME": t.TempDir()}, nil, fakeProbe("203.0.113.7", ""))
+			map[string]string{"DIGITALX_CLI_HOME": t.TempDir()}, nil, fakeProbe("203.0.113.7", ""))
 		if code != 0 {
 			t.Fatalf("exit=%d", code)
 		}
@@ -260,13 +260,13 @@ func TestLocalCommandsHumanByDefault(t *testing.T) {
 }
 
 // The mcp serve --read-only / --multi-key toggles resolve from env vars
-// (KORBIT_CLI_MCP_*) end to end through the real command — the path the .mcpb
+// (DIGITALX_CLI_MCP_*) end to end through the real command — the path the .mcpb
 // Desktop Extension uses to expose them as install-time checkboxes. Guards
 // against a refactor that stops consulting the env in runMCP.
 func TestMCPServeEnvTogglesWireThroughPlan(t *testing.T) {
 	out, _, code := runCLI(
 		[]string{"mcp", "serve", "--dry-run", "--json"},
-		map[string]string{"KORBIT_CLI_MCP_READ_ONLY": "1", "KORBIT_CLI_MCP_MULTI_KEY": "true"},
+		map[string]string{"DIGITALX_CLI_MCP_READ_ONLY": "1", "DIGITALX_CLI_MCP_MULTI_KEY": "true"},
 		&stubDoer{})
 	if code != 0 {
 		t.Fatalf("exit=%d: %s", code, out)
@@ -291,7 +291,7 @@ func TestOrderPlaceHumanEchoesClientOrderID(t *testing.T) {
 	out, _, code := runCLI(
 		[]string{"order", "place", "--symbol", "btc_krw", "--side", "buy", "--type", "limit",
 			"--price", "100000000", "--qty", "0.001", "--key", "bot"},
-		map[string]string{"KORBIT_CLI_HOME": home}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": home}, doer)
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
@@ -374,7 +374,7 @@ func TestHumanFormattersPinFieldMapping(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			home := t.TempDir()
 			seedBoundKey(t, home)
-			out, stderr, code := runCLI(tc.args, map[string]string{"KORBIT_CLI_HOME": home},
+			out, stderr, code := runCLI(tc.args, map[string]string{"DIGITALX_CLI_HOME": home},
 				&stubDoer{resp: resp(200, tc.body, nil)})
 			if code != 0 {
 				t.Fatalf("exit=%d stderr=%s", code, stderr)
@@ -399,7 +399,7 @@ func TestWhoamiUserUUIDHumanDefault(t *testing.T) {
 		home := t.TempDir()
 		seedBoundKey(t, home)
 		out, stderr, code := runCLI([]string{"whoami", "--key", "bot"},
-			map[string]string{"KORBIT_CLI_HOME": home}, &stubDoer{resp: resp(200, body, nil)})
+			map[string]string{"DIGITALX_CLI_HOME": home}, &stubDoer{resp: resp(200, body, nil)})
 		if code != 0 {
 			t.Fatalf("exit=%d stderr=%s", code, stderr)
 		}

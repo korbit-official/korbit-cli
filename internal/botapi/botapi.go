@@ -132,7 +132,7 @@ type Options struct {
 	// Empty makes db.* unavailable.
 	DBPath string
 	// NoFsync opens the db.* database with PRAGMA synchronous=OFF (faster writes,
-	// weaker crash-durability) — the --no-fsync/KORBIT_CLI_NO_FSYNC opt-in.
+	// weaker crash-durability) — the --no-fsync/DIGITALX_CLI_NO_FSYNC opt-in.
 	NoFsync bool
 
 	// Stateful builds a materialized state.Store fed by Ingest and exposes it as

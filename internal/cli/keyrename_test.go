@@ -21,7 +21,7 @@ func TestKeyRenamePreservesBindingAndDefault(t *testing.T) {
 	seedBoundKey(t, home) // bound default key "bot" in the file backend
 
 	out, stderr, code := runCLI([]string{"key", "rename", "bot", "main", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, &stubDoer{})
+		map[string]string{"DIGITALX_CLI_HOME": home}, &stubDoer{})
 	if code != 0 {
 		t.Fatalf("rename exit = %d — %s", code, stderr)
 	}
@@ -33,7 +33,7 @@ func TestKeyRenamePreservesBindingAndDefault(t *testing.T) {
 	}
 
 	list, _, _ := runCLI([]string{"key", "list", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, &stubDoer{})
+		map[string]string{"DIGITALX_CLI_HOME": home}, &stubDoer{})
 	if strings.Contains(list, `"name":"bot"`) {
 		t.Fatalf("old name must be gone: %s", list)
 	}
@@ -57,7 +57,7 @@ func TestKeyRenameRejectsCollision(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, stderr, code := runCLI([]string{"key", "rename", "a", "b"},
-		map[string]string{"KORBIT_CLI_HOME": home}, &stubDoer{})
+		map[string]string{"DIGITALX_CLI_HOME": home}, &stubDoer{})
 	if code != 2 {
 		t.Fatalf("collision must be a usage error (exit 2), got %d — %s", code, stderr)
 	}
@@ -81,7 +81,7 @@ func TestKeyAddWithAPIKeyBindsImmediately(t *testing.T) {
 
 	out, stderr, code := runCLI(
 		[]string{"key", "add", "imported", "--from-pem-file", pemPath, "--api-key", "KEYID-XYZ", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": home}, &stubDoer{})
+		map[string]string{"DIGITALX_CLI_HOME": home}, &stubDoer{})
 	if code != 0 {
 		t.Fatalf("add --api-key exit = %d — %s", code, stderr)
 	}

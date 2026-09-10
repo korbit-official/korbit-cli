@@ -8,7 +8,7 @@ far?".
 
 Journaling is on by default: writes (order place/cancel, transfers) are always recorded, reads only
 under `--debug`. It's a hard guarantee — an order's row is written *before* the request is sent. Opt
-out with `KORBIT_CLI_NO_JOURNAL=1`.
+out with `DIGITALX_CLI_NO_JOURNAL=1`.
 
 ## Reading the journal
 
@@ -51,7 +51,7 @@ routine inspection (`logs` is lighter).
 
 For a clock/IP/connectivity problem rather than a past action, `korbit doctor --json` is the
 read-only health check (key → binding → `whoami` → default accountSeq permission → public IP → clock skew → WebSocket reachability),
-and each finding carries a `fix`. Add `--debug` (or `KORBIT_CLI_DEBUG=1`) to any command for verbose
+and each finding carries a `fix`. Add `--debug` (or `DIGITALX_CLI_DEBUG=1`) to any command for verbose
 stderr diagnostics (request target, retry decisions, timing).
 
 ## Clock skew / `EXCEED_TIME_WINDOW`

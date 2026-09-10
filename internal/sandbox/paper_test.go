@@ -93,7 +93,7 @@ func paperHarnessMarkets(t *testing.T, markets statusMarkets) (*Manager, string)
 	}
 	apiKey := keys.SandboxAPIKeyPrefix + "ED25519_KEY_00000001_0000002"
 	km := keys.NewManager(home, "file", func() int64 { return 1700000000000 }, nil)
-	dbPath := filepath.Join(home, "sandbox", "korbit-sandbox.db")
+	dbPath := filepath.Join(home, "sandbox", "digitalx-sandbox.db")
 	denoBin := fakeDenoMarkets(t, dbPath+"-pid", kp.PrivatePEM, apiKey, markets)
 	doer := doerFunc(func(r *http.Request) (*http.Response, error) {
 		return &http.Response{StatusCode: 200, Body: http.NoBody, Header: http.Header{}}, nil

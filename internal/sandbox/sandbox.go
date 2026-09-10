@@ -20,7 +20,7 @@
 //     at creation and it is never even transiently the default.
 //   - The artifact cache (the managed Deno + Deno's own module cache) is shared
 //     across agents; mutable state (db, pidfile, log) lives under
-//     KORBIT_CLI_HOME/sandbox/.
+//     DIGITALX_CLI_HOME/sandbox/.
 package sandbox
 
 import (
@@ -36,9 +36,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/korbit-official/korbit-cli/internal/keys"
+	"github.com/korbit-official/korbit-cli/internal/legacyfile"
 	"github.com/korbit-official/korbit-cli/internal/logging"
 	"github.com/korbit-official/korbit-cli/internal/sandbox/deno"
 )
@@ -61,10 +63,10 @@ const MinSandboxVersion = "1.2.0"
 // Config carries one sandbox operation's settings. Zero values resolve to the
 // documented defaults.
 type Config struct {
-	// Home is the CLI home (KORBIT_CLI_HOME); mutable state lives under it.
+	// Home is the CLI home (DIGITALX_CLI_HOME); mutable state lives under it.
 	Home string
-	// CacheDir is the shared artifact cache root (os.UserCacheDir()/korbit-cli,
-	// or KORBIT_CLI_SANDBOX_CACHE).
+	// CacheDir is the shared artifact cache root (os.UserCacheDir()/digitalx-cli,
+	// or an existing os.UserCacheDir()/korbit-cli, or DIGITALX_CLI_SANDBOX_CACHE).
 	CacheDir string
 	// URL overrides the bundle source (Official Source by default; a local path
 	// or file:// is read from disk).
@@ -74,7 +76,7 @@ type Config struct {
 	// Port is the requested fixed port (0 ⇒ DefaultPort with ephemeral fallback;
 	// a non-zero value forces that exact port with no fallback).
 	Port int
-	// DB overrides the database path (default <home>/sandbox/korbit-sandbox.db).
+	// DB overrides the database path (default <home>/sandbox/digitalx-sandbox.db).
 	DB string
 	// KeyName overrides the imported key's name (default DefaultKeyName).
 	KeyName string
@@ -133,10 +135,10 @@ type Deps struct {
 	// LookPath resolves an executable (exec.LookPath); tests stub it to control
 	// whether a system `deno` appears present.
 	LookPath func(string) (string, error)
-	// DenoURL / DenoVersion override the managed-Deno pin (KORBIT_CLI_DENO_*).
+	// DenoURL / DenoVersion override the managed-Deno pin (DIGITALX_CLI_DENO_*).
 	DenoURL     string
 	DenoVersion string
-	// KeyManager imports the seeded key; the caller wires it over KORBIT_CLI_HOME.
+	// KeyManager imports the seeded key; the caller wires it over DIGITALX_CLI_HOME.
 	KeyManager *keys.Manager
 	// BannerOut, if set, receives the short license notice at the top of `start`
 	// (rendered by the bundle's own `license --show-banner`, so the text is never
@@ -150,6 +152,13 @@ type Deps struct {
 type Manager struct {
 	cfg  Config
 	deps Deps
+
+	// dbOnce guards the one-time database-path resolution (see resolveDBPath),
+	// which may adopt a database left under the earlier product name. Resolving
+	// once keeps every path derived from it — the sidecars, the pidfile, the
+	// market snapshot — pointing at the same database for the process's life.
+	dbOnce     sync.Once
+	dbResolved string
 }
 
 // New builds a Manager, applying defaults.
@@ -169,21 +178,107 @@ func New(cfg Config, deps Deps) *Manager {
 // log returns the manager's operational logger, never nil (logging.Or).
 func (m *Manager) log() *slog.Logger { return logging.Or(m.deps.Logger) }
 
-// StateDir is the per-home mutable state root (KORBIT_CLI_HOME/sandbox): the db
+// StateDir is the per-home mutable state root (DIGITALX_CLI_HOME/sandbox): the db
 // (+ its -wal/-shm/-pid sidecars) and run.log. Exported so a caller cleaning up
 // after the sandbox (e.g. `self uninstall`) removes the same directory this
 // manager writes, without duplicating the "sandbox" subdir name.
 func StateDir(home string) string { return filepath.Join(home, "sandbox") }
 
-// stateDir is KORBIT_CLI_HOME/sandbox — the per-home mutable state root.
+// stateDir is DIGITALX_CLI_HOME/sandbox — the per-home mutable state root.
 func (m *Manager) stateDir() string { return StateDir(m.cfg.Home) }
 
-// dbPath is the sandbox database path.
+// DBFileName is the sandbox database under the state dir; LegacyDBFileName is
+// the name a state dir created under the earlier product name carries.
+const (
+	DBFileName       = "digitalx-sandbox.db"
+	LegacyDBFileName = "korbit-sandbox.db"
+)
+
+// dbCompanions are the files SQLite and the bundle keep beside the database:
+// the write-ahead log, its shared-memory index, the {pid,port} pidfile, and the
+// market snapshot cache. They move with the database when the legacy name is
+// adopted, so none of them is left pointing at a database that is gone.
+var dbCompanions = []string{"-wal", "-shm", "-pid", ".market-snapshot.json"}
+
+// dbPath is the sandbox database path — the explicit override, else the state
+// dir's, resolved once per Manager (see resolveDBPath).
 func (m *Manager) dbPath() string {
 	if m.cfg.DB != "" {
 		return m.cfg.DB
 	}
-	return filepath.Join(m.stateDir(), "korbit-sandbox.db")
+	m.dbOnce.Do(func() { m.dbResolved = m.resolveDBPath() })
+	return m.dbResolved
+}
+
+// resolveDBPath returns the state dir's database path, adopting a database left
+// under the earlier product name (companions included) so its balances, orders,
+// and trades stay in play.
+//
+// A sandbox still SERVING the legacy database is left alone: renaming the file
+// out from under a running server would leave it writing to a path nothing else
+// can find, and its pidfile would no longer match the database `stop` looks for.
+// See legacyServerRunning for what counts as serving. A crashed run's stale
+// pidfile does not block adoption; while a live server does, this process keeps
+// using the legacy name and the next run after that server stops adopts it.
+//
+// A rename that FAILS also keeps the legacy name, so nothing is created under
+// the current name and the next run retries.
+func (m *Manager) resolveDBPath() string {
+	current := filepath.Join(m.stateDir(), DBFileName)
+	legacy := filepath.Join(m.stateDir(), LegacyDBFileName)
+	if _, err := os.Lstat(current); err == nil {
+		return current
+	}
+	if _, err := os.Lstat(legacy); err != nil {
+		return current
+	}
+	if m.legacyServerRunning(legacy) {
+		return legacy
+	}
+	adopted, err := legacyfile.Adopt(current, legacy, dbCompanions...)
+	switch {
+	case err == nil:
+		m.log().Info("adopted the existing sandbox database", "from", legacy, "to", current)
+		return current
+	case !adopted:
+		m.log().Warn("could not adopt the existing sandbox database — using it under its existing name",
+			"from", legacy, "to", current, "err", err)
+		return legacy
+	default:
+		m.log().Warn("adopted the sandbox database but left a companion behind",
+			"from", legacy, "to", current, "err", err)
+		return current
+	}
+}
+
+// legacyServerRunning reports whether a sandbox is actively serving the database
+// at the legacy name, from its pidfile: the pid must resolve to a live process
+// AND the recorded port must answer /v2/time.
+//
+// The port probe is not redundant with the pid check. A pid alone is weak
+// evidence — the number can be recycled by an unrelated process, and on some
+// platforms a resolvable pid is all the OS will tell you cheaply — so a stale
+// pidfile could otherwise pin the database to the legacy name forever. Requiring
+// the port to answer makes "running" mean what the rest of this package means by
+// it (the same readiness probe `start` and `status` use). The cost is paid only
+// while a legacy database is still present and its pidfile parses: once adopted,
+// resolveDBPath returns at the first check.
+func (m *Manager) legacyServerRunning(legacy string) bool {
+	pf, err := parsePidfile(legacy + "-pid")
+	if err != nil || pf.PID <= 0 || pf.Port == 0 {
+		return false
+	}
+	if !processAlive(pf.PID) {
+		return false
+	}
+	if !m.probeReady(context.Background(), pf.Port) {
+		m.log().Debug("sandbox pidfile names a live pid but its port does not answer — treating it as stale",
+			"db", legacy, "pid", pf.PID, "port", pf.Port)
+		return false
+	}
+	m.log().Info("sandbox running against the previous database name — keeping it for this run",
+		"db", legacy, "pid", pf.PID, "port", pf.Port)
+	return true
 }
 
 // pidfilePath is where the bundle writes {pid,port} — <db>-pid.
@@ -212,15 +307,26 @@ func (m *Manager) denoManager() *deno.Manager {
 
 // readPidfile reads and parses the bundle's pidfile, or an error if absent/bad.
 func (m *Manager) readPidfile() (Pidfile, error) {
-	raw, err := os.ReadFile(m.pidfilePath())
+	pf, err := parsePidfile(m.pidfilePath())
+	if err != nil {
+		return Pidfile{}, err
+	}
+	m.log().Debug("read sandbox pidfile", "path", m.pidfilePath(), "pid", pf.PID, "port", pf.Port)
+	return pf, nil
+}
+
+// parsePidfile reads the bundle's {pid,port} pidfile at an explicit path. It is
+// separate from readPidfile so the database-path resolution can consult the
+// LEGACY pidfile without going through the paths it is still resolving.
+func parsePidfile(path string) (Pidfile, error) {
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		return Pidfile{}, err
 	}
 	var pf Pidfile
 	if err := json.Unmarshal(raw, &pf); err != nil {
-		return Pidfile{}, fmt.Errorf("sandbox pidfile %s is malformed: %w", m.pidfilePath(), err)
+		return Pidfile{}, fmt.Errorf("sandbox pidfile %s is malformed: %w", path, err)
 	}
-	m.log().Debug("read sandbox pidfile", "path", m.pidfilePath(), "pid", pf.PID, "port", pf.Port)
 	return pf, nil
 }
 

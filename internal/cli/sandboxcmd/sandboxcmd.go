@@ -16,6 +16,7 @@ import (
 	"os/exec"
 
 	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
+	"github.com/korbit-official/korbit-cli/internal/envalias"
 	"github.com/korbit-official/korbit-cli/internal/output"
 	"github.com/korbit-official/korbit-cli/internal/progname"
 	"github.com/korbit-official/korbit-cli/internal/sandbox"
@@ -64,16 +65,16 @@ func Run(cx *clienv.Cmd, c *spec.Command, cmd *cobra.Command, args []string) err
 	scfg := sandbox.Config{
 		Home:        home,
 		CacheDir:    cacheDir,
-		URL:         cx.Getenv("KORBIT_CLI_SANDBOX_URL"),
-		RuntimePref: cx.Getenv("KORBIT_CLI_SANDBOX_RUNTIME"),
+		URL:         envalias.Lookup(cx.Getenv, "DIGITALX_CLI_SANDBOX_URL"),
+		RuntimePref: envalias.Lookup(cx.Getenv, "DIGITALX_CLI_SANDBOX_RUNTIME"),
 	}
 	deps := sandbox.Deps{
 		Doer:        cx.Doer,
 		Now:         cx.Now,
 		Log:         func(s string) { cx.IO.Notef("%s", s) },
 		Logger:      cx.Log,
-		DenoURL:     cx.Getenv("KORBIT_CLI_DENO_URL"),
-		DenoVersion: cx.Getenv("KORBIT_CLI_DENO_VERSION"),
+		DenoURL:     envalias.Lookup(cx.Getenv, "DIGITALX_CLI_DENO_URL"),
+		DenoVersion: envalias.Lookup(cx.Getenv, "DIGITALX_CLI_DENO_VERSION"),
 		KeyManager:  km,
 		// The short license notice prints to stderr at the top of `start`.
 		BannerOut: cx.IO.Err,
@@ -122,8 +123,9 @@ func Run(cx *clienv.Cmd, c *spec.Command, cmd *cobra.Command, args []string) err
 }
 
 // sandboxCacheDir resolves the shared artifact cache via sandbox.ResolveCacheDir
-// (KORBIT_CLI_SANDBOX_CACHE, else os.UserCacheDir()/korbit-cli), re-typing its
-// failure as a config-class error (exit 4).
+// (DIGITALX_CLI_SANDBOX_CACHE, else os.UserCacheDir()/digitalx-cli, or an
+// existing os.UserCacheDir()/korbit-cli), re-typing its failure as a
+// config-class error (exit 4).
 func sandboxCacheDir(cx *clienv.Cmd) (string, error) {
 	dir, err := sandbox.ResolveCacheDir(cx.Getenv)
 	if err != nil {

@@ -140,7 +140,7 @@ type meta struct {
 
 // Config selects the pinned version, asset URL base, and expected checksum.
 // Defaults come from the generated pin; overrides exist for tests (and the
-// KORBIT_CLI_DENO_VERSION / KORBIT_CLI_DENO_URL env, wired by the caller).
+// DIGITALX_CLI_DENO_VERSION / DIGITALX_CLI_DENO_URL env, wired by the caller).
 type Config struct {
 	// Version is the Deno release tag (e.g. "v2.8.3"). Defaults to the pinned Version.
 	Version string
@@ -213,7 +213,7 @@ func (m *Manager) expectedSHA(target string) (string, error) {
 			return sha, nil
 		}
 	}
-	return "", fmt.Errorf("no pinned checksum for Deno %s on %s — set the checksum (KORBIT_CLI_DENO_URL pins must carry one)", m.version(), platformKey())
+	return "", fmt.Errorf("no pinned checksum for Deno %s on %s — set the checksum (DIGITALX_CLI_DENO_URL pins must carry one)", m.version(), platformKey())
 }
 
 // versionsRoot holds one sub-directory per cached version+target. It is the dir

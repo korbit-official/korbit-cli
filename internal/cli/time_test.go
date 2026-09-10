@@ -19,7 +19,7 @@ func TestTimeReportsSkew(t *testing.T) {
 	doer := routeDoer{timeBody: `{"success":true,"data":{"time":1700000000250}}`}
 
 	out, _, code := runCLI([]string{"time", "--json", "--compact"},
-		map[string]string{"KORBIT_CLI_HOME": t.TempDir()}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": t.TempDir()}, doer)
 	if code != 0 {
 		t.Fatalf("exit = %d — %s", code, out)
 	}
@@ -30,7 +30,7 @@ func TestTimeReportsSkew(t *testing.T) {
 	}
 
 	human, _, code := runCLI([]string{"time"},
-		map[string]string{"KORBIT_CLI_HOME": t.TempDir()}, doer)
+		map[string]string{"DIGITALX_CLI_HOME": t.TempDir()}, doer)
 	if code != 0 {
 		t.Fatalf("human exit = %d — %s", code, human)
 	}

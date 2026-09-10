@@ -18,8 +18,8 @@ import (
 func sandboxEnv(t *testing.T) map[string]string {
 	t.Helper()
 	return map[string]string{
-		"KORBIT_CLI_HOME":          t.TempDir(),
-		"KORBIT_CLI_SANDBOX_CACHE": t.TempDir(),
+		"DIGITALX_CLI_HOME":          t.TempDir(),
+		"DIGITALX_CLI_SANDBOX_CACHE": t.TempDir(),
 	}
 }
 

@@ -11,15 +11,87 @@ import (
 	"testing"
 )
 
-func TestHomeFromEnv(t *testing.T) {
-	getenv := func(k string) string {
-		if k == "KORBIT_CLI_HOME" {
-			return "/tmp/custom"
+// setUserHome points os.UserHomeDir at a fresh temp directory and returns it,
+// so the Home branches that probe ~ never see the developer's real home.
+func setUserHome(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)        // unix
+	t.Setenv("USERPROFILE", dir) // windows
+	return dir
+}
+
+func env(vars map[string]string) func(string) string {
+	return func(k string) string { return vars[k] }
+}
+
+func TestHome(t *testing.T) {
+	t.Run("env wins", func(t *testing.T) {
+		setUserHome(t)
+		got := Home(env(map[string]string{"DIGITALX_CLI_HOME": "/tmp/custom"}))
+		if got != "/tmp/custom" {
+			t.Fatalf("Home = %q", got)
 		}
-		return ""
-	}
-	if got := Home(getenv); got != "/tmp/custom" {
-		t.Fatalf("Home = %q", got)
+	})
+
+	t.Run("legacy env accepted", func(t *testing.T) {
+		setUserHome(t)
+		got := Home(env(map[string]string{"KORBIT_CLI_HOME": "/tmp/legacy"}))
+		if got != "/tmp/legacy" {
+			t.Fatalf("Home = %q", got)
+		}
+	})
+
+	t.Run("current env wins over legacy", func(t *testing.T) {
+		setUserHome(t)
+		got := Home(env(map[string]string{
+			"DIGITALX_CLI_HOME": "/tmp/custom",
+			"KORBIT_CLI_HOME":   "/tmp/legacy",
+		}))
+		if got != "/tmp/custom" {
+			t.Fatalf("Home = %q", got)
+		}
+	})
+
+	t.Run("existing current directory", func(t *testing.T) {
+		home := setUserHome(t)
+		mkdir(t, filepath.Join(home, DirName))
+		mkdir(t, filepath.Join(home, LegacyDirName))
+		if got, want := Home(env(nil)), filepath.Join(home, DirName); got != want {
+			t.Fatalf("Home = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("existing legacy directory", func(t *testing.T) {
+		home := setUserHome(t)
+		mkdir(t, filepath.Join(home, LegacyDirName))
+		if got, want := Home(env(nil)), filepath.Join(home, LegacyDirName); got != want {
+			t.Fatalf("Home = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("neither directory exists", func(t *testing.T) {
+		home := setUserHome(t)
+		if got, want := Home(env(nil)), filepath.Join(home, DirName); got != want {
+			t.Fatalf("Home = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("legacy name is a plain file", func(t *testing.T) {
+		home := setUserHome(t)
+		if err := os.WriteFile(filepath.Join(home, LegacyDirName), []byte("not a home"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if got, want := Home(env(nil)), filepath.Join(home, DirName); got != want {
+			t.Fatalf("Home = %q, want %q", got, want)
+		}
+	})
+}
+
+func mkdir(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(path, 0o700); err != nil {
+		t.Fatal(err)
 	}
 }
 
