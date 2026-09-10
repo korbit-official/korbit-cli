@@ -83,7 +83,7 @@ trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/server"
 cp "$bin" "$stage/server/$binname"
 chmod +x "$stage/server/$binname"
-cp "$root/assets/korbit.png" "$stage/icon.png"
+cp "$root/assets/digitalx.png" "$stage/icon.png"
 # The bundle carries a copy of the binary, which statically links open-source
 # modules, so it ships the same license/notice/disclaimer set as the release
 # archives — attribution travels with every distributed copy. These sit at the
