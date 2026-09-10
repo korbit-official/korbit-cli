@@ -111,10 +111,13 @@ builds:
 # for why the legacy set exists. Both are listed in the one checksums.txt below,
 # so a single signature authenticates every download.
 archives:
-  - id: dgx-cli
+  # The primary set. The ARCHIVE is named after the product (digitalx-cli); the
+  # BINARY inside it is dgx-cli. internal/selfupdate/release.go's assetName()
+  # builds this same name — keep the two in sync.
+  - id: digitalx-cli
     ids:
       - dgx-cli
-    name_template: "dgx-cli_{{ .Os }}_{{ .Arch }}"
+    name_template: "digitalx-cli_{{ .Os }}_{{ .Arch }}"
     formats:
       - tar.gz
     format_overrides:
@@ -183,6 +186,7 @@ release:
 
 changelog:
   # Each release is a one-commit snapshot on a clean linear history, so a
-  # git-log-derived changelog would be meaningless. The published release notes
-  # come from `gh release create --generate-notes` in scripts/publish.sh.
+  # git-log-derived changelog would be meaningless. scripts/publish.sh creates
+  # the release with an empty body (`gh release create --notes ""`), so the
+  # release notes are written by hand on the release page afterwards.
   disable: true

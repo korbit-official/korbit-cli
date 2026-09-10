@@ -23,7 +23,7 @@
 #   GOOS  GOARCH       target platform/arch ({{ .Os }} / {{ .Arch }})
 #   VERSION            release version, semver ({{ .Version }})
 #
-# Output: dist/dgx-cli_<goos>_<goarch>.mcpb (dist/ is inferred from the binary
+# Output: dist/digitalx_<goos>_<goarch>.mcpb (dist/ is inferred from the binary
 # path, matching how GoReleaser lays out its build directories).
 set -euo pipefail
 
@@ -51,7 +51,7 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 
 # dist/ is two levels up from the binary (dist/dgx-cli_<os>_<arch>.../dgx-cli).
 dist="$(cd "$(dirname "$bin")/.." && pwd)"
-out="$dist/dgx-cli_${goos}_${goarch}.mcpb"
+out="$dist/digitalx_${goos}_${goarch}.mcpb"
 
 # Map the Go target to the MCPB platform token and the on-disk binary name.
 # MCPB uses Node's process.platform values: win32 (not "windows").
@@ -93,17 +93,19 @@ for doc in LICENSE NOTICE THIRD_PARTY_LICENSES.txt DISCLAIMER.md DISCLAIMER.ko.m
 	cp "$root/$doc" "$stage/$doc"
 done
 
-# `name` is the extension's INSTALL KEY: an MCPB host keys the installed
-# extension on it, so changing it makes a host treat this bundle as a different
-# extension and install it ALONGSIDE the one already there — two servers, two
-# copies of every tool. It must stay "korbit" for as long as installed bundles
-# carry that key. `display_name` is what the user actually reads, and is free to
-# change.
+# `name` is the extension's INSTALL KEY and `display_name` is what the user
+# reads; both carry the product's name. A host keys the installed extension on
+# `name`, so a host that already holds a bundle under a different key shows this
+# one as a SECOND extension side by side — the two do not merge, and the user
+# removes the one they no longer want by hand. That is the accepted behaviour: a
+# Desktop Extension has no self-update and no migration path, so there is nothing
+# for a stable key to carry forward, and the name a newcomer reads in the
+# extension list matters more than continuity with a key they never see.
 cat >"$stage/manifest.json" <<EOF
 {
   "manifest_version": "0.3",
-  "name": "korbit",
-  "display_name": "Digital X CLI",
+  "name": "digitalx",
+  "display_name": "Digital X",
   "version": "$version",
   "description": "Operate the Digital X cryptocurrency exchange over MCP — every REST endpoint as a tool, with the same validation, signing, journaling, and retries as the CLI.",
   "long_description": "Exposes the Digital X Open API v2 as MCP tools backed by the dgx-cli binary running locally on your machine, so your API keys never leave it. Read market data, manage orders, and check balances; the order-placement tool supports a dry-run that simulates the fill against the live order book before anything is sent. First-time users with no key yet can complete setup entirely in chat via the setup and doctor tools.",

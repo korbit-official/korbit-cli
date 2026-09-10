@@ -32,17 +32,18 @@ func mcpbSource(t *testing.T) string {
 //
 //   - `name` is the extension's install key. An MCPB host keys the installed
 //     extension on it, so a different value installs a SECOND extension next to
-//     the one a user already has — two servers, two copies of every tool. It
-//     stays "korbit" independently of what the product is called.
-//   - `display_name` is the human-readable name, and does follow the product.
+//     one a user already has — two servers, two copies of every tool. Both it and
+//     `display_name` carry the product's name; a Desktop Extension has no
+//     self-update and no migration, so a user with an older bundle removes it by
+//     hand.
 //   - the entry point and command must name the binary the bundle actually
 //     stages, or the host launches nothing.
 //   - the injected env names must be ones the CLI reads.
 func TestMCPBManifestPins(t *testing.T) {
 	src := mcpbSource(t)
 	for _, want := range []string{
-		`"name": "korbit",`,
-		`"display_name": "Digital X CLI",`,
+		`"name": "digitalx",`,
+		`"display_name": "Digital X",`,
 		`binname="dgx-cli"`,
 		`entry_point="server/$binname"`,
 		`command_path='${__dirname}/server/'"$binname"`,

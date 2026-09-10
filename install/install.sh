@@ -51,7 +51,7 @@ if [ "$os" = darwin ] && [ "$arch" = amd64 ]; then
   err "Intel Macs aren't supported — build from source with 'go install github.com/$REPO@latest'"
 fi
 
-asset="dgx-cli_${os}_${arch}.tar.gz"
+asset="digitalx-cli_${os}_${arch}.tar.gz"
 
 # The expected hash for this platform's archive, from the embedded pin block.
 expected=$(printf '%s\n' "$PIN_SHA256" | awk -v a="$asset" '$2==a {print $1}' | head -n1)

@@ -1317,13 +1317,13 @@ func TestInstallUpgradeIsNotARepair(t *testing.T) {
 // ---- helper unit tests ----
 
 func TestParseChecksums(t *testing.T) {
-	data := []byte("aa11  dgx-cli_linux_amd64.tar.gz\nbb22 *dgx-cli_windows_amd64.zip\ncc33  korbit_linux_amd64.tar.gz\n\n")
+	data := []byte("aa11  digitalx-cli_linux_amd64.tar.gz\nbb22 *digitalx-cli_windows_amd64.zip\ncc33  korbit_linux_amd64.tar.gz\n\n")
 	m := parseChecksums(data)
-	if m["dgx-cli_linux_amd64.tar.gz"] != "aa11" {
-		t.Errorf("linux hash = %q", m["dgx-cli_linux_amd64.tar.gz"])
+	if m["digitalx-cli_linux_amd64.tar.gz"] != "aa11" {
+		t.Errorf("linux hash = %q", m["digitalx-cli_linux_amd64.tar.gz"])
 	}
-	if m["dgx-cli_windows_amd64.zip"] != "bb22" { // "*" binary-mode marker stripped
-		t.Errorf("windows hash = %q", m["dgx-cli_windows_amd64.zip"])
+	if m["digitalx-cli_windows_amd64.zip"] != "bb22" { // "*" binary-mode marker stripped
+		t.Errorf("windows hash = %q", m["digitalx-cli_windows_amd64.zip"])
 	}
 	// One checksums.txt covers both archive sets a release publishes.
 	if m["korbit_linux_amd64.tar.gz"] != "cc33" {

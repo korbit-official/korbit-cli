@@ -18,12 +18,18 @@ Every release publishes the **same program twice**, under two names:
 
 | Asset | Binary inside | Who downloads it |
 | --- | --- | --- |
-| `dgx-cli_<os>_<arch>.{tar.gz,zip}` | `dgx-cli` | the installers, and `dgx-cli self update` |
+| `digitalx-cli_<os>_<arch>.{tar.gz,zip}` | `dgx-cli` | the installers, and `dgx-cli self update` |
 | `korbit_<os>_<arch>.{tar.gz,zip}` | `korbit` | an installed `korbit` binary updating itself |
 
-The two are built from the same source with the same flags, ldflags, and target
-matrix — they differ only in the compiled binary's filename (`.goreleaser.yaml`
-carries a second `build` and a second `archives` entry for the legacy set).
+The primary **archive** is named for the product (`digitalx-cli`) while the
+**binary** inside it is `dgx-cli` — the two names are independent, and both
+`assetName()` in `internal/selfupdate/release.go` and the installers build the
+archive name, then extract `dgx-cli` out of it.
+
+The two sets are built from the same source with the same flags, ldflags, and
+target matrix — they differ only in the compiled binary's filename
+(`.goreleaser.yaml` carries a second `build` and a second `archives` entry for
+the legacy set).
 
 The legacy set exists because an already-installed `korbit` asks for a fixed
 asset name and then extracts the archive entry whose basename is exactly
@@ -41,6 +47,12 @@ One `checksums.txt` covers both sets plus the `.mcpb` bundles, so the single
 signature over it authenticates every download. The `.mcpb` Desktop Extensions
 are built from the `dgx-cli` binaries only — an extension is installed fresh
 rather than self-updated, so it needs no legacy name.
+
+> **The `korbit_*` sunset is not decided yet.** The legacy set cannot run
+> forever, but neither a cut-off release count nor a date has been fixed. Fix one
+> — and write it here — **before the first release that publishes both sets**, so
+> the compatibility window has a stated end from its first day rather than an
+> open-ended promise that is awkward to withdraw later.
 
 ## Target matrix
 
@@ -182,7 +194,7 @@ the server with `claude mcp add …` (see the README).
 
 An `.mcpb` is just a ZIP with a `manifest.json` at the root plus the binary under
 `server/`. `scripts/build-mcpb.sh` is a per-target post-build hook (it runs right
-after `macos-sign.sh`) that writes `dist/dgx-cli_<os>_<arch>.mcpb`. We ship **one
+after `macos-sign.sh`) that writes `dist/digitalx_<os>_<arch>.mcpb`. We ship **one
 bundle per platform/arch** — each carries a single binary — rather than one fat
 multi-platform bundle. No Node tooling is required to build them.
 
@@ -234,21 +246,65 @@ Keep `asc-key.json` and the `.p8` out of the repo.
 
 ## Publishing (separate, via `gh`)
 
-### The release repository must already carry the current name
+### Two release repositories, both owned for the whole compatibility window
+
+A release is published to **two** GitHub repositories, and the reason is that a
+GitHub rename redirect is not something a shipped binary may depend on: the
+redirect from a transferred repository's old name lasts only while that name
+stays unclaimed, and claiming it — even by us — ends it. So instead of relying on
+a redirect, both names are held and both are published to.
+
+| Repository | Gets | Read by |
+| --- | --- | --- |
+| `digitalx-official/digitalx-cli` | `digitalx-cli_*` archives, the `.mcpb` bundles, `install.sh`, `install.ps1`, `checksums.txt`, `checksums.txt.sig` | the installers and `dgx-cli self update` |
+| `korbit-official/korbit-cli` | `korbit_*` archives, plus the **same** `checksums.txt` and `checksums.txt.sig` | an already-installed `korbit` binary updating itself |
 
 `DefaultRepo` (`internal/selfupdate/selfupdate.go`) and `REPO` / `$Repo` in both
-installers resolve to **`digitalx-official/digitalx-cli`**. A release built from
-this source is therefore publishable only once the GitHub organisation and
-repository carry that name: publish it earlier and `self update`, `install.sh`,
-and `install.ps1` all resolve a repository that does not exist. Publish the
-release **after** the org/repo rename, and keep the previous org name registered
-so the redirect below cannot be taken over.
+installers resolve to **`digitalx-official/digitalx-cli`**, so a release built
+from this source is publishable only once that organisation and repository exist
+under that name — publish earlier and `self update`, `install.sh` and
+`install.ps1` all resolve a repository that is not there.
 
-Binaries already on users' machines are unaffected either way: they request
-`releases/latest` under the org/repo name compiled into them, and GitHub
-redirects that to the renamed repository. They then download the
-`korbit_<os>_<arch>` asset set, which every release still publishes (see
-[Two archive sets](#two-archive-sets-per-release)).
+A binary already on a user's machine resolves
+`github.com/<old-org>/<old-repo>/releases/latest` under the name compiled into
+it and reads the release tag off the final URL path. That is what the legacy
+repository serves, which is why the release there must exist **under the same
+tag** — and why one `checksums.txt` listing every asset of both sets rides both
+releases: each side looks up its own entry, and the single signature
+authenticates both.
+
+The legacy repository is a plain repository in the kept old organisation, not a
+mirror: it carries no source, only releases. Give it one commit (a README saying
+what it is and where the project lives now) so `gh release create` has a target
+commit to tag.
+
+**Sequence — do these in order.**
+
+1. **Transfer** the repository into the new organisation as
+   `digitalx-official/digitalx-cli`.
+2. **Create** `korbit-official/korbit-cli` in the kept old organisation, with a
+   README commit. Doing this *after* the transfer is what claims the old name
+   deliberately rather than leaving it open.
+3. **Publish** the release, which lands on both (see below).
+
+**Step 2 opens a gap — keep it short.** The transfer takes the repository's
+*entire release history* with it: every existing release, tag and asset ends up
+under `digitalx-official/digitalx-cli`, and the `korbit-official/korbit-cli` you
+then create starts with **none**. So from the moment that repo exists until the
+first publish lands in it:
+
+- an installed `korbit` running `self update` resolves
+  `korbit-official/korbit-cli/releases/latest`, finds no release, and reports
+  `no release found` — a clean, fail-closed error, not a corrupt install, but the
+  user cannot update until step 3;
+- any old pinned URL under the previous org
+  (`…/releases/download/<tag>/korbit_<os>_<arch>.tar.gz`) now resolves to the new
+  empty repository and 404s, because creating the repo replaced the redirect that
+  had been forwarding those.
+
+Neither is recoverable by waiting, so **do step 3 immediately after step 2** —
+have the artifacts built, signed and verified *before* creating the legacy repo,
+so publishing is the only thing left to do.
 
 Building and publishing are separate steps. `make release` **never contacts
 GitHub** — it only builds, signs, and (with `make notarize`) reaches Apple. The
@@ -257,15 +313,30 @@ the same built+signed+notarized `dist/` can go to a staging repo for review and
 then to the public repo without rebuilding.
 
 ```sh
-make publish                              # upload dist/ to the current repo's release
-KORBIT_RELEASE_REPO=<owner>/<name> make publish   # …or to a specific repo
+make publish                                      # primary -> the current repo, legacy -> the default legacy repo
+KORBIT_RELEASE_REPO=<owner>/<name> make publish   # …primary to a specific repo
+KORBIT_LEGACY_RELEASE_REPO='' make publish        # …and skip the legacy upload entirely
 ```
 
 `make publish` requires HEAD to be on the release tag, and `gh` authenticated
-(`gh auth login`, or `GH_TOKEN`/`GITHUB_TOKEN` in CI). It uploads the archives,
-the `.mcpb` Desktop Extensions, the filled `install.sh`/`install.ps1`,
-`checksums.txt`, and its signature (`checksums.txt.sig`);
-re-running re-uploads with `--clobber`.
+(`gh auth login`, or `GH_TOKEN`/`GITHUB_TOKEN` in CI). It creates (or re-uploads
+over, with `--clobber`) the release for that tag on **both** repositories:
+
+- **primary** — `KORBIT_RELEASE_REPO`, defaulting to the repository `gh` detects
+  from the checkout's git remote. Gets the `digitalx-cli_*` archives, the `.mcpb`
+  Desktop Extensions, the filled `install.sh`/`install.ps1`, `checksums.txt` and
+  `checksums.txt.sig`.
+- **legacy** — `KORBIT_LEGACY_RELEASE_REPO`, defaulting to
+  `korbit-official/korbit-cli`. Gets the `korbit_*` archives plus the same
+  `checksums.txt` and `checksums.txt.sig`. Set it to the **empty string** to skip
+  the legacy upload — which is what you want when the primary target is a staging
+  repository, since the legacy repository is public.
+
+(Both maintainer variables keep the `KORBIT_` prefix, as do `KORBIT_RSA_SIGN_KEY`
+and the `KORBIT_SKIP_*` switches: the release environment is renamed in one move
+rather than one variable at a time, so a half-renamed environment never has to be
+reasoned about.)
+
 These filled installers are the release-pinned copies attached to the GitHub
 release; they embed this release's archive checksums, so they must ship in the
 same release as those archives — `make release` fills them from this tag's
@@ -287,9 +358,14 @@ make release                    # build + sign into dist/
 make notarize                   # notarize the signed macOS binaries
 #    …verify dist/ locally…
 
-# 3. Publish — staging repo first for review, then the public repo (same artifacts).
-KORBIT_RELEASE_REPO=<staging-owner>/<repo>      make publish
+# 3. Publish — staging repo first for review (no legacy upload), then the real
+#    pair: the primary repo plus the legacy repo, same artifacts, same tag.
+KORBIT_RELEASE_REPO=<staging-owner>/<repo> KORBIT_LEGACY_RELEASE_REPO='' make publish
 KORBIT_RELEASE_REPO=digitalx-official/digitalx-cli  make publish
 ```
+
+Step 3 assumes both repositories already exist under their current names — see
+[Two release repositories](#two-release-repositories-both-owned-for-the-whole-compatibility-window)
+for the transfer-then-create-then-publish order.
 
 Windows binaries are shipped unsigned (Authenticode signing is not configured).

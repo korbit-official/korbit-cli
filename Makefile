@@ -47,7 +47,7 @@ release-unsigned: ## Real release build with signing disabled (test without a ce
 notarize: ## Notarize the signed macOS binaries in dist/ (real releases only)
 	./scripts/macos-notarize.sh dist
 
-publish: ## Upload built dist/ artifacts to a GitHub Release (gh; KORBIT_RELEASE_REPO to override)
+publish: ## Upload built dist/ artifacts to the primary + legacy GitHub Releases (gh; KORBIT_RELEASE_REPO / KORBIT_LEGACY_RELEASE_REPO to override)
 	./scripts/publish.sh dist
 
 clean: ## Remove build artifacts

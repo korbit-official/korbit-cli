@@ -24,9 +24,10 @@ import (
 const maxArchiveBytes = 256 << 20 // 256 MiB
 
 // assetName is the release archive filename for this platform, matching the
-// GoReleaser archive name_template (dgx-cli_{{.Os}}_{{.Arch}}) and the per-OS
-// format override (tar.gz everywhere, zip on Windows). A release also carries a
-// second, identically built archive set named korbit_<os>_<arch>, whose inner
+// GoReleaser archive name_template (digitalx-cli_{{.Os}}_{{.Arch}}) and the
+// per-OS format override (tar.gz everywhere, zip on Windows). The archive is
+// named for the product; the binary inside it is dgx-cli. A release also carries
+// a second, identically built archive set named korbit_<os>_<arch>, whose inner
 // binary is named korbit — that set exists only for updaters that extract by
 // that basename, and is never what this code asks for. Keep in sync with
 // .goreleaser.yaml.
@@ -35,7 +36,7 @@ func (c Config) assetName() string {
 	if c.os() == "windows" {
 		ext = "zip"
 	}
-	return fmt.Sprintf("dgx-cli_%s_%s.%s", c.os(), c.arch(), ext)
+	return fmt.Sprintf("digitalx-cli_%s_%s.%s", c.os(), c.arch(), ext)
 }
 
 // downloadURL is the release asset URL for a tag and this platform's archive.

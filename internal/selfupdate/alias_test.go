@@ -90,11 +90,11 @@ func TestLayoutNames(t *testing.T) {
 // code must never request it.
 func TestAssetNameIsPrimary(t *testing.T) {
 	c := Config{GOOS: "linux", GOARCH: "arm64"}
-	if got := c.assetName(); got != "dgx-cli_linux_arm64.tar.gz" {
+	if got := c.assetName(); got != "digitalx-cli_linux_arm64.tar.gz" {
 		t.Errorf("assetName = %q", got)
 	}
 	c = Config{GOOS: "windows", GOARCH: "amd64"}
-	if got := c.assetName(); got != "dgx-cli_windows_amd64.zip" {
+	if got := c.assetName(); got != "digitalx-cli_windows_amd64.zip" {
 		t.Errorf("assetName = %q", got)
 	}
 }

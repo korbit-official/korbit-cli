@@ -52,7 +52,7 @@ $PIN_SHA256 = @'
     'ARM64' { $arch = 'arm64' }
     default { Die "unsupported architecture: $($env:PROCESSOR_ARCHITECTURE)" }
   }
-  $asset = "dgx-cli_windows_$arch.zip"
+  $asset = "digitalx-cli_windows_$arch.zip"
 
   # Expected hash for this platform's archive, from the embedded pin block.
   $expected = $null
