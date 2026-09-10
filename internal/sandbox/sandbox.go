@@ -327,8 +327,8 @@ func parsePidfile(path string) (Pidfile, error) {
 //     home elsewhere or be reached from the LAN. Not port-scoped because the
 //     collision fallback binds an OS-assigned ephemeral port (--port 0). The
 //     alias hosts are what a pre-1.4.0 bundle reaches for (a bundle pinned via
-//     the URL override and started with --skip-version-check); drop that grant
-//     once no pre-1.4.0 bundle is in use.
+//     the URL override and started with --skip-version-check); the grant stays
+//     until those hosts are retired.
 //   - --allow-env: only the bundle's own config knobs — both the
 //     DIGITALX_SANDBOX_* namespace and the KORBIT_SANDBOX_* one it also reads
 //     (prefix wildcards, so they never drift from the bundle's config) — plus
