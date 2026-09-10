@@ -13,9 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/jqfilter"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/jqfilter"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
 )
 
 // These exercise the sinks in isolation — no WebSocket session, no goja — which

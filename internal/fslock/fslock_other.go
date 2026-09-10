@@ -10,7 +10,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/korbit-official/korbit-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
 )
 
 // This CLI targets linux, darwin, and windows — all covered by the unix and

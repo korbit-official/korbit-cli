@@ -10,7 +10,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"github.com/korbit-official/korbit-cli/internal/i18n"
+	"github.com/digitalx-official/digitalx-cli/internal/i18n"
 )
 
 // A Korean-language session must lay out inside the same terminal budget as

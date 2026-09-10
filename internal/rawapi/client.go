@@ -10,8 +10,8 @@ import (
 	"log/slog"
 	"strconv"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
 )
 
 // Doer is the minimal wire surface the typed layer drives: one logical call

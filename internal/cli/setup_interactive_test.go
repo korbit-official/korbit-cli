@@ -12,10 +12,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/cli"
-	"github.com/korbit-official/korbit-cli/internal/cli/setupui"
-	"github.com/korbit-official/korbit-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/cli"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/setupui"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
 )
 
 // skewThenOKDoer returns EXCEED_TIME_WINDOW on the first whoami and 200 after,

@@ -16,12 +16,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/cli"
-	"github.com/korbit-official/korbit-cli/internal/journal"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/stream"
-	"github.com/korbit-official/korbit-cli/internal/tui"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/cli"
+	"github.com/digitalx-official/digitalx-cli/internal/journal"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/tui"
 )
 
 // runTUICLI is runCLI plus the WebSocket dial and TUI runner seams.

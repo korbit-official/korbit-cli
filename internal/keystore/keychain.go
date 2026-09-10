@@ -10,8 +10,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/korbit-official/korbit-cli/internal/logging"
-	"github.com/korbit-official/korbit-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
 )
 
 // keychainService is the service name under which every key's secret is stored

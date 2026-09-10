@@ -17,15 +17,15 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/agentskill"
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/callrec"
-	"github.com/korbit-official/korbit-cli/internal/clock"
-	"github.com/korbit-official/korbit-cli/internal/journal"
-	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/progname"
-	"github.com/korbit-official/korbit-cli/internal/version"
+	"github.com/digitalx-official/digitalx-cli/internal/agentskill"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/callrec"
+	"github.com/digitalx-official/digitalx-cli/internal/clock"
+	"github.com/digitalx-official/digitalx-cli/internal/journal"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/version"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
 )
@@ -1090,7 +1090,7 @@ func TestMCPHandshakeServerName(t *testing.T) {
 
 	// Prove it does not follow the running program's name.
 	prev := progname.Name()
-	progname.Set("korbit-cli")
+	progname.Set("digitalx-cli")
 	t.Cleanup(func() { progname.Set(prev) })
 
 	server := srv.build(false, false)

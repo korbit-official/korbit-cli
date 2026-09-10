@@ -18,13 +18,13 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
-	"github.com/korbit-official/korbit-cli/internal/config"
-	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/keystore"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/progname"
-	"github.com/korbit-official/korbit-cli/internal/spec"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/clienv"
+	"github.com/digitalx-official/digitalx-cli/internal/config"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/keystore"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/spec"
 	"github.com/spf13/cobra"
 )
 
@@ -181,7 +181,7 @@ func runKeystoreMigrate(cx *clienv.Cmd, home string, cfg config.Config, cmd *cob
 				// forward-version key must never brick the batch); when the user named
 				// it explicitly, fail loudly for that key.
 				if !all {
-					return output.Configf("key %q is stored in the %q keystore, which this build does not support — migrate it with a newer korbit-cli", n, backend)
+					return output.Configf("key %q is stored in the %q keystore, which this build does not support — migrate it with a newer digitalx-cli", n, backend)
 				}
 				src = nil
 			} else if backend != target && keystore.Available(backend, cx.Log) != nil {
@@ -197,7 +197,7 @@ func runKeystoreMigrate(cx *clienv.Cmd, home string, cfg config.Config, cmd *cob
 		items = append(items, keystore.MigrateItem{Name: n, Source: src, SourceUnavailable: unavailable[backend]})
 	}
 	if len(skippedUnknown) > 0 {
-		warnings = append(warnings, fmt.Sprintf("skipped %d key(s) stored in a keystore this build does not support — migrate them with a newer korbit-cli: %s",
+		warnings = append(warnings, fmt.Sprintf("skipped %d key(s) stored in a keystore this build does not support — migrate them with a newer digitalx-cli: %s",
 			len(skippedUnknown), strings.Join(skippedUnknown, ", ")))
 	}
 

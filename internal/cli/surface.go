@@ -7,9 +7,9 @@ package cli
 import (
 	"strings"
 
-	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
-	"github.com/korbit-official/korbit-cli/internal/ops"
-	"github.com/korbit-official/korbit-cli/internal/spec"
+	"github.com/digitalx-official/digitalx-cli/internal/cmdmeta"
+	"github.com/digitalx-official/digitalx-cli/internal/ops"
+	"github.com/digitalx-official/digitalx-cli/internal/spec"
 )
 
 // surfaceCmd is the unified view of one command the cobra tree, help, and the

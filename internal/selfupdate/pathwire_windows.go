@@ -14,7 +14,7 @@ import (
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 
-	"github.com/korbit-official/korbit-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
 )
 
 // unsafeToRewrite has no unix ownership/hard-link semantics to check on Windows,

@@ -11,8 +11,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/logging"
-	"github.com/korbit-official/korbit-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
 )
 
 // errNoCreds is returned by Do for a signed call on a public-only client.
@@ -49,7 +49,7 @@ type Clock interface {
 	ServerNowMs() int64
 }
 
-// Client is the single front door for calling Korbit: the L1 transport that
+// Client is the single front door for calling Digital X: the L1 transport that
 // signs REST calls and the WebSocket upgrade (SignHandshake), runs exactly the
 // retry Policy it is HANDED (the zero Policy is a single shot), owns its clock
 // (read via Clock, resync via Resync), and records each call through a per-call
@@ -62,7 +62,7 @@ type Clock interface {
 // a fresh per-call Recorder for every Do, so a shared Client has no shared
 // mutable recording state.
 type Client struct {
-	// BaseURL is the API host (e.g. https://api.korbit.co.kr). Required.
+	// BaseURL is the API host (e.g. https://api.digitalx.miraeasset.com). Required.
 	BaseURL string
 	// Doer performs the HTTP request; nil uses http.DefaultClient.
 	Doer Doer
@@ -70,7 +70,7 @@ type Client struct {
 	// fails fast).
 	Creds *Credentials
 	// UserAgent overrides the User-Agent header; "" keeps the default
-	// ("korbit-cli/<version>"). Composing it is the caller's job (see Options.UserAgent).
+	// ("digitalx-cli/<version>"). Composing it is the caller's job (see Options.UserAgent).
 	UserAgent string
 	// Clock is the shared server-clock estimate this client signs against; nil =
 	// sign with the local wall clock. Wire it to one clock.State (via

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/version"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/version"
 )
 
 // selfEnv points HOME/DIGITALX_CLI_HOME at a temp dir with the binary dir absent

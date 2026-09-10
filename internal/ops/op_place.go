@@ -13,10 +13,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/ids"
-	"github.com/korbit-official/korbit-cli/internal/progname"
-	"github.com/korbit-official/korbit-cli/internal/rawapi"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/ids"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/rawapi"
 )
 
 // order place — the reconcile protocol over the typed rawapi layer.
@@ -265,7 +265,7 @@ func (op placeOp) runReconcile(ctx context.Context, a *API, h OpHandle, args pla
 		}
 		log.Debug("order place: retry loop hit its hard iteration ceiling — treating placement as UNKNOWN",
 			"clientOrderId", clientOrderID, "sends", sends)
-		fmt.Fprintf(a.stderr(), "korbit-cli: order place: retry loop reached its hard iteration ceiling — treating the placement as UNKNOWN\n")
+		fmt.Fprintf(a.stderr(), "%s: order place: retry loop reached its hard iteration ceiling — treating the placement as UNKNOWN\n", progname.Name())
 		return a.reconcileUnknownTyped(ctx, h, symbol, clientOrderID, accountSeq, lastErr, finish, sends)
 	}
 
@@ -293,7 +293,7 @@ func (op placeOp) runReconcile(ctx context.Context, a *API, h OpHandle, args pla
 		finish("accepted", "", "", sends)
 		res.JournalErr = h.Finish(outcomeOK, "DUPLICATE_CLIENT_ORDER_ID")
 		res.Note = fmt.Sprintf("clientOrderId %s already has an order on the server (DUPLICATE_CLIENT_ORDER_ID) but it %s — the order IS placed; do NOT re-place, fetch it with `%s order get --symbol %s --client-order-id %s`", clientOrderID, detail, progname.Name(), symbol, clientOrderID)
-		fmt.Fprintf(a.stderr(), "korbit-cli: order place: %s\n", res.Note)
+		fmt.Fprintf(a.stderr(), "%s: order place: %s\n", progname.Name(), res.Note)
 		return res, fmt.Errorf("%s: %w", res.Note, dupErr)
 	}
 	orderID := jsonNumberField(placedData, "orderId")
@@ -314,7 +314,7 @@ func (op placeOp) runReconcile(ctx context.Context, a *API, h OpHandle, args pla
 		orderRef = "clientOrderId " + clientOrderID
 	}
 	res.Note = fmt.Sprintf("the order was placed (%s) but the full order %s — this is the placement acknowledgement, not the full order with fill state; fetch it with `%s order get --symbol %s --client-order-id %s`", orderRef, detail, progname.Name(), symbol, clientOrderID)
-	fmt.Fprintf(a.stderr(), "korbit-cli: order place: %s\n", res.Note)
+	fmt.Fprintf(a.stderr(), "%s: order place: %s\n", progname.Name(), res.Note)
 	return res, nil
 }
 

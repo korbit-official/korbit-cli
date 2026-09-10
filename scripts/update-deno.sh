@@ -4,7 +4,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
-# update-deno.sh — re-pin the managed Deno runtime that korbit-cli downloads for
+# update-deno.sh — re-pin the managed Deno runtime that digitalx-cli downloads for
 # the sandbox. Regenerates internal/sandbox/deno_pinned.go with the chosen Deno
 # release version and the SHA-256 of each platform's release zip.
 #
@@ -15,11 +15,11 @@
 # Requires: gh (authenticated GitHub CLI). Run from anywhere inside the repo.
 #
 # The checksums come from the GitHub release assets' own `digest` field, so the
-# pin is verifiable: korbit-cli refuses a downloaded Deno whose SHA-256 does not
+# pin is verifiable: digitalx-cli refuses a downloaded Deno whose SHA-256 does not
 # match the value written here.
 set -euo pipefail
 
-# Deno release target triple -> Go "<GOOS>/<GOARCH>" (every platform korbit-cli
+# Deno release target triple -> Go "<GOOS>/<GOARCH>" (every platform digitalx-cli
 # may run on; Deno publishes glibc-only Linux, so musl/Alpine has no managed Deno).
 TARGETS=(
 	"aarch64-apple-darwin:darwin/arm64"
@@ -64,7 +64,7 @@ tmp="$(mktemp)"
 	echo
 	echo "package deno"
 	echo
-	echo "// Version is the pinned Deno release korbit-cli downloads as the managed"
+	echo "// Version is the pinned Deno release digitalx-cli downloads as the managed"
 	echo "// sandbox runtime. Bump it by re-running scripts/update-deno.sh."
 	echo "const Version = \"$VERSION\""
 	echo

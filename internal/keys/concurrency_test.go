@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/keystore"
+	"github.com/digitalx-official/digitalx-cli/internal/keystore"
 )
 
 // fileManager builds a Manager over the REAL file vault rooted at home — not the

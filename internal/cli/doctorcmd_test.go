@@ -13,12 +13,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/cli"
-	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/keystore"
-	"github.com/korbit-official/korbit-cli/internal/progname"
-	"github.com/korbit-official/korbit-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/cli"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/keystore"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
 )
 
 // runWithDeps runs the CLI with both a stub Doer and a stub IP prober — doctor
@@ -333,7 +333,7 @@ func TestDoctorIPAllowlistNeitherFamilyAccepted(t *testing.T) {
 	if !strings.Contains(out, "your IPv4/IPv6 connection is not allowlisted") {
 		t.Fatalf("expected a neither-family-allowlisted diagnosis: %s", out)
 	}
-	if !strings.Contains(out, "developers.korbit.co.kr") || !strings.Contains(out, "203.0.113.7") || !strings.Contains(out, "2001:db8::/64") {
+	if !strings.Contains(out, "developers.digitalx.miraeasset.com") || !strings.Contains(out, "203.0.113.7") || !strings.Contains(out, "2001:db8::/64") {
 		t.Fatalf("expected portal guidance with the IP entries to add: %s", out)
 	}
 }
@@ -596,7 +596,7 @@ func TestSetupResumesUnboundKey(t *testing.T) {
 	if !strings.Contains(out, `"status":"awaitingRegistration"`) {
 		t.Fatalf("expected awaitingRegistration status: %s", out)
 	}
-	if !strings.Contains(out, "developers.korbit.co.kr/manage/create") {
+	if !strings.Contains(out, "developers.digitalx.miraeasset.com/manage/create") {
 		t.Fatalf("resume must re-print the registration link: %s", out)
 	}
 }
@@ -892,7 +892,7 @@ func TestDoctorChecksWebSocket(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("healthy doctor with reachable WS must exit 0, got %d — %s", code, out)
 		}
-		if !strings.Contains(out, `"wsBaseUrl":"wss://ws-api.korbit.co.kr"`) {
+		if !strings.Contains(out, `"wsBaseUrl":"wss://ws-api.digitalx.miraeasset.com"`) {
 			t.Fatalf("report must carry the resolved WS base URL: %s", out)
 		}
 		if !strings.Contains(out, `"name":"websocket","status":"ok"`) {
@@ -938,10 +938,10 @@ func TestDoctorHumanHeaderShowsEndpoints(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit=%d out=%s", code, out)
 	}
-	if !strings.Contains(out, "endpoint: https://api.korbit.co.kr") {
+	if !strings.Contains(out, "endpoint: https://api.digitalx.miraeasset.com") {
 		t.Fatalf("human header must show the REST endpoint: %s", out)
 	}
-	if !strings.Contains(out, "ws: wss://ws-api.korbit.co.kr") {
+	if !strings.Contains(out, "ws: wss://ws-api.digitalx.miraeasset.com") {
 		t.Fatalf("human header must show the WS host: %s", out)
 	}
 	// An OK check's guidance is labeled "note", never "fix".

@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/korbit-official/korbit-cli/internal/cli/probe"
-	"github.com/korbit-official/korbit-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/probe"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
 )
 
 // formatEndpointVerification renders the smoke-test result as a stderr note. When

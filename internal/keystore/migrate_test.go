@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/keystore"
-	"github.com/korbit-official/korbit-cli/internal/keystore/keystoretest"
+	"github.com/digitalx-official/digitalx-cli/internal/keystore"
+	"github.com/digitalx-official/digitalx-cli/internal/keystore/keystoretest"
 )
 
 // recCommit returns a commit func that records the names it was called with.

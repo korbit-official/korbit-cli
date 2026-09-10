@@ -11,7 +11,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/korbit-official/korbit-cli/internal/fslock"
+	"github.com/digitalx-official/digitalx-cli/internal/fslock"
 	"github.com/minio/selfupdate"
 )
 

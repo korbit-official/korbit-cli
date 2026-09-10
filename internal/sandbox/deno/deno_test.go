@@ -331,7 +331,7 @@ func TestHasModuleCacheIsPerSource(t *testing.T) {
 }
 
 // TestPinnedChecksumsCoverEveryTarget asserts the generated checksums map has an
-// entry for every platform korbit-cli maps a Deno target for, so a version bump
+// entry for every platform digitalx-cli maps a Deno target for, so a version bump
 // (scripts/update-deno.sh) can't silently drop a platform and leave it
 // unverifiable at runtime.
 func TestPinnedChecksumsCoverEveryTarget(t *testing.T) {

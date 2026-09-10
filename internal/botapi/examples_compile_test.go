@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/spec"
+	"github.com/digitalx-official/digitalx-cli/internal/spec"
 )
 
 // TestMonitorExamplesCompile guards the monitor command's documented examples:

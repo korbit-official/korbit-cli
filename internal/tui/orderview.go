@@ -10,10 +10,10 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/lipgloss/v2"
 
-	"github.com/korbit-official/korbit-cli/internal/i18n"
-	"github.com/korbit-official/korbit-cli/internal/ops"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/keystrip"
-	"github.com/korbit-official/korbit-cli/internal/tui/uikit"
+	"github.com/digitalx-official/digitalx-cli/internal/i18n"
+	"github.com/digitalx-official/digitalx-cli/internal/ops"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/keystrip"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/uikit"
 )
 
 // The order panel's rendering: the form / confirm / busy views as shared

@@ -1,4 +1,4 @@
-module github.com/korbit-official/korbit-cli
+module github.com/digitalx-official/digitalx-cli
 
 go 1.26.4
 

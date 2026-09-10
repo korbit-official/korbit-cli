@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/selfupdate"
+	"github.com/digitalx-official/digitalx-cli/internal/selfupdate"
 )
 
 // TestSuggestSkillRefresh pins that the follow-up carries everything a stdout /

@@ -22,31 +22,31 @@ import (
 	"strings"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/cli/agentskillcmd"
-	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
-	"github.com/korbit-official/korbit-cli/internal/cli/doctorcmd"
-	"github.com/korbit-official/korbit-cli/internal/cli/keymgmtcmd"
-	"github.com/korbit-official/korbit-cli/internal/cli/monitorcmd"
-	"github.com/korbit-official/korbit-cli/internal/cli/probe"
-	"github.com/korbit-official/korbit-cli/internal/cli/sandboxcmd"
-	"github.com/korbit-official/korbit-cli/internal/cli/selfcmd"
-	"github.com/korbit-official/korbit-cli/internal/cli/setupui"
-	"github.com/korbit-official/korbit-cli/internal/cli/tuicmd"
-	"github.com/korbit-official/korbit-cli/internal/clock"
-	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
-	"github.com/korbit-official/korbit-cli/internal/config"
-	"github.com/korbit-official/korbit-cli/internal/envalias"
-	"github.com/korbit-official/korbit-cli/internal/i18n"
-	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/logging"
-	"github.com/korbit-official/korbit-cli/internal/netbind"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/progname"
-	"github.com/korbit-official/korbit-cli/internal/spec"
-	"github.com/korbit-official/korbit-cli/internal/stream"
-	"github.com/korbit-official/korbit-cli/internal/tui"
-	"github.com/korbit-official/korbit-cli/internal/version"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/agentskillcmd"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/clienv"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/doctorcmd"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/keymgmtcmd"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/monitorcmd"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/probe"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/sandboxcmd"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/selfcmd"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/setupui"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/tuicmd"
+	"github.com/digitalx-official/digitalx-cli/internal/clock"
+	"github.com/digitalx-official/digitalx-cli/internal/cmdmeta"
+	"github.com/digitalx-official/digitalx-cli/internal/config"
+	"github.com/digitalx-official/digitalx-cli/internal/envalias"
+	"github.com/digitalx-official/digitalx-cli/internal/i18n"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/netbind"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/spec"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/tui"
+	"github.com/digitalx-official/digitalx-cli/internal/version"
 
 	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
@@ -258,7 +258,7 @@ func (rt *runtime) logFormatSetting() string {
 // logStyle resolves the operational logger's presentation (see logging.Style):
 // --log-format json selects JSON for every sink; otherwise text, timestamped
 // (and untagged) only when logs are diverted to a file, where a wall-clock
-// anchor is wanted and the terminal-scoped "korbit-cli:" tag is not. setupLogging
+// anchor is wanted and the terminal-scoped "dgx-cli:" tag is not. setupLogging
 // validates the format word up front, so an unrecognized value here falls back
 // to text.
 func (rt *runtime) logStyle() logging.Style {
@@ -485,7 +485,7 @@ func Execute(args []string, d Deps) int {
 func buildTree(rt *runtime) *cobra.Command {
 	root := &cobra.Command{
 		Use:           progname.Name(),
-		Short:         "Korbit Open API v2 CLI",
+		Short:         "Digital X Open API v2 CLI",
 		Version:       version.Version,
 		SilenceErrors: true,
 		SilenceUsage:  true,

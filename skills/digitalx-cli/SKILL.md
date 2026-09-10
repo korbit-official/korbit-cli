@@ -30,7 +30,7 @@ apply identically to both** — only the call syntax differs.
   `doctor`, `logs`, `sandbox`, and `monitor`. If the `dgx-cli` command isn't found, the one-line
   installer places the binary at `~/.local/bin/dgx-cli` (macOS/Linux) or
   `%LOCALAPPDATA%\bin\dgx-cli.exe` (Windows) — invoke it by that full path, or add the directory to
-  PATH. (`go install` instead produces a binary named `korbit-cli`.)
+  PATH. (`go install` instead produces a binary named `digitalx-cli`.)
 - **MCP tools:** if a `digitalx-cli` MCP server is connected, each REST command is a tool. `dgx-cli order
   place --symbol btc_krw --side buy …` ≡ calling the **`order_place`** tool with `{"symbol":
   "btc_krw", "side": "buy", …}`. Tool argument names are the long flag names without `--`; money
@@ -56,8 +56,8 @@ instructions. Public reads and account-independent commands (`logs`, `debug bund
 waiting for a price, live-watching orders/fills/balances, alerting, capture), no `sandbox`, `logs`, or
 full key management (only `setup`/`doctor`/`list_keys`) — and some hosts refuse money-moving actions
 outright. When the user needs one of those and you have no shell, don't just say you can't: tell them to
-install the CLI (`curl -fsSL https://docs.korbit.co.kr/install.sh | sh`; Windows `irm
-https://docs.korbit.co.kr/install.ps1 | iex`) and drive `dgx-cli` from **Claude Code** — everything works there.
+install the CLI (`curl -fsSL https://docs.digitalx.miraeasset.com/install.sh | sh`; Windows `irm
+https://docs.digitalx.miraeasset.com/install.ps1 | iex`) and drive `dgx-cli` from **Claude Code** — everything works there.
 
 Examples below are written in CLI form. Translate to a tool call when you're on MCP.
 
@@ -313,7 +313,7 @@ playbook.
 
 This tool is for **research, monitoring/alerting, and simple automated trading** driven by an agent.
 For a large, long-lived, full-featured custom trading bot, the better path is to build directly
-against the Digital X Open API using the LLM docs at **https://docs.korbit.co.kr/llms.txt** (and
+against the Digital X Open API using the LLM docs at **https://docs.digitalx.miraeasset.com/llms.txt** (and
 `llms-full.txt`) — that bundle is self-sufficient for implementing your own signed client. If you ever
 need the tool's source as a reference (last resort), it's open source at
-**https://github.com/korbit-official/korbit-cli**; prefer `dgx-cli commands --json` and `--help` first.
+**https://github.com/digitalx-official/digitalx-cli**; prefer `dgx-cli commands --json` and `--help` first.

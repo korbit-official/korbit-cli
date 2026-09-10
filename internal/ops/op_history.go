@@ -10,8 +10,9 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/rawapi"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/rawapi"
 )
 
 // order history / fills — the cursorless window walk over the typed layer.
@@ -140,7 +141,7 @@ func (op historyOp) Run(ctx context.Context, a *API, in RunInput) (Result, error
 	if !complete && !gotEnough {
 		res.Truncated = true
 		res.Note = fmt.Sprintf("api.%s: the requested window was too large to fully cover — the result is incomplete; narrow startTime/endTime or set --limit", opJSKeyName(op.meta))
-		fmt.Fprintf(a.stderr(), "korbit-cli: %s\n", res.Note)
+		fmt.Fprintf(a.stderr(), "%s: %s\n", progname.Name(), res.Note)
 	}
 	res.JournalErr = finishOK(a, h)
 	return res, nil

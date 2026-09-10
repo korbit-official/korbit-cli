@@ -18,9 +18,9 @@ import (
 // is never mistaken for production.
 func (r Report) FormatText(w io.Writer) {
 	if r.OK {
-		fmt.Fprint(w, "Korbit CLI doctor: healthy")
+		fmt.Fprint(w, "Digital X CLI doctor: healthy")
 	} else {
-		fmt.Fprint(w, "Korbit CLI doctor: problems found")
+		fmt.Fprint(w, "Digital X CLI doctor: problems found")
 	}
 	if r.Key != "" {
 		fmt.Fprint(w, " (key "+strconv.Quote(r.Key)+")")

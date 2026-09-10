@@ -22,29 +22,29 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/agentskill"
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/callrec"
-	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
-	"github.com/korbit-official/korbit-cli/internal/cli/doctorcmd"
-	"github.com/korbit-official/korbit-cli/internal/cli/keymgmtcmd"
-	"github.com/korbit-official/korbit-cli/internal/cli/probe"
-	"github.com/korbit-official/korbit-cli/internal/cli/textout"
-	"github.com/korbit-official/korbit-cli/internal/clock"
-	"github.com/korbit-official/korbit-cli/internal/config"
-	"github.com/korbit-official/korbit-cli/internal/envalias"
-	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/ops"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/progname"
-	"github.com/korbit-official/korbit-cli/internal/rawapi"
-	"github.com/korbit-official/korbit-cli/internal/version"
+	"github.com/digitalx-official/digitalx-cli/internal/agentskill"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/callrec"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/clienv"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/doctorcmd"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/keymgmtcmd"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/probe"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/textout"
+	"github.com/digitalx-official/digitalx-cli/internal/clock"
+	"github.com/digitalx-official/digitalx-cli/internal/config"
+	"github.com/digitalx-official/digitalx-cli/internal/envalias"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/ops"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/rawapi"
+	"github.com/digitalx-official/digitalx-cli/internal/version"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
 )
 
 // The mcp command runs a Model Context Protocol stdio server exposing the
-// Korbit API as tools. Like monitor, it is a long-running command and breaks
+// Digital X API as tools. Like monitor, it is a long-running command and breaks
 // the "one JSON document on stdout" rule — here stdout carries ONLY the
 // JSON-RPC protocol, and all diagnostics go to stderr (a stray stdout write
 // would corrupt the protocol stream). Stopping deliberately (client disconnect,
@@ -441,7 +441,7 @@ func (s *mcpServer) build(readOnly, multiKey bool) *mcp.Server {
 
 	server.AddTool(&mcp.Tool{
 		Name:        "list_keys",
-		Description: "List the locally configured Korbit API keys (name, type, keystore backend, bound api-key id, per-key base URL, default flag, and whether this server signs with each). Read-only; returns no secrets and does not call the Korbit API. Use the whoami tool for the live account behind the signing key.",
+		Description: "List the locally configured Digital X API keys (name, type, keystore backend, bound api-key id, per-key base URL, default flag, and whether this server signs with each). Read-only; returns no secrets and does not call the Digital X API. Use the whoami tool for the live account behind the signing key.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{},"additionalProperties":false}`),
 		Annotations: &mcp.ToolAnnotations{Title: "List configured keys", ReadOnlyHint: true},
 	}, s.makeListKeysHandler())
@@ -469,7 +469,7 @@ func (s *mcpServer) build(readOnly, multiKey bool) *mcp.Server {
 		Name:        guideName,
 		Description: guideDesc(guideTopics),
 		InputSchema: guideSchema(guideTopics),
-		Annotations: &mcp.ToolAnnotations{Title: "Korbit workflow guide", ReadOnlyHint: true},
+		Annotations: &mcp.ToolAnnotations{Title: "Digital X workflow guide", ReadOnlyHint: true},
 	}, guideHandler)
 	count++
 
@@ -477,7 +477,7 @@ func (s *mcpServer) build(readOnly, multiKey bool) *mcp.Server {
 		Name:        legacyGuideName,
 		Description: legacyGuideDesc(guideTopics),
 		InputSchema: guideSchema(guideTopics),
-		Annotations: &mcp.ToolAnnotations{Title: "Korbit workflow guide (deprecated alias)", ReadOnlyHint: true},
+		Annotations: &mcp.ToolAnnotations{Title: "Digital X workflow guide (deprecated alias)", ReadOnlyHint: true},
 	}, guideHandler)
 	count++
 
@@ -491,9 +491,9 @@ func (s *mcpServer) build(readOnly, multiKey bool) *mcp.Server {
 	// is a pure read.
 	server.AddTool(&mcp.Tool{
 		Name:        "setup",
-		Description: withProg("Set up a Korbit API key for this machine without leaving chat: generates a local ED25519 keypair (private key stays in the keystore) and returns a `registrationLink` to open in a browser — the human reviews the prefilled permissions + IP allowlist and confirms with MFA, then pastes back the issued key id. Call this tool again with that id as `apiKey` to bind it and run a complementary read-only `doctor` health check in one step. Re-running is always safe (resumes an unregistered key, binds an unbound one, or reports it's already configured); if a credential is already supplied inline via the environment, it reports that instead of creating a key. Optional `name` (default \"default\") and `withTransfers` (also request deposit/withdrawal write permissions); pass `apiKey` only once the public key is registered."),
+		Description: withProg("Set up a Digital X API key for this machine without leaving chat: generates a local ED25519 keypair (private key stays in the keystore) and returns a `registrationLink` to open in a browser — the human reviews the prefilled permissions + IP allowlist and confirms with MFA, then pastes back the issued key id. Call this tool again with that id as `apiKey` to bind it and run a complementary read-only `doctor` health check in one step. Re-running is always safe (resumes an unregistered key, binds an unbound one, or reports it's already configured); if a credential is already supplied inline via the environment, it reports that instead of creating a key. Optional `name` (default \"default\") and `withTransfers` (also request deposit/withdrawal write permissions); pass `apiKey` only once the public key is registered."),
 		InputSchema: json.RawMessage(`{"type":"object","properties":{"name":{"type":"string","description":"key name (default \"default\")"},"apiKey":{"type":"string","description":"the API key id issued by the developers portal — pass it (after the public key is registered) to bind the key in one step"},"withTransfers":{"type":"boolean","description":"also request deposit/withdrawal write permissions in the registration link"}},"additionalProperties":false}`),
-		Annotations: &mcp.ToolAnnotations{Title: "Set up a Korbit API key", IdempotentHint: true, DestructiveHint: new(bool)},
+		Annotations: &mcp.ToolAnnotations{Title: "Set up a Digital X API key", IdempotentHint: true, DestructiveHint: new(bool)},
 	}, s.makeSetupHandler())
 	count++
 
@@ -1015,22 +1015,22 @@ func toolDataResultValue(v any) (*mcp.CallToolResult, error) {
 // irm|iex on Windows, the curl|sh one-liner everywhere else.
 func installOneLiner() string {
 	if goruntime.GOOS == "windows" {
-		return "`irm https://docs.korbit.co.kr/install.ps1 | iex`"
+		return "`irm https://docs.digitalx.miraeasset.com/install.ps1 | iex`"
 	}
-	return "`curl -fsSL https://docs.korbit.co.kr/install.sh | sh`"
+	return "`curl -fsSL https://docs.digitalx.miraeasset.com/install.sh | sh`"
 }
 
 // mcpInstructions is the server-level guidance the host shows the model: what
 // this server is, which key it signs with, and the load-bearing safety rules.
 func mcpInstructions(launchKey string, multiKey, readOnly bool) string {
 	var b strings.Builder
-	b.WriteString("Korbit cryptocurrency exchange via the " + mcpServerName + " MCP server. ")
-	b.WriteString("Each tool maps to a Korbit Open API v2 endpoint; arguments are keyed on the wire parameter names. ")
+	b.WriteString("Digital X cryptocurrency exchange via the " + mcpServerName + " MCP server. ")
+	b.WriteString("Each tool maps to a Digital X Open API v2 endpoint; arguments are keyed on the wire parameter names. ")
 	b.WriteString(fmt.Sprintf("Authenticated tools sign with the key %q. ", launchKey))
 	if multiKey {
 		b.WriteString("This server is in --multi-key mode: pass an optional `key` (a configured key name; see list_keys) to sign a call with a different account. ")
 	} else {
-		b.WriteString("This server signs with a single key; to use another Korbit account, the operator must run a separate MCP server. ")
+		b.WriteString("This server signs with a single key; to use another Digital X account, the operator must run a separate MCP server. ")
 	}
 	if readOnly {
 		b.WriteString("This server is read-only: only market-data and account-read tools are exposed. ")

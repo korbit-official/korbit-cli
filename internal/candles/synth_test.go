@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
 )
 
 // fakeClock is an adjustable server/local clock for the synth.

@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/korbit-official/korbit-cli/internal/fslock"
+	"github.com/digitalx-official/digitalx-cli/internal/fslock"
 )
 
 // FailedRemoval is one thing uninstall could not remove or edit, with why — so

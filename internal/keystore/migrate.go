@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/korbit-official/korbit-cli/internal/logging"
-	"github.com/korbit-official/korbit-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
 )
 
 // MigrateItem is one key to migrate: its name and the backend its registry

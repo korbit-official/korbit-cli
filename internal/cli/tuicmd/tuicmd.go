@@ -21,26 +21,26 @@ import (
 
 	"github.com/charmbracelet/x/term"
 
-	"github.com/korbit-official/korbit-cli/internal/accountseq"
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/callrec"
-	"github.com/korbit-official/korbit-cli/internal/candles"
-	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
-	"github.com/korbit-official/korbit-cli/internal/cli/monitorcmd"
-	"github.com/korbit-official/korbit-cli/internal/cli/probe"
-	"github.com/korbit-official/korbit-cli/internal/clock"
-	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
-	"github.com/korbit-official/korbit-cli/internal/config"
-	"github.com/korbit-official/korbit-cli/internal/i18n"
-	"github.com/korbit-official/korbit-cli/internal/journal"
-	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/ops"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/progname"
-	"github.com/korbit-official/korbit-cli/internal/rawapi"
-	"github.com/korbit-official/korbit-cli/internal/stream"
-	"github.com/korbit-official/korbit-cli/internal/tui"
-	"github.com/korbit-official/korbit-cli/internal/useragent"
+	"github.com/digitalx-official/digitalx-cli/internal/accountseq"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/callrec"
+	"github.com/digitalx-official/digitalx-cli/internal/candles"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/clienv"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/monitorcmd"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/probe"
+	"github.com/digitalx-official/digitalx-cli/internal/clock"
+	"github.com/digitalx-official/digitalx-cli/internal/cmdmeta"
+	"github.com/digitalx-official/digitalx-cli/internal/config"
+	"github.com/digitalx-official/digitalx-cli/internal/i18n"
+	"github.com/digitalx-official/digitalx-cli/internal/journal"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/ops"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/rawapi"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/tui"
+	"github.com/digitalx-official/digitalx-cli/internal/useragent"
 	"github.com/spf13/cobra"
 )
 
@@ -79,7 +79,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string, tuiRun func(tui.Conf
 	}
 
 	if cx.Modes.JSONMode && !cx.Modes.DryRun {
-		return output.Usagef("tui is interactive and has no JSON output — use `korbit-cli monitor` for machine-readable streaming")
+		return output.Usagef("tui is interactive and has no JSON output — use `dgx-cli monitor` for machine-readable streaming")
 	}
 
 	home, cfg, err := cx.LoadConfig()
@@ -168,7 +168,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string, tuiRun func(tui.Conf
 
 	// The TUI's public market-data reads — the launched-pairs list and the candle
 	// chart — journal through one shared recorder under DefaultPolicy, so they show
-	// up in `korbit logs` under --debug like every other surface's public reads
+	// up in `dgx-cli logs` under --debug like every other surface's public reads
 	// (the call site no longer decides journaling). Its log-only sink keeps a
 	// journal hiccup off the order toast, and it is safe for the chart goroutine to
 	// share (callrec mints a per-call recorder). The trader's order calls use a
@@ -214,7 +214,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string, tuiRun func(tui.Conf
 	runFn := tuiRun
 	if runFn == nil {
 		if !writerIsTerminal(cx.IO.Out) {
-			return output.Usagef("tui needs an interactive terminal (stdout is not a TTY) — use `korbit-cli monitor` for piped or machine-readable streaming")
+			return output.Usagef("tui needs an interactive terminal (stdout is not a TTY) — use `dgx-cli monitor` for piped or machine-readable streaming")
 		}
 		runFn = tui.Run
 	}
@@ -276,7 +276,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string, tuiRun func(tui.Conf
 		apiKeyID := resolved.APIKeyID
 		streamCreds = &apiclient.Credentials{APIKeyID: apiKeyID, Signer: signer}
 		base.Creds, base.KeyName = streamCreds, keyName
-		cx.IO.Notef("korbit-cli: signing as key %q", resolved.Name)
+		cx.IO.Notef("%s: signing as key %q", progname.Name(), resolved.Name)
 
 		// Pre-flight the key against /v2/currentKeyInfo before the alt-screen
 		// opens, so a definitive key/config problem is reported on the terminal —
@@ -470,7 +470,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string, tuiRun func(tui.Conf
 	if err != nil {
 		// The session died underneath the TUI (the TUI quit when the event
 		// stream closed). Same classification as monitor: a rejected upgrade
-		// with a Korbit envelope is an API error (exit 3).
+		// with a Digital X envelope is an API error (exit 3).
 		return monitorcmd.RunError(err)
 	}
 	return nil
@@ -810,7 +810,7 @@ func containsInt(xs []int, v int) bool {
 // preflightVerdict decides whether the private TUI session can start from a
 // /v2/currentKeyInfo result (the raw unwrapped data plus the call error). Only a
 // DEFINITIVE rejection blocks the start: apiclient.ClassFatal (a 4xx carrying a
-// Korbit envelope code — auth/permission/config — the same class the WS upgrade
+// Digital X envelope code — auth/permission/config — the same class the WS upgrade
 // treats as fatal), or an unusable key/account in the returned payload. Both are
 // a ConfigError (exit 4) carrying the fix. A transient failure (network, HTTP
 // 5xx/429) and an unconverged clock resync (EXCEED_TIME_WINDOW) are NON-fatal
@@ -833,7 +833,7 @@ func preflightVerdict(data json.RawMessage, err error, accountSeqs []int, nowMs 
 		var apiErr *output.ApiError
 		if errors.As(err, &apiErr) && probe.IsIPAllowlistCode(apiErr.Code) {
 			return output.Configf(
-				"this API key is not allowlisted for your current IP address — add your IP to the key's allowlist in the developers portal, or run `%s doctor` to see the address Korbit sees (%s)",
+				"this API key is not allowlisted for your current IP address — add your IP to the key's allowlist in the developers portal, or run `%s doctor` to see the address Digital X sees (%s)",
 				progname.Name(), apiErr.Code)
 		}
 		detail := err.Error()

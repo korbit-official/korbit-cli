@@ -21,9 +21,9 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"github.com/korbit-official/korbit-cli/internal/i18n"
-	"github.com/korbit-official/korbit-cli/internal/stream/state"
-	"github.com/korbit-official/korbit-cli/internal/tui/uikit"
+	"github.com/digitalx-official/digitalx-cli/internal/i18n"
+	"github.com/digitalx-official/digitalx-cli/internal/stream/state"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/uikit"
 )
 
 // Key is the comparable cache key: equal Keys render identically. TickerRev is
@@ -92,7 +92,7 @@ func AcctChipSpan(k Key) (start, width int, ok bool) {
 	if chip == "" {
 		return 0, 0, false
 	}
-	left := "korbit-cli tui" + "  " + i18n.T("%d markets", k.MarketCount)
+	left := "dgx-cli tui" + "  " + i18n.T("%d markets", k.MarketCount)
 	right := chip + "  " + i18n.T("key:") + k.KeyName + "  " + k.BaseURL
 	prefix := 0 // visible cells before the chip within the right block
 	if k.Cramped != "" {
@@ -115,7 +115,7 @@ func render(k Key, d Data) string {
 
 	// The symbol list lives in the sidebar; the header names the app and the
 	// active symbol count, with the key/endpoint on the right.
-	left := uikit.StyTitle.Render("korbit-cli tui") + uikit.StyDim.Render("  "+i18n.T("%d markets", k.MarketCount))
+	left := uikit.StyTitle.Render("dgx-cli tui") + uikit.StyDim.Render("  "+i18n.T("%d markets", k.MarketCount))
 	right := ""
 	if k.KeyName != "" {
 		tail := i18n.T("key:") + k.KeyName + "  " + k.BaseURL

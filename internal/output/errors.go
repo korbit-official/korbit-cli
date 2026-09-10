@@ -18,8 +18,8 @@ const (
 	ExitSuccess  = 0 // success
 	ExitInternal = 1 // network failure or internal error
 	ExitUsage    = 2 // usage error — the caller can fix the invocation
-	ExitAPI      = 3 // the Korbit API rejected the request (see error.code)
-	ExitConfig   = 4 // key/keystore/config problem — fix with `korbit key ...`
+	ExitAPI      = 3 // the Digital X API rejected the request (see error.code)
+	ExitConfig   = 4 // key/keystore/config problem — fix with `dgx-cli key ...`
 )
 
 // The error taxonomy maps each failure class to a process exit code and the
@@ -64,7 +64,7 @@ func Configf(format string, a ...any) *ConfigError {
 	return &ConfigError{Message: fmt.Sprintf(format, a...)}
 }
 
-// ApiError marks a request the Korbit API rejected (ExitAPI). Code is the
+// ApiError marks a request the Digital X API rejected (ExitAPI). Code is the
 // symbolic error string (the envelope's error.message); HTTPStatus is the
 // envelope's error.code.
 type ApiError struct {

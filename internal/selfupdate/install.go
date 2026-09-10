@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/korbit-official/korbit-cli/internal/fslock"
+	"github.com/digitalx-official/digitalx-cli/internal/fslock"
 )
 
 // InstallResult is what `self install` reports: the version installed, the

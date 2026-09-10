@@ -9,16 +9,16 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/korbit-official/korbit-cli/internal/stream"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/balances"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/fills"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/footer"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/header"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/notices"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/orderbook"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/orders"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/sidebar"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/trades"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/balances"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/fills"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/footer"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/header"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/notices"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/orderbook"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/orders"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/sidebar"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/trades"
 )
 
 // benchModel builds a fully populated private model: ticker/book/trades for both

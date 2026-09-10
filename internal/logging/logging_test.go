@@ -12,7 +12,14 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
 )
+
+// tag is the stderr line prefix a tagged text record carries: the invoked
+// program name, read the same way the handler reads it, so these assertions
+// follow a renamed binary instead of pinning one spelling.
+func tag() string { return progname.Name() + ": " }
 
 func TestLevelForGating(t *testing.T) {
 	// The default (no --debug, no explicit --log-level) is Error: warn-and-below
@@ -29,7 +36,7 @@ func TestLevelForGating(t *testing.T) {
 	if strings.Contains(got, "debug:") || strings.Contains(got, "info:") || strings.Contains(got, "warn:") {
 		t.Fatalf("debug/info/warn must be suppressed at the default level, got: %q", got)
 	}
-	if !strings.Contains(got, "korbit-cli: error: e\n") {
+	if !strings.Contains(got, tag()+"error: e\n") {
 		t.Fatalf("the Error tier must show at the default level, got: %q", got)
 	}
 	if LevelFor(false) != slog.LevelError {
@@ -53,7 +60,7 @@ func TestTraceLevel(t *testing.T) {
 	// At Trace, a Trace record shows and renders with the "trace" tag.
 	var buf bytes.Buffer
 	Trace(New(&buf, LevelTrace), "fine", "k", "v")
-	if got := buf.String(); got != "korbit-cli: trace: fine k=v\n" {
+	if got := buf.String(); got != tag()+"trace: fine k=v\n" {
 		t.Fatalf("trace render: %q", got)
 	}
 
@@ -66,7 +73,7 @@ func TestTraceLevel(t *testing.T) {
 	if strings.Contains(got, "trace:") {
 		t.Fatalf("trace must be gated out at --log-level debug, got: %q", got)
 	}
-	if !strings.Contains(got, "korbit-cli: debug: coarse\n") {
+	if !strings.Contains(got, tag()+"debug: coarse\n") {
 		t.Fatalf("debug should still show, got: %q", got)
 	}
 }
@@ -76,10 +83,10 @@ func TestDebugShowsEverything(t *testing.T) {
 	log := New(&buf, LevelFor(true)) // debug: Debug and above
 	log.Debug("hello")
 	log.Info("there")
-	if !strings.Contains(buf.String(), "korbit-cli: debug: hello\n") {
+	if !strings.Contains(buf.String(), tag()+"debug: hello\n") {
 		t.Fatalf("debug line missing under debug level: %q", buf.String())
 	}
-	if !strings.Contains(buf.String(), "korbit-cli: info: there\n") {
+	if !strings.Contains(buf.String(), tag()+"info: there\n") {
 		t.Fatalf("info line missing under debug level: %q", buf.String())
 	}
 }
@@ -89,7 +96,7 @@ func TestAttrsRendering(t *testing.T) {
 	log := New(&buf, slog.LevelInfo)
 	log.Info("signing", "key", "my key", "n", 3)
 	got := strings.TrimSpace(buf.String())
-	want := `korbit-cli: info: signing key="my key" n=3`
+	want := `dgx-cli: info: signing key="my key" n=3`
 	if got != want {
 		t.Fatalf("attr rendering\n got: %q\nwant: %q", got, want)
 	}
@@ -126,7 +133,7 @@ func TestOrAndNopAreSilentAndSafe(t *testing.T) {
 		t.Fatal("Or(l) should return l unchanged when l is non-nil")
 	}
 	Or(l).Info("kept")
-	if !strings.Contains(buf.String(), "korbit-cli: info: kept\n") {
+	if !strings.Contains(buf.String(), tag()+"info: kept\n") {
 		t.Fatalf("Or(l) dropped a record, got: %q", buf.String())
 	}
 }
@@ -173,12 +180,12 @@ func TestLevelOffSuppressesEverything(t *testing.T) {
 
 func TestTimestampStyleDropsTagAndStampsTime(t *testing.T) {
 	// The --log-file text style stamps a local RFC3339 timestamp, then the level
-	// and message, and drops the "korbit-cli: " tag a shared terminal needs.
+	// and message, and drops the "<prog>: " tag a shared terminal needs.
 	var buf bytes.Buffer
 	log := NewStyled(&buf, slog.LevelInfo, Style{Timestamp: true})
 	log.Warn("disk slow", "ms", 42)
 	got := strings.TrimSpace(buf.String())
-	if strings.Contains(got, "korbit-cli:") {
+	if strings.Contains(got, tag()) {
 		t.Fatalf("timestamp style must drop the tag, got: %q", got)
 	}
 	want := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2} warn disk slow ms=42$`)
@@ -268,8 +275,26 @@ func TestConcurrentWritesAreLineAtomic(t *testing.T) {
 		t.Fatalf("expected 50 lines, got %d", len(lines))
 	}
 	for _, l := range lines {
-		if l != "korbit-cli: warn: concurrent line" {
+		if l != tag()+"warn: concurrent line" {
 			t.Fatalf("interleaved/garbled line: %q", l)
+		}
+	}
+}
+
+// TestTextTagIsTheInvokedProgramName pins that the stderr tag is the name the
+// binary was invoked as, not a compiled-in product name: an install that keeps
+// the legacy command alongside the current one must not label its own output
+// with the other name.
+func TestTextTagIsTheInvokedProgramName(t *testing.T) {
+	orig := progname.Name()
+	t.Cleanup(func() { progname.Set(orig) })
+
+	for _, prog := range []string{"dgx-cli", "korbit"} {
+		progname.Set(prog)
+		var buf bytes.Buffer
+		NewStyled(&buf, slog.LevelInfo, Style{}).Warn("tagged")
+		if got, want := buf.String(), prog+": warn: tagged\n"; got != want {
+			t.Fatalf("as %q: got %q, want %q", prog, got, want)
 		}
 	}
 }

@@ -15,7 +15,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/korbit-official/korbit-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 )

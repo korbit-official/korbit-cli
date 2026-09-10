@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
 )
 
 func newIO() (*bytes.Buffer, *bytes.Buffer, IO) {
@@ -103,7 +105,7 @@ func TestEmitErrorHumanMode(t *testing.T) {
 		if got != "error: needs a subcommand" {
 			t.Fatalf("human usage error = %q", got)
 		}
-		if strings.Contains(got, "{") || strings.Contains(got, "korbit-cli") {
+		if strings.Contains(got, "{") || strings.Contains(got, progname.Name()+": ") {
 			t.Fatalf("human error must be plain, untagged: %q", got)
 		}
 	})

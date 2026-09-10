@@ -24,7 +24,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/korbit-official/korbit-cli/internal/tui/candlechart"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/candlechart"
 )
 
 const intervalMs = 3_600_000 // synthetic 1h candles

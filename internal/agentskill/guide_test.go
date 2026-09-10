@@ -12,7 +12,7 @@ import (
 
 func guideSkill() fstest.MapFS {
 	return fstest.MapFS{
-		"SKILL.md":                 {Data: []byte("---\nname: korbit\ndescription: x\n---\n\n# Operating Korbit\n\nbody\n")},
+		"SKILL.md":                 {Data: []byte("---\nname: digitalx-cli\ndescription: x\n---\n\n# Operating Digital X\n\nbody\n")},
 		"references/monitoring.md": {Data: []byte("# Monitoring\n\nplaybook\n")},
 		"references/funding.md":    {Data: []byte("# Funding\n\nplaybook\n")},
 	}
@@ -37,10 +37,10 @@ func TestGuideContentOverviewStripsFrontmatter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.HasPrefix(body, "---") || strings.Contains(body, "name: korbit") {
+	if strings.HasPrefix(body, "---") || strings.Contains(body, "name: digitalx-cli") {
 		t.Fatalf("frontmatter not stripped:\n%s", body)
 	}
-	if !strings.HasPrefix(body, "# Operating Korbit") {
+	if !strings.HasPrefix(body, "# Operating Digital X") {
 		t.Fatalf("body should start at the heading:\n%s", body)
 	}
 }

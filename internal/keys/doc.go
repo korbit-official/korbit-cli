@@ -49,7 +49,7 @@
 //     (`keystore migrate --keep-source` copies are explicitly
 //     non-authoritative). Resolve reads exactly there — no fallback probing of
 //     other backends.
-//   - Keys may belong to different Korbit accounts, so nothing here ever falls
+//   - Keys may belong to different Digital X accounts, so nothing here ever falls
 //     back from one key to another: the default is set only explicitly (or on
 //     first creation), and removing the default clears it rather than silently
 //     re-pointing at another account. This holds for forced removal too (see
@@ -68,7 +68,7 @@
 //     SetBaseURL, ClearBaseURL, SetKeystoreBackend, Remove, Rename) holds
 //     an exclusive cross-process advisory lock (keys.json.lock, via
 //     internal/fslock) across its whole load → modify → atomic-rename cycle, so
-//     two concurrent korbit-cli processes (a long-running monitor bot plus
+//     two concurrent digitalx-cli processes (a long-running monitor bot plus
 //     ad-hoc commands) can't last-writer-wins each other's update. READ-ONLY
 //     methods (List, Show, Names, Resolve, DefaultKeyName, BaseURLOf,
 //     MetaBaseURL) are deliberately LOCK-FREE: the atomic rename guarantees

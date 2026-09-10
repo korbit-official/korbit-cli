@@ -7,7 +7,7 @@ package state
 import (
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
 )
 
 // TestSectionRevisionsBump pins the render-cache contract: each section's

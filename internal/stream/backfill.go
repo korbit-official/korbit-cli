@@ -13,9 +13,9 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/ops"
-	"github.com/korbit-official/korbit-cli/internal/rawapi"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/ops"
+	"github.com/digitalx-official/digitalx-cli/internal/rawapi"
 )
 
 // historyWindowMs is the documented retention for /v2/allOrders and

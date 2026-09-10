@@ -5,9 +5,9 @@
 package botapi
 
 import (
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/stream/state"
 	"github.com/dop251/goja"
-	"github.com/korbit-official/korbit-cli/internal/stream"
-	"github.com/korbit-official/korbit-cli/internal/stream/state"
 )
 
 // installState installs the synchronous `state` global: a read-only projection

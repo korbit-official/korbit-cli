@@ -19,8 +19,8 @@ import (
 	"image/color"
 	"strconv"
 
-	"github.com/korbit-official/korbit-cli/internal/indicators"
-	"github.com/korbit-official/korbit-cli/internal/tui/candlechart"
+	"github.com/digitalx-official/digitalx-cli/internal/indicators"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/candlechart"
 )
 
 // EMA overlays the exponential moving average of candle closes as one line.

@@ -10,11 +10,11 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/progname"
-	"github.com/korbit-official/korbit-cli/internal/spec"
-	"github.com/korbit-official/korbit-cli/internal/version"
+	"github.com/digitalx-official/digitalx-cli/internal/cmdmeta"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/spec"
+	"github.com/digitalx-official/digitalx-cli/internal/version"
 )
 
 // progPlaceholder is the token spec strings (examples, notes, descriptions) use
@@ -258,7 +258,7 @@ func RenderGroupHelp(path ...string) string {
 func RenderRootHelp() string {
 	prog := progname.Name()
 	var l []string
-	l = append(l, fmt.Sprintf("%s v%s — Korbit Open API v2 CLI", prog, version.Version))
+	l = append(l, fmt.Sprintf("%s v%s — Digital X Open API v2 CLI", prog, version.Version))
 	l = append(l, "", fmt.Sprintf("Usage: %s <command> [options]        (%s <command> --help for details)", prog, prog))
 
 	surface := commandSurface()

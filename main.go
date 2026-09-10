@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Command korbit is a command-line client for the Korbit Open API v2 — market
+// Command dgx-cli is a command-line client for the Digital X Open API v2 — market
 // data, ED25519-signed trading, and key management — built as a stable,
 // JSON-in/JSON-out tool surface for AI agents.
 package main
@@ -11,8 +11,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/korbit-official/korbit-cli/internal/cli"
-	"github.com/korbit-official/korbit-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/cli"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
 )
 
 func main() {

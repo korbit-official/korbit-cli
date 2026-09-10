@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
 )
 
 // HistoryWindowMs is the documented /v2/allOrders + /v2/myTrades retention

@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/korbit-official/korbit-cli/internal/rawapi"
+	"github.com/digitalx-official/digitalx-cli/internal/rawapi"
 )
 
 // candles — auto-pages past the server's 200-candle per-request cap.

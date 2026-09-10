@@ -9,10 +9,10 @@ import (
 	"io"
 	"strings"
 
-	"github.com/korbit-official/korbit-cli/internal/cli/textout"
-	"github.com/korbit-official/korbit-cli/internal/progname"
-	"github.com/korbit-official/korbit-cli/internal/sandbox"
-	"github.com/korbit-official/korbit-cli/internal/sandbox/deno"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/textout"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/sandbox"
+	"github.com/digitalx-official/digitalx-cli/internal/sandbox/deno"
 )
 
 // The sandbox lifecycle results are defined in the lower internal/sandbox layer,

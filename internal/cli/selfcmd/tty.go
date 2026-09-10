@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/x/term"
-	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/clienv"
 )
 
 // openTTYConfirm returns a yes/no confirm (with a per-question default) backed by

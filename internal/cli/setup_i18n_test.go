@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/cli/setupui"
-	"github.com/korbit-official/korbit-cli/internal/i18n"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/setupui"
+	"github.com/digitalx-official/digitalx-cli/internal/i18n"
 )
 
 // resetLang restores the process-global active display language to English after

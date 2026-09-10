@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/cli"
-	"github.com/korbit-official/korbit-cli/internal/cli/setupui"
-	"github.com/korbit-official/korbit-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/cli"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/setupui"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
 )
 
 // claimDoer routes the three endpoints auto-claim setup touches: the keyless

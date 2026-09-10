@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/stream/state"
-	"github.com/korbit-official/korbit-cli/internal/tui/uikit"
+	"github.com/digitalx-official/digitalx-cli/internal/stream/state"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/uikit"
 )
 
 func sampleData() Data {

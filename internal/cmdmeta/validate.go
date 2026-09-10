@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
 	"github.com/shopspring/decimal"
 )
 

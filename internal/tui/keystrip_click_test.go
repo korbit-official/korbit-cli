@@ -9,8 +9,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/korbit-official/korbit-cli/internal/candles"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/keystrip"
+	"github.com/digitalx-official/digitalx-cli/internal/candles"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/keystrip"
 )
 
 // footerCapX returns the screen column of the footer key cap that presses keyStr.

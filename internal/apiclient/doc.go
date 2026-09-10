@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Package korbit is the wire layer (L0) plus the L1 primitive client for the
-// Korbit Open API v2.
+// Package apiclient is the wire layer (L0) plus the L1 primitive client for the
+// Digital X Open API v2.
 //
 // # L0 — wire building blocks (no policy)
 //
@@ -25,7 +25,7 @@
 // shared clock, executes exactly the retry Policy it is HANDED, and reports
 // every logical call to a per-call Recorder it mints itself. The same Client
 // also signs the private WebSocket upgrade (SignHandshake), so it is the single
-// front door for calling Korbit. Higher layers (L2 ops, frontends) own the
+// front door for calling Digital X. Higher layers (L2 ops, frontends) own the
 // policy and the journaling; the Client owns neither.
 //
 // # Contracts
@@ -48,7 +48,7 @@
 //     recvWindow, and signature are added inside Build after the CallInfo is
 //     captured, so no secret or signing artifact ever reaches a Recorder.
 //   - The User-Agent seam: Options.UserAgent / Client.UserAgent override the
-//     header; "" keeps the default ("korbit-cli/<version>"). COMPOSING the
+//     header; "" keeps the default ("digitalx-cli/<version>"). COMPOSING the
 //     string (program version + OS + Origin) is the caller's job at wiring
 //     time — this package gathers no OS info and only carries the seam.
 //

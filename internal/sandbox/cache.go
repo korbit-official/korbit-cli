@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/korbit-official/korbit-cli/internal/envalias"
+	"github.com/digitalx-official/digitalx-cli/internal/envalias"
 )
 
 // EnvCacheDir names the environment variable that relocates the shared artifact
@@ -106,9 +106,9 @@ func writeCacheReadme(dir string) {
 	_ = os.WriteFile(filepath.Join(dir, "README.md"), []byte(cacheReadmeText), 0o644)
 }
 
-const cacheReadmeText = `# korbit-cli sandbox cache
+const cacheReadmeText = `# digitalx-cli sandbox cache
 
-Cache maintained by korbit-cli for its local sandbox (a mock of the Digital X
+Cache maintained by digitalx-cli for its local sandbox (a mock of the Digital X
 Open API for local development and testing). Safe to delete — recreated on the next
 ` + "`sandbox`" + ` command.
 
@@ -124,10 +124,10 @@ The sandbox runs under Deno, which fetches the bundle from the Official Source
   any dependencies.
 
 Terms: the bundle (digitalx-sandbox.mjs) is proprietary software of Digital X Co., Ltd. under its
-OWN terms — it is NOT covered by korbit-cli's open-source license. Read those
-terms with ` + "`korbit sandbox license`" + `, obtain the bundle only from the
+OWN terms — it is NOT covered by digitalx-cli's open-source license. Read those
+terms with ` + "`dgx-cli sandbox license`" + `, obtain the bundle only from the
 Official Source, and keep use conformant (local development and testing only).
 
 Your sandbox database, keys, and logs are NOT here — they live under your
-korbit-cli home (DIGITALX_CLI_HOME). Override this cache with DIGITALX_CLI_SANDBOX_CACHE.
+digitalx-cli home (DIGITALX_CLI_HOME). Override this cache with DIGITALX_CLI_SANDBOX_CACHE.
 `

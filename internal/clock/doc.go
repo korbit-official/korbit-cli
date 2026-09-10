@@ -2,14 +2,14 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Package clock holds one session's (or process's) estimate of the Korbit
+// Package clock holds one session's (or process's) estimate of the Digital X
 // server clock — the single piece of shared state behind every signed request —
 // and the one operation that measures and installs it. State is the estimate;
 // Syncer is the measurement home shared by every signing surface (see below).
 //
 // # Why one estimate is shared
 //
-// Korbit verifies each signed `timestamp` against an asymmetric window:
+// Digital X verifies each signed `timestamp` against an asymmetric window:
 // serverTime − recvWindow ≤ ts < serverTime + 1000 (recvWindow default 5s,
 // max 60s; the +1s future bound is fixed). So a corrected timestamp must track
 // the SERVER's clock, not UTC, and must lean into the past by the measurement

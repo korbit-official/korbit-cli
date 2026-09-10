@@ -19,16 +19,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/callrec"
-	"github.com/korbit-official/korbit-cli/internal/clock"
-	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
-	"github.com/korbit-official/korbit-cli/internal/config"
-	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/logging"
-	"github.com/korbit-official/korbit-cli/internal/netbind"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/callrec"
+	"github.com/digitalx-official/digitalx-cli/internal/clock"
+	"github.com/digitalx-official/digitalx-cli/internal/cmdmeta"
+	"github.com/digitalx-official/digitalx-cli/internal/config"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/netbind"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
 	"github.com/spf13/cobra"
 )
 
@@ -182,7 +182,7 @@ func (e Env) NoticeLogger(level slog.Level) *slog.Logger {
 }
 
 // ClientSpec is the per-surface input to Backend.BuildClient: the few things
-// that vary across the ways a command calls Korbit (endpoint, tui, monitor, mcp,
+// that vary across the ways a command calls Digital X (endpoint, tui, monitor, mcp,
 // doctor, dry-run, stream). The Backend turns it into the one apiclient.Client a
 // surface uses, so "forgot the logger / recorder / Origin / User-Agent" is
 // structurally impossible — there is one construction site. When one signing
@@ -218,7 +218,7 @@ func (s ClientSpec) As(surface, detail string, log *slog.Logger) ClientSpec {
 	return s
 }
 
-// Backend is the call machinery a command uses to talk to Korbit: config/key
+// Backend is the call machinery a command uses to talk to Digital X: config/key
 // resolution today, growing to base-URL resolution and client/clock/recorder
 // construction for the streaming and diagnostic commands. cli's runtime is the
 // sole implementation.

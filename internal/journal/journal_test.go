@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
 )
 
 func openTemp(t *testing.T) *Logger {
@@ -148,7 +148,7 @@ func TestLogCallRoundTrip(t *testing.T) {
 	id, err := l.LogCall(CallRecord{
 		OperationID: opID, Seq: 1,
 		StartedAtMs: 1000, FinishedAtMs: 1200,
-		Method: "POST", Path: "/v2/orders", BaseURL: "https://api.korbit.co.kr",
+		Method: "POST", Path: "/v2/orders", BaseURL: "https://api.digitalx.miraeasset.com",
 		Auth: true, KeyName: "bot", APIKeyID: "KEYID-1", ParamsJSON: `{"symbol":"btc_krw"}`,
 		HTTPStatus: &status, Success: false, ErrorCode: "DUPLICATE_CLIENT_ORDER_ID",
 		ErrorMessage: "already placed", RetryCount: 2, DurationMs: 200, CLIVersion: "9.9.9",

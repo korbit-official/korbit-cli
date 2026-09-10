@@ -14,7 +14,7 @@ package spec
 import (
 	"strings"
 
-	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
+	"github.com/digitalx-official/digitalx-cli/internal/cmdmeta"
 )
 
 // Command is one CLI command (one to three id segments, e.g. ["ticker"],
@@ -56,7 +56,7 @@ type GlobalFlag struct {
 
 // GlobalFlags are accepted by every command.
 var GlobalFlags = []GlobalFlag{
-	{Flag: "key", TakesValue: true, Desc: "named key to sign with (default: the key set via `korbit-cli key use`; also: DIGITALX_CLI_KEY). Or supply a key inline via DIGITALX_CLI_API_KEY_ID + DIGITALX_CLI_API_KEY_SECRET + DIGITALX_CLI_API_KEY_TYPE — mutually exclusive with --key/DIGITALX_CLI_KEY"},
+	{Flag: "key", TakesValue: true, Desc: "named key to sign with (default: the key set via `dgx-cli key use`; also: DIGITALX_CLI_KEY). Or supply a key inline via DIGITALX_CLI_API_KEY_ID + DIGITALX_CLI_API_KEY_SECRET + DIGITALX_CLI_API_KEY_TYPE — mutually exclusive with --key/DIGITALX_CLI_KEY"},
 	{Flag: "base-url", TakesValue: true, Desc: "override the REST base URL (also: DIGITALX_CLI_BASE_URL env var, baseUrl in config.json)"},
 	{Flag: "ws-base-url", TakesValue: true, Desc: "override the WebSocket base URL for monitor (scheme ws/wss; also: DIGITALX_CLI_WS_BASE_URL env var, wsBaseUrl in config.json). Default: derived from the REST base URL. Also the value persisted by `key set-base-url`"},
 	{Flag: "bind", TakesValue: true, Desc: "bind outbound connections (REST + WebSocket) to a single source IP or network interface, e.g. --bind 192.0.2.10 or --bind eth0 (also: DIGITALX_CLI_NET_BIND env var). A value that parses as an IP is a source address, otherwise an interface name; prefix with addr! or if! to force. Useful on multi-homed hosts to pick the link to use, or to spread calls across source IPs (public endpoints are rate-limited per IP). A source IP binds that one family; bind an interface to cover IPv4+IPv6 (true device binding — on Linux needs root/CAP_NET_RAW, otherwise restrict to one family with --family or bind a source IP)"},
@@ -70,7 +70,7 @@ var GlobalFlags = []GlobalFlag{
 	{Flag: "compact", TakesValue: false, Desc: "single-line JSON output (implies --json)"},
 	{Flag: "debug", TakesValue: false, Desc: "verbose diagnostics on stderr, and journal read calls too — which are otherwise excluded from the action journal, where only writes are journaled by default (also: DIGITALX_CLI_DEBUG env var)"},
 	{Flag: "log-level", TakesValue: true, Desc: "operational-log level: trace, debug, info, warn, error, or off (also: DIGITALX_CLI_LOG_LEVEL env var). Defaults to error — a command's result and errors come through stdout/the error envelope, so warn-and-below logs are an opt-in diagnostic; turn them on to troubleshoot. debug explains each request (and an order's full place/reconcile trail); trace adds per-iteration detail (each send/lookup, each history/candles page). Sets the level only — separate from --debug, and takes precedence over it when both are set. Default: error (debug under --debug)"},
-	{Flag: "log-file", TakesValue: true, Desc: "append operational logs to this file instead of stderr (also: DIGITALX_CLI_LOG_FILE env var). For the tui command this is the only way to capture diagnostics, since the full-screen UI owns the terminal. In the default text format, file lines are stamped with a local RFC3339 timestamp and drop the `korbit-cli: ` tag (a file trail wants a wall-clock anchor); --log-format json is unaffected by destination"},
+	{Flag: "log-file", TakesValue: true, Desc: "append operational logs to this file instead of stderr (also: DIGITALX_CLI_LOG_FILE env var). For the tui command this is the only way to capture diagnostics, since the full-screen UI owns the terminal. In the default text format, file lines are stamped with a local RFC3339 timestamp and drop the `dgx-cli: ` tag (a file trail wants a wall-clock anchor); --log-format json is unaffected by destination"},
 	{Flag: "log-format", TakesValue: true, Desc: "operational-log format: text (default) or json (also: DIGITALX_CLI_LOG_FORMAT env var). text is one human line per record; json is one object per line (time, level, msg, then attributes) for log pipelines. The level vocabulary (trace/debug/info/warn/error) is identical in both"},
 	{Flag: "lang", TakesValue: true, Desc: "display language for human-facing interactive UI chrome (labels, key hints, dialogs). Defaults to your OS locale, else English; an unsupported code is rejected with the list of supported ones. Market data, trading vocabulary, API messages, and all machine/JSON output stay English regardless"},
 	{Flag: "no-fsync", TakesValue: false, Desc: "open the action journal and the monitor bot database with PRAGMA synchronous=OFF (no fsync) for faster writes; a power loss or OS crash may then lose or corrupt recent writes. The journal is a recreatable local log, so this only trades crash-durability for speed (also: DIGITALX_CLI_NO_FSYNC env var)"},

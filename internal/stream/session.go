@@ -15,16 +15,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/logging"
-	"github.com/korbit-official/korbit-cli/internal/rawapi"
-	"github.com/korbit-official/korbit-cli/internal/version"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/rawapi"
+	"github.com/digitalx-official/digitalx-cli/internal/version"
 )
 
 // Production WebSocket endpoints.
 const (
-	DefaultPublicURL  = "wss://ws-api.korbit.co.kr/v2/public"
-	DefaultPrivateURL = "wss://ws-api.korbit.co.kr/v2/private"
+	DefaultPublicURL  = "wss://ws-api.digitalx.miraeasset.com/v2/public"
+	DefaultPrivateURL = "wss://ws-api.digitalx.miraeasset.com/v2/private"
 )
 
 // Config describes a streaming session.
@@ -36,7 +36,7 @@ type Config struct {
 	// Subscriptions is the channel set to stream. At least one is required;
 	// it is fixed for the session's lifetime.
 	Subscriptions []Subscription
-	// Client is the session's single Korbit API handle (required): it performs
+	// Client is the session's single Digital X API handle (required): it performs
 	// REST backfill + public-trade gap patching, signs the private WebSocket
 	// upgrade (Client.SignHandshake), and owns the shared server-clock estimate
 	// (read via Client.Clock, resync via Client.Resync). Its Creds (set for a
@@ -117,8 +117,8 @@ type Config struct {
 	// that stops receiving eventually stalls the WebSocket reads.
 	EventBuffer int
 	// UserAgent is the User-Agent stamped on every WebSocket dial (the upgrade
-	// handshake is a Korbit API request). Empty falls back to the bare
-	// "korbit-cli/<version>". The REST/backfill side uses the Client's own
+	// handshake is a Digital X API request). Empty falls back to the bare
+	// "digitalx-cli/<version>". The REST/backfill side uses the Client's own
 	// UserAgent. The caller composes both (see internal/useragent) so the stream
 	// layer carries no environment-gathering of its own.
 	UserAgent string
@@ -474,12 +474,12 @@ func (s *Session) newConn(endpoint, wsURL string, subs []Subscription, auth *con
 }
 
 // dialWithUA stamps the configured User-Agent onto every dial; an empty
-// Config.UserAgent falls back to the bare "korbit-cli/<version>".
+// Config.UserAgent falls back to the bare "digitalx-cli/<version>".
 func (s *Session) dialWithUA() Dialer {
 	dial := s.cfg.Dial
 	ua := s.cfg.UserAgent
 	if ua == "" {
-		ua = "korbit-cli/" + version.Version
+		ua = version.Token()
 	}
 	return func(ctx context.Context, wsURL string, header http.Header) (Conn, error) {
 		if header == nil {

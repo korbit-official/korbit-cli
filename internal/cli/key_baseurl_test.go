@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
 )
 
 // TestKeyAddPinsBaseURL: `key add --base-url` persists the host on the new key,
@@ -18,13 +18,13 @@ import (
 func TestKeyAddPinsBaseURL(t *testing.T) {
 	home := t.TempDir()
 	env := map[string]string{"DIGITALX_CLI_HOME": home}
-	_, stderr, code := runCLI([]string{"key", "add", "bot", "--base-url", "https://api-test.korbit.co.kr/", "--compact"}, env, &stubDoer{})
+	_, stderr, code := runCLI([]string{"key", "add", "bot", "--base-url", "https://api-test.digitalx.miraeasset.com/", "--compact"}, env, &stubDoer{})
 	if code != 0 {
 		t.Fatalf("key add --base-url exit=%d — %s", code, stderr)
 	}
 	out, _, _ := runCLI([]string{"key", "show", "bot", "--compact"}, env, &stubDoer{})
-	if !strings.Contains(out, `"baseUrl":"https://api-test.korbit.co.kr"`) ||
-		!strings.Contains(out, `"wsBaseUrl":"wss://ws-api-test.korbit.co.kr"`) {
+	if !strings.Contains(out, `"baseUrl":"https://api-test.digitalx.miraeasset.com"`) ||
+		!strings.Contains(out, `"wsBaseUrl":"wss://ws-api-test.digitalx.miraeasset.com"`) {
 		t.Fatalf("key add did not pin the base URL: %s", out)
 	}
 }
@@ -35,7 +35,7 @@ func TestKeyAddPinsExplicitWSBaseURL(t *testing.T) {
 	home := t.TempDir()
 	env := map[string]string{"DIGITALX_CLI_HOME": home}
 	_, stderr, code := runCLI([]string{"key", "add", "bot",
-		"--base-url", "https://api-test.korbit.co.kr", "--ws-base-url", "wss://stream.example.test/", "--compact"}, env, &stubDoer{})
+		"--base-url", "https://api-test.digitalx.miraeasset.com", "--ws-base-url", "wss://stream.example.test/", "--compact"}, env, &stubDoer{})
 	if code != 0 {
 		t.Fatalf("exit=%d — %s", code, stderr)
 	}
@@ -55,12 +55,12 @@ func TestKeyAddHMACPinsBaseURL(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, stderr, code := runCLI([]string{"key", "add", "hmac-bot", "--type", "hmac-sha256", "--api-key", "KEYID-H",
-		"--secret-file", secretFile, "--base-url", "https://api-test.korbit.co.kr", "--compact"}, env, &stubDoer{})
+		"--secret-file", secretFile, "--base-url", "https://api-test.digitalx.miraeasset.com", "--compact"}, env, &stubDoer{})
 	if code != 0 {
 		t.Fatalf("key add hmac --base-url exit=%d — %s", code, stderr)
 	}
 	out, _, _ := runCLI([]string{"key", "show", "hmac-bot", "--compact"}, env, &stubDoer{})
-	if !strings.Contains(out, `"baseUrl":"https://api-test.korbit.co.kr"`) {
+	if !strings.Contains(out, `"baseUrl":"https://api-test.digitalx.miraeasset.com"`) {
 		t.Fatalf("hmac key add did not pin the base URL: %s", out)
 	}
 }
@@ -103,13 +103,13 @@ func TestKeyAddWSBaseURLWithoutBaseURL(t *testing.T) {
 func TestSetupPinsBaseURLOnCreate(t *testing.T) {
 	home := t.TempDir()
 	env := map[string]string{"DIGITALX_CLI_HOME": home}
-	_, stderr, code := runWithDeps([]string{"setup", "--name", "fresh", "--base-url", "https://api-test.korbit.co.kr", "--compact"},
+	_, stderr, code := runWithDeps([]string{"setup", "--name", "fresh", "--base-url", "https://api-test.digitalx.miraeasset.com", "--compact"},
 		env, nil, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("setup --base-url exit=%d — %s", code, stderr)
 	}
 	out, _, _ := runCLI([]string{"key", "show", "fresh", "--compact"}, env, &stubDoer{})
-	if !strings.Contains(out, `"baseUrl":"https://api-test.korbit.co.kr"`) {
+	if !strings.Contains(out, `"baseUrl":"https://api-test.digitalx.miraeasset.com"`) {
 		t.Fatalf("setup did not pin the base URL on create: %s", out)
 	}
 }
@@ -120,13 +120,13 @@ func TestSetupReRunIgnoresBaseURL(t *testing.T) {
 	home := t.TempDir()
 	env := map[string]string{"DIGITALX_CLI_HOME": home}
 	seedUnboundKey(t, home, "default") // exists, no base URL
-	_, stderr, code := runWithDeps([]string{"setup", "--base-url", "https://api-test.korbit.co.kr", "--compact"},
+	_, stderr, code := runWithDeps([]string{"setup", "--base-url", "https://api-test.digitalx.miraeasset.com", "--compact"},
 		env, nil, fakeProbe("203.0.113.7", ""))
 	if code != 0 {
 		t.Fatalf("setup re-run exit=%d — %s", code, stderr)
 	}
 	out, _, _ := runCLI([]string{"key", "show", "default", "--compact"}, env, &stubDoer{})
-	if strings.Contains(out, "api-test.korbit.co.kr") {
+	if strings.Contains(out, "api-test.digitalx.miraeasset.com") {
 		t.Fatalf("a setup re-run must not pin the base URL: %s", out)
 	}
 }

@@ -15,11 +15,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/ops"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/rawapi"
-	"github.com/korbit-official/korbit-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/ops"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/rawapi"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
 )
 
 // Req is the recorded shape of one logical call the fake ops.Doer saw. It keeps
@@ -391,7 +391,7 @@ func TestCredsMissingThrowsClearly(t *testing.T) {
 	ft := newFakeTransport()
 	err := runOn(t, Options{
 		API:      ft.api(apiExtra{}),
-		CredsErr: `no key configured; add one with "korbit key add"`,
+		CredsErr: `no key configured; add one with "dgx-cli key add"`,
 		On:       "await api.balance()",
 	}, dataEvent(`{}`))
 	if err == nil || !strings.Contains(err.Error(), "needs a signing key") || !strings.Contains(err.Error(), "no key configured") {

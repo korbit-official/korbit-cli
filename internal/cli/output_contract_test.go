@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
 )
 
 // emittedErrorKeys returns the field names the error envelope actually emits for
@@ -173,12 +173,12 @@ func TestOrderPlaceDuplicateGuidanceInEnvelope(t *testing.T) {
 	}
 
 	// JSON mode: the guidance rides the structured error envelope on stderr; there
-	// is no separate `korbit-cli: clientOrderId …` prose note line.
+	// is no separate `<prog>: clientOrderId …` prose note line.
 	out, stderr, code := run(t, "--compact")
 	if code != 3 {
 		t.Fatalf("a duplicate placement must exit ExitAPI(3), exit=%d out=%s stderr=%s", code, out, stderr)
 	}
-	if strings.Contains(stderr, "korbit-cli: clientOrderId") {
+	if strings.Contains(stderr, logTag()+"clientOrderId") {
 		t.Fatalf("the recovery guidance must not be a free-floating stderr note: %s", stderr)
 	}
 	var env struct {
@@ -209,7 +209,7 @@ func TestOrderPlaceDuplicateGuidanceInEnvelope(t *testing.T) {
 	if hCode != 3 {
 		t.Fatalf("human-mode duplicate must also exit ExitAPI(3), exit=%d stderr=%s", hCode, hStderr)
 	}
-	if strings.Contains(hStderr, "korbit-cli: clientOrderId") {
+	if strings.Contains(hStderr, logTag()+"clientOrderId") {
 		t.Fatalf("human mode must not emit a separate prose note: %s", hStderr)
 	}
 	if !strings.Contains(hStderr, "do NOT re-place") {

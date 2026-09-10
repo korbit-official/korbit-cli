@@ -13,11 +13,11 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/korbit-official/korbit-cli/internal/i18n"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/curlist"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/keystrip"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/transfers"
-	"github.com/korbit-official/korbit-cli/internal/tui/uikit"
+	"github.com/digitalx-official/digitalx-cli/internal/i18n"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/curlist"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/keystrip"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/transfers"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/uikit"
 )
 
 // The funding screen's rendering and hit-testing. The layout is master–detail
@@ -479,7 +479,7 @@ func (f fundingModel) withdrawLines(inner int) []fundingFormLine {
 		})
 	case len(addrs) == 0:
 		// The row explains the missing registration in place, before any action.
-		msg := i18n.T("none registered here — register one in the Korbit developers portal (then r to refresh)")
+		msg := i18n.T("none registered here — register one in the Digital X developers portal (then r to refresh)")
 		wrapped := strings.Split(uikit.Wrap(msg, inner-fundingLabelW()), "\n")
 		for i, l := range wrapped {
 			ln := fundingFact(strings.Repeat(" ", fundingLabelW()) + uikit.StyWarn.Render(l))
@@ -614,9 +614,9 @@ func (f fundingModel) krwLines(inner int) []fundingFormLine {
 		out = append(out, fundingFact(uikit.PadRight(i18n.T("available"), fundingLabelW())+uikit.GroupThousands(b.Available)+" krw"))
 	}
 	out = append(out, f.amountLine())
-	note := i18n.T("sends a confirmation push to your Korbit app — the deposit proceeds only after you complete the verification there")
+	note := i18n.T("sends a confirmation push to your Digital X app — the deposit proceeds only after you complete the verification there")
 	if f.tab == fundingWithdraw {
-		note = i18n.T("sends a confirmation push to your Korbit app — the withdrawal proceeds only after you complete the verification there")
+		note = i18n.T("sends a confirmation push to your Digital X app — the withdrawal proceeds only after you complete the verification there")
 	}
 	for _, l := range strings.Split(uikit.Wrap(note, inner-fundingLabelW()), "\n") {
 		out = append(out, fundingFact(strings.Repeat(" ", fundingLabelW())+uikit.StyDim.Render(l)))
@@ -666,9 +666,9 @@ func (f fundingModel) confirmLines(inner int) []fundingFormLine {
 		add("")
 		add(uikit.StyWarn.Render(i18n.T("crypto withdrawals cannot be reversed once processed")))
 	case factKRWDeposit, factKRWWithdraw:
-		line := i18n.T("send a deposit push for %s KRW to your Korbit app", uikit.GroupThousands(f.action.amount))
+		line := i18n.T("send a deposit push for %s KRW to your Digital X app", uikit.GroupThousands(f.action.amount))
 		if f.action.kind == factKRWWithdraw {
-			line = i18n.T("send a withdrawal push for %s KRW to your Korbit app", uikit.GroupThousands(f.action.amount))
+			line = i18n.T("send a withdrawal push for %s KRW to your Digital X app", uikit.GroupThousands(f.action.amount))
 		}
 		add(line)
 		add(uikit.StyDim.Render(i18n.T("nothing moves until you complete the verification in the app")))

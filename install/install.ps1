@@ -4,10 +4,10 @@
 # filled with this release's version + archive checksums and attached to the
 # GitHub release, fetchable directly at:
 #
-#   irm https://github.com/korbit-official/korbit-cli/releases/latest/download/install.ps1 | iex
+#   irm https://github.com/digitalx-official/digitalx-cli/releases/latest/download/install.ps1 | iex
 #
 # (The README's advertised one-liner instead fetches the evergreen installer
-# hosted at https://docs.korbit.co.kr/install.ps1.)
+# hosted at https://docs.digitalx.miraeasset.com/install.ps1.)
 #
 # What it does: detect your architecture, download that release's .zip, verify
 # its SHA-256 against the value embedded below, extract it, and hand off to
@@ -36,7 +36,7 @@ $PIN_SHA256 = @'
 '@
 # <<< release-pin <<<
 
-  $Repo = 'korbit-official/korbit-cli'
+  $Repo = 'digitalx-official/digitalx-cli'
 
   # Report a fatal condition. `throw` (not `exit`) so that, under `irm | iex`, we
   # unwind back to the caller's prompt rather than closing the terminal.

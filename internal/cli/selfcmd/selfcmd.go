@@ -20,17 +20,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
-	clihome "github.com/korbit-official/korbit-cli/internal/config"
-	"github.com/korbit-official/korbit-cli/internal/journal"
-	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/keystore"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/progname"
-	"github.com/korbit-official/korbit-cli/internal/sandbox"
-	"github.com/korbit-official/korbit-cli/internal/selfupdate"
-	"github.com/korbit-official/korbit-cli/internal/spec"
-	"github.com/korbit-official/korbit-cli/internal/version"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/clienv"
+	clihome "github.com/digitalx-official/digitalx-cli/internal/config"
+	"github.com/digitalx-official/digitalx-cli/internal/journal"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/keystore"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/sandbox"
+	"github.com/digitalx-official/digitalx-cli/internal/selfupdate"
+	"github.com/digitalx-official/digitalx-cli/internal/spec"
+	"github.com/digitalx-official/digitalx-cli/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -256,7 +256,7 @@ func suggestSkillRefresh() *skillResult {
 	return &skillResult{
 		Suggested: true,
 		Command:   prog + " agent skill doctor",
-		Message: fmt.Sprintf("This update may bundle a newer Korbit Agent Skill. Run `%s agent skill doctor` to check your installed copy, then `%s agent skill install --claude` (or `--codex`) to refresh it.",
+		Message: fmt.Sprintf("This update may bundle a newer Digital X Agent Skill. Run `%s agent skill doctor` to check your installed copy, then `%s agent skill install --claude` (or `--codex`) to refresh it.",
 			prog, prog),
 	}
 }

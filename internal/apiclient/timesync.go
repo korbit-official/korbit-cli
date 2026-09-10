@@ -9,10 +9,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/korbit-official/korbit-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
 )
 
-// timePath is the public endpoint that returns Korbit's server clock as a
+// timePath is the public endpoint that returns Digital X's server clock as a
 // millisecond epoch in the standard {success,data:{time}} envelope. The CLI
 // syncs to *this* clock — the one the signed-request time-window check uses —
 // not to UTC, so a corrected timestamp lands in the server's validity window
@@ -33,7 +33,7 @@ const defaultClockProbes = 5
 // min(caller TimeoutMs, this); an unset caller timeout is capped here too.
 const maxClockProbeTimeoutMs = 3000
 
-// ClockOffset is the result of measuring the local clock against Korbit's
+// ClockOffset is the result of measuring the local clock against Digital X's
 // server clock. OffsetMs is the best estimate of (serverClock - localClock):
 // add it to a local timestamp to get the server's notion of "now". RTTMinMs is
 // the smallest round-trip seen across the probes; the estimate's uncertainty is
@@ -53,7 +53,7 @@ type ClockOffset struct {
 func (o ClockOffset) UncertaintyMs() int64 { return o.RTTMinMs / 2 }
 
 // MeasureClockOffset estimates the offset between the local clock (opts.Now) and
-// the Korbit server clock by probing /v2/time `probes` times and keeping the
+// the Digital X server clock by probing /v2/time `probes` times and keeping the
 // sample with the smallest round-trip — NTP's minimum-delay filter, which
 // rejects the queuing noise that inflates and skews the estimate. For each
 // probe it brackets the request with two local readings and compares the server

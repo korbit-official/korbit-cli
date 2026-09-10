@@ -7,8 +7,8 @@ package ops
 import (
 	"context"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/cmdmeta"
 )
 
 // This file defines the journal seam ops sees: a set of interfaces a frontend

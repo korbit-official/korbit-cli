@@ -49,14 +49,14 @@
 // Output is one record per line, in one of three shapes selected by [Style]
 // (the cli resolves it from --log-format and whether --log-file is in use):
 //
-//	korbit-cli: <level>: <message>[ key=value …]   // text, stderr (the default)
+//	<prog>: <level>: <message>[ key=value …]    // text, stderr (the default)
 //	<rfc3339-local> <level> <message>[ key=value …] // text, --log-file (Style.Timestamp)
 //	{"time":"…","level":"…","msg":"…",…}            // --log-format json (FormatJSON)
 //
 // where <level> is one of trace/debug/info/warn/error (the JSON level uses
-// the same vocabulary). The "korbit-cli: " tag scopes a line to this tool on a
-// shared terminal; a file or JSON trail has no such session to scope, so it
-// carries a wall-clock timestamp instead.
+// the same vocabulary). The "<prog>: " tag — the invoked program name — scopes a
+// line to this tool on a shared terminal; a file or JSON trail has no such
+// session to scope, so it carries a wall-clock timestamp instead.
 //
 // Each record is emitted to the sink in exactly ONE write (the line is fully
 // assembled first, in every format). Within a single logger and its With/

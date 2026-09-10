@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/stream/state"
-	"github.com/korbit-official/korbit-cli/internal/tui/uikit"
+	"github.com/digitalx-official/digitalx-cli/internal/stream/state"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/uikit"
 )
 
 func sampleData() Data {
@@ -30,7 +30,7 @@ func sampleData() Data {
 }
 
 func key() Key {
-	return Key{TickerRev: 1, Symbol: "btc_krw", MarketCount: 3, KeyName: "main", BaseURL: "https://api.korbit.co.kr", W: 100}
+	return Key{TickerRev: 1, Symbol: "btc_krw", MarketCount: 3, KeyName: "main", BaseURL: "https://api.digitalx.miraeasset.com", W: 100}
 }
 
 func TestRendersTwoLinesAndContent(t *testing.T) {
@@ -42,7 +42,7 @@ func TestRendersTwoLinesAndContent(t *testing.T) {
 	if got := strings.Count(out, "\n") + 1; got != 2 {
 		t.Errorf("header = %d lines, want 2", got)
 	}
-	if !strings.Contains(out, "korbit-cli tui") {
+	if !strings.Contains(out, "dgx-cli tui") {
 		t.Errorf("line 1 should name the app; got: %q", out)
 	}
 	if !strings.Contains(out, "3 markets") {

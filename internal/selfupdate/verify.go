@@ -16,7 +16,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/korbit-official/korbit-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
 )
 
 // maxMetaBytes caps the small metadata downloads (the release-signing cert and

@@ -16,12 +16,12 @@ import (
 	"os/exec"
 	goruntime "runtime"
 
-	"github.com/korbit-official/korbit-cli/internal/agentskill"
-	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/progname"
-	"github.com/korbit-official/korbit-cli/internal/spec"
-	"github.com/korbit-official/korbit-cli/internal/version"
+	"github.com/digitalx-official/digitalx-cli/internal/agentskill"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/clienv"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/spec"
+	"github.com/digitalx-official/digitalx-cli/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -169,7 +169,7 @@ func agentHomeFor(getenv func(string) string, goos string) (string, error) {
 type skillDoctorReport struct {
 	Skill        string              `json:"skill"`
 	CliVersion   string              `json:"cliVersion"`
-	Binary       string              `json:"binary"`      // command name the skill shells out to ("korbit")
+	Binary       string              `json:"binary"`      // command name the skill shells out to ("dgx-cli")
 	InvokedAs    string              `json:"invokedAs"`   // name this executable was actually run as
 	NameMatches  bool                `json:"nameMatches"` // InvokedAs == Binary
 	NameFix      string              `json:"nameFix,omitempty"`
@@ -214,7 +214,7 @@ func runDoctor(cx *clienv.Cmd, src fs.FS) error {
 		InvokedAs: progname.Name(),
 	}
 	// Check 1: this executable is itself named the command the skill invokes.
-	// `go install` produces a "korbit-cli" binary, but the installed skill runs
+	// `go install` produces a "digitalx-cli" binary, but the installed skill runs
 	// literal `dgx-cli …` commands (agentskill.SkillBinary) — so a mismatch is
 	// the usual reason that command isn't found below, and the fix is to expose
 	// this binary under that name.

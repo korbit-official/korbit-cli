@@ -11,9 +11,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/stream"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/header"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/header"
 )
 
 // fakeFunding is a canned Funding seam that counts calls, so the tests can
@@ -794,7 +794,7 @@ func TestFundingKRWDepositPush(t *testing.T) {
 	if len(fk.krwDepositCalls) != 1 || fk.krwDepositCalls[0] != "50000" {
 		t.Fatalf("krw deposit push calls = %v", fk.krwDepositCalls)
 	}
-	if m.funding.banner.kind != bannerOK || !strings.Contains(m.funding.banner.text, "Korbit app") {
+	if m.funding.banner.kind != bannerOK || !strings.Contains(m.funding.banner.text, "Digital X app") {
 		t.Fatalf("the push result must point at the app, got %q", m.funding.banner.text)
 	}
 }
@@ -1115,7 +1115,7 @@ func TestWithdrawNoAddressesExplainsInPane(t *testing.T) {
 
 	frame := plain(m.render())
 	// The explanation may wrap mid-phrase, so match its two halves separately.
-	if !strings.Contains(frame, "register one in the Korbit developers") || !strings.Contains(frame, "portal") {
+	if !strings.Contains(frame, "register one in the Digital X developers") || !strings.Contains(frame, "portal") {
 		t.Fatalf("the pane must explain the missing registration in place:\n%s", frame)
 	}
 	// Submitting refuses with the same pointer.

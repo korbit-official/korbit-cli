@@ -7,7 +7,7 @@ package ops
 import (
 	"errors"
 
-	"github.com/korbit-official/korbit-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
 )
 
 // apiErrOf extracts the *output.ApiError from an error, or nil.

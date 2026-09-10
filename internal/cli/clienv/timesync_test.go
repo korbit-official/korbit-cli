@@ -7,7 +7,7 @@ package clienv_test
 import (
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/clienv"
 )
 
 // TestParseTimeSyncMode pins the value vocabulary: case-insensitive, trimmed,

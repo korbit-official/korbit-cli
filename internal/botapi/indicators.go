@@ -8,8 +8,8 @@ import (
 	"math"
 	"strings"
 
+	"github.com/digitalx-official/digitalx-cli/internal/indicators"
 	"github.com/dop251/goja"
-	"github.com/korbit-official/korbit-cli/internal/indicators"
 	"github.com/shopspring/decimal"
 )
 

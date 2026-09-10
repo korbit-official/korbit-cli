@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/korbit-official/korbit-cli/internal/accountseq"
-	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
-	"github.com/korbit-official/korbit-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/accountseq"
+	"github.com/digitalx-official/digitalx-cli/internal/cmdmeta"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -37,7 +37,7 @@ const mcpKeyArg = "key"
 // tool's schema on purpose — only a placement is worth previewing.
 const mcpDryRunArg = "dryRun"
 
-// guideName is the read-only tool that returns the bundled Korbit Agent Skill's
+// guideName is the read-only tool that returns the bundled Digital X Agent Skill's
 // workflow guidance — the safety rules and the recommended workflow for each
 // task. An MCP-only client (e.g. Claude Desktop via the .mcpb Desktop
 // Extension) never loads the skill the way Claude Code does, so this tool is how
@@ -59,7 +59,7 @@ const mcpGuideTopicArg = "topic"
 // discovered in the skill so the model can target one directly.
 func guideDesc(topics []string) string {
 	var b strings.Builder
-	b.WriteString("Korbit workflow guidance from the bundled agent skill: the safety rules (dry-run-first order placement, idempotency, decimal-string money) and the recommended workflow for each task. Call with no `topic` for the overview and task router; pass a `topic` for a focused playbook. Read this before placing an order or driving an unfamiliar flow. Read-only; returns documentation text and makes no API call.")
+	b.WriteString("Digital X workflow guidance from the bundled agent skill: the safety rules (dry-run-first order placement, idempotency, decimal-string money) and the recommended workflow for each task. Call with no `topic` for the overview and task router; pass a `topic` for a focused playbook. Read this before placing an order or driving an unfamiliar flow. Read-only; returns documentation text and makes no API call.")
 	if len(topics) > 0 {
 		b.WriteString(" Topics: " + strings.Join(topics, ", ") + ".")
 	}
@@ -116,7 +116,7 @@ func toolDescription(c surfaceCmd) string {
 // exists and how to invoke it from a shell.
 const botRuntimeReferenceName = "bot_runtime_reference"
 
-const botRuntimeReferenceDesc = "Reference for the korbit-cli bot runtime: the `monitor` command's --init/--where/--on JavaScript hooks, the async api.*/db.* API, and the synchronous `ta` technical-indicator library. This MCP server exposes REST endpoints as tools but cannot run a streaming bot — use the CLI (`" + progPlaceholder + " monitor --enable-experimental ...`) to run one. The bot runtime is EXPERIMENTAL and off by default (hence the --enable-experimental flag), and its API may change. Read-only; returns documentation text and makes no API call."
+const botRuntimeReferenceDesc = "Reference for the digitalx-cli bot runtime: the `monitor` command's --init/--where/--on JavaScript hooks, the async api.*/db.* API, and the synchronous `ta` technical-indicator library. This MCP server exposes REST endpoints as tools but cannot run a streaming bot — use the CLI (`" + progPlaceholder + " monitor --enable-experimental ...`) to run one. The bot runtime is EXPERIMENTAL and off by default (hence the --enable-experimental flag), and its API may change. Read-only; returns documentation text and makes no API call."
 
 // botRuntimeReferenceText renders the monitor command's surface entry — summary,
 // flags, notes, examples — into model-facing markdown. It is sourced entirely
@@ -128,7 +128,7 @@ func botRuntimeReferenceText() string {
 		return "the monitor bot runtime is unavailable in this build"
 	}
 	var b strings.Builder
-	b.WriteString("# korbit-cli bot runtime (`" + progPlaceholder + " monitor`)\n\n")
+	b.WriteString("# digitalx-cli bot runtime (`" + progPlaceholder + " monitor`)\n\n")
 	b.WriteString(c.Summary)
 	b.WriteString("\n\nRun it from a shell — this MCP server cannot stream a bot. The JavaScript hooks (--init/--where/--on) share one runtime with the full async api.*/db.* API and the synchronous ta/ta.stream indicator library.\n")
 	if len(c.Params) > 0 {

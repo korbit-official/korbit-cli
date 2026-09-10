@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
 )
 
 // apiWithLog builds a test API whose operation-level decisions are captured into

@@ -35,7 +35,7 @@ builds:
       # -s -w strips the symbol table and DWARF; -X injects the release version
       # (GoReleaser's .Version is the git tag with any leading "v" stripped).
       - -s -w
-      - -X github.com/korbit-official/korbit-cli/internal/version.Version={{ .Version }}
+      - -X github.com/digitalx-official/digitalx-cli/internal/version.Version={{ .Version }}
     # Target matrix: darwin/arm64, linux/{amd64,arm64}, windows/{amd64,arm64}.
     # Intel macOS (darwin/amd64) is intentionally not built.
     goos:
@@ -89,7 +89,7 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-      - -X github.com/korbit-official/korbit-cli/internal/version.Version={{ .Version }}
+      - -X github.com/digitalx-official/digitalx-cli/internal/version.Version={{ .Version }}
     goos:
       - darwin
       - linux

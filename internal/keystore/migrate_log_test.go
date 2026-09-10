@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/keystore"
-	"github.com/korbit-official/korbit-cli/internal/keystore/keystoretest"
-	"github.com/korbit-official/korbit-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/keystore"
+	"github.com/digitalx-official/digitalx-cli/internal/keystore/keystoretest"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
 )
 
 // TestMigrateLogsStepsNoSecret traces the copy → verify → commit → delete

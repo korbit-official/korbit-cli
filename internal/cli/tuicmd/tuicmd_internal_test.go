@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/rawapi"
-	"github.com/korbit-official/korbit-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/rawapi"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
 )
 
 // The subscription set: ticker + account channels cover EVERY symbol, while the

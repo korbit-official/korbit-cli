@@ -4,7 +4,7 @@
 
 package apiclient
 
-import "github.com/korbit-official/korbit-cli/internal/cmdmeta"
+import "github.com/digitalx-official/digitalx-cli/internal/cmdmeta"
 
 // Origin attributes a logical call to the frontend that issued it: which
 // Surface a Client acts for, with an optional finer Detail. It flows into

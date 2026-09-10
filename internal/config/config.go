@@ -16,10 +16,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/envalias"
-	"github.com/korbit-official/korbit-cli/internal/fslock"
-	"github.com/korbit-official/korbit-cli/internal/logging"
-	"github.com/korbit-official/korbit-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/envalias"
+	"github.com/digitalx-official/digitalx-cli/internal/fslock"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
 )
 
 // Backends are the supported keystore backend names.
@@ -306,7 +306,7 @@ func setTUIField(fields map[string]json.RawMessage, key string, value any) error
 // keystore.json, and the write is atomic (temp file + rename) so a crash
 // mid-write cannot leave a truncated config.json behind.
 //
-// The read-merge-write is serialized against concurrent korbit-cli processes
+// The read-merge-write is serialized against concurrent digitalx-cli processes
 // via config.json's own lock (independent of the registry/vault locks): the
 // merge that preserves unknown fields is itself a load-modify-write, so two
 // unlocked writers could last-writer-wins and drop a field. config.json has no

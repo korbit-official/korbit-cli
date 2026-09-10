@@ -15,7 +15,7 @@ const (
 	maxRecvWindowMs     = 60000
 )
 
-// State is one session's (or one process's) estimate of the Korbit server
+// State is one session's (or one process's) estimate of the Digital X server
 // clock, shared by everything that signs against it: the WebSocket upgrade
 // query, REST request signing, the EXCEED_TIME_WINDOW corrective resync, and
 // delivery-delay measurement. It is mutex-guarded and safe for concurrent use.
@@ -45,7 +45,7 @@ func New(now func() int64) *State { return &State{now: now} }
 // the server's fixed +1s future bound). Callers convert these from a
 // apiclient.ClockOffset (offsetMs = off.OffsetMs, leanMs = off.UncertaintyMs());
 // the conversion lives at the call site so this package stays free of any
-// korbit import (no dependency cycle — see doc.go).
+// apiclient import (no dependency cycle — see doc.go).
 func (s *State) Install(offsetMs, leanMs int64) {
 	s.mu.Lock()
 	s.offsetMs = offsetMs

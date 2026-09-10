@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package doctorcmd implements the `doctor` command: a read-only assessment of
-// whether the current key configuration can reach and trade on Korbit, with a
+// whether the current key configuration can reach and trade on Digital X, with a
 // fix named for every problem. It runs against the clienv.Cmd seam, so the cli
 // (and the mcp doctor tool) dispatch into it without it importing cli. The
 // Report renders its own human ✓/⚠/✗ checklist via FormatText
@@ -22,18 +22,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/accountseq"
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
-	"github.com/korbit-official/korbit-cli/internal/cli/probe"
-	"github.com/korbit-official/korbit-cli/internal/clock"
-	"github.com/korbit-official/korbit-cli/internal/config"
-	"github.com/korbit-official/korbit-cli/internal/i18n"
-	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/keystore"
-	"github.com/korbit-official/korbit-cli/internal/netbind"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/accountseq"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/clienv"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/probe"
+	"github.com/digitalx-official/digitalx-cli/internal/clock"
+	"github.com/digitalx-official/digitalx-cli/internal/config"
+	"github.com/digitalx-official/digitalx-cli/internal/i18n"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/keystore"
+	"github.com/digitalx-official/digitalx-cli/internal/netbind"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
 	"github.com/spf13/cobra"
 )
 
@@ -100,7 +100,7 @@ type Report struct {
 }
 
 // Run implements the `doctor` command: a read-only assessment of whether the
-// current key configuration can reach and trade on Korbit, with a fix named for
+// current key configuration can reach and trade on Digital X, with a fix named for
 // every problem. ExitSuccess = healthy (warnings allowed), ExitConfig = blocking
 // config problem, ExitInternal = only a network failure prevented verification.
 func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
@@ -334,7 +334,7 @@ func assessed(rep Report, code int) (Report, int, error) {
 // even before a key is configured. baseURL is the REST endpoint this credential
 // (or, keyless, the default resolution) targets.
 func doctorTail(cx *clienv.Cmd, cmd *cobra.Command, rep *Report, add func(name, status, detail, fix string), home, baseURL, name string, resolved *keys.Resolved, km *keys.Manager) int {
-	// Public IP as Korbit's production API sees us — probed once and reused both
+	// Public IP as Digital X's production API sees us — probed once and reused both
 	// for the IP-allowlist diagnosis (signed path) and the standalone "public IP"
 	// check (environment path).
 	iprep := probe.IPs(cx.IPProbe, probe.ProdBaseURL, probe.DefaultTimeoutMs, cx.Family.Networks())
@@ -429,7 +429,7 @@ func doctorSigned(cx *clienv.Cmd, cmd *cobra.Command, rep *Report, add func(name
 			}
 			if probe.IsIPAllowlistCode(apiErr.Code) {
 				// The default connection's source IP isn't allowlisted. Replay the
-				// signed request over each family to isolate which one Korbit accepts
+				// signed request over each family to isolate which one Digital X accepts
 				// and give a precise fix — the "ip allowlist" check carries the cure.
 				add("live whoami", CheckFail, i18n.T("API rejected the signed request: %s", detail),
 					i18n.T("your IP isn't allowlisted for this key — see the 'ip allowlist' check below"))
@@ -469,7 +469,7 @@ func doctorEnv(cx *clienv.Cmd, cmd *cobra.Command, rep *Report, add func(name, s
 	// Public IP for the allowlist — always reported.
 	if iprep.Any() {
 		add("public IP", CheckOK,
-			"Korbit sees you from: "+strings.Join(iprep.Allowlist, ", "),
+			"Digital X sees you from: "+strings.Join(iprep.Allowlist, ", "),
 			"ensure these are in the key's IP allowlist")
 	} else {
 		add("public IP", CheckWarn, i18n.T("could not determine your public IP"), i18n.T("check your network connection; then `%s`", progname.Name()+" ip"))
@@ -563,7 +563,7 @@ var ipFamilies = []struct {
 
 // doctorDiagnoseAllowlist runs after the live whoami was rejected for an
 // IP-allowlist reason. It replays the signed currentKeyInfo request over each
-// TCP family (forcing IPv4, then IPv6) to learn which one Korbit's allowlist
+// TCP family (forcing IPv4, then IPv6) to learn which one Digital X's allowlist
 // accepts:
 //   - if a family is accepted, the key is allowlisted for that family only; the
 //     successful response also carries the key's configured `whitelist`, so the

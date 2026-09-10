@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/logging"
-	"github.com/korbit-official/korbit-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
 )
 
 func data(channel, symbol string, origin stream.Origin, serverTime int64, source, payload string) stream.Data {

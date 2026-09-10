@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Package ids mints client order ids and enforces the Korbit clientOrderId
+// Package ids mints client order ids and enforces the Digital X clientOrderId
 // charset.
 package ids
 
@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// ClientOrderIDPattern is the Korbit clientOrderId charset/length rule.
+// ClientOrderIDPattern is the Digital X clientOrderId charset/length rule.
 var ClientOrderIDPattern = regexp.MustCompile(`^[0-9a-zA-Z.:_-]{1,36}$`)
 
 // UUIDv7 returns an RFC 9562 UUIDv7: a 48-bit unix-ms timestamp followed by

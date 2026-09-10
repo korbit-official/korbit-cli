@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/rawapi"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/rawapi"
 )
 
 // fakeClient is a scripted Doer (satisfying both ops.Doer and rawapi.Doer): it

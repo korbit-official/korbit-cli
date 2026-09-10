@@ -10,7 +10,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"github.com/korbit-official/korbit-cli/internal/rawapi"
+	"github.com/digitalx-official/digitalx-cli/internal/rawapi"
 )
 
 // A pair's order value bounds, as published by GET /v2/currencyPairs. The

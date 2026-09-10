@@ -9,7 +9,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/korbit-official/korbit-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
 )
 
 // FormatText renders the install summary for human output (textout.TextFormatter);

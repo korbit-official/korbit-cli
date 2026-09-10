@@ -11,8 +11,8 @@ import (
 	"log/slog"
 	"sort"
 
-	"github.com/korbit-official/korbit-cli/internal/logging"
-	"github.com/korbit-official/korbit-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
 )
 
 // Synth derives the monitor's synthesized `candle` channel: it consumes the

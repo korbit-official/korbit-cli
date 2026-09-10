@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package sandboxcmd implements the `sandbox …` builtin group: the lifecycle
-// manager for the local Korbit API Sandbox. All sandbox business logic lives in
+// manager for the local Digital X API Sandbox. All sandbox business logic lives in
 // internal/sandbox (+ internal/sandbox/deno); this layer only resolves config
 // from the environment, dispatches, and produces results. The dispatch never
 // writes config.json and the manager only ever pins loopback URLs onto the
@@ -15,12 +15,12 @@ import (
 	"errors"
 	"os/exec"
 
-	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
-	"github.com/korbit-official/korbit-cli/internal/envalias"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/progname"
-	"github.com/korbit-official/korbit-cli/internal/sandbox"
-	"github.com/korbit-official/korbit-cli/internal/spec"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/clienv"
+	"github.com/digitalx-official/digitalx-cli/internal/envalias"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/sandbox"
+	"github.com/digitalx-official/digitalx-cli/internal/spec"
 	"github.com/spf13/cobra"
 )
 

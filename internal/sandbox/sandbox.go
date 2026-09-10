@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Package sandbox is the lifecycle manager for the local Korbit API Sandbox: it
+// Package sandbox is the lifecycle manager for the local Digital X API Sandbox: it
 // runs the single-file mock under Deno — the CLI-managed pinned Deno by default,
 // or a system `deno` — handing Deno the Official-Source bundle URL to fetch and
 // cache itself, runs/stops/inspects it as a managed background server, and imports
@@ -39,10 +39,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/legacyfile"
-	"github.com/korbit-official/korbit-cli/internal/logging"
-	"github.com/korbit-official/korbit-cli/internal/sandbox/deno"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/legacyfile"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/sandbox/deno"
 )
 
 // DefaultPort is the predictable default the sandbox binds, falling back to an
@@ -87,7 +87,7 @@ type Config struct {
 	// Reimport replaces the imported key's material even if it already exists.
 	Reimport bool
 	// Paper enables paper trading: a fresh database is initialized with its
-	// seeded pairs' market data mirrored LIVE from production Korbit (the
+	// seeded pairs' market data mirrored LIVE from production Digital X (the
 	// bundle's `init-db --source live`, which verifies each pair's production
 	// status and needs network); fills stay simulated locally. The seeded set is
 	// the bundle's fixture pairs by default, or every LAUNCHED production pair

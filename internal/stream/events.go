@@ -27,7 +27,7 @@ const (
 	// feeQty where a WebSocket myTrade has fee).
 	OriginBackfill Origin = "backfill"
 	// OriginDerived is data the CLI synthesized itself rather than relayed — a
-	// channel that does not exist on the Korbit WebSocket API (the monitor's
+	// channel that does not exist on the Digital X WebSocket API (the monitor's
 	// candle channel, built by internal/candles from the trade stream plus REST
 	// seeds). Payload is a CLI-owned document, a stable contract of the emitting
 	// layer. A Session never emits this origin.

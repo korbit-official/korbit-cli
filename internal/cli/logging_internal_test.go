@@ -12,9 +12,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/logging"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
 )
 
 // stream.LogNotice logs each notice at its own level, so the logger's threshold
@@ -57,8 +58,9 @@ func TestSyncWriterSerializesIndependentLoggers(t *testing.T) {
 	}
 	wg.Wait()
 
-	wantStream := "korbit-cli: info: stream line component=stream k=v"
-	wantOp := "korbit-cli: warn: op line"
+	tag := progname.Name() + ": "
+	wantStream := tag + "info: stream line component=stream k=v"
+	wantOp := tag + "warn: op line"
 	var ns, no int
 	for _, l := range strings.Split(strings.TrimRight(buf.String(), "\n"), "\n") {
 		switch l {

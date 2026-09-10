@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package candles derives live OHLC candle series from the two sources the
-// Korbit API offers — the REST candles endpoint and the public trade stream —
+// Digital X API offers — the REST candles endpoint and the public trade stream —
 // because the API has no candle WebSocket channel. It is the single home of
 // the bucket math shared by its two consumers:
 //

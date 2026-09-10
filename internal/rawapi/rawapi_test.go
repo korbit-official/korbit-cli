@@ -17,7 +17,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
 )
 
 // captureDoer records the last outgoing request and replies with a fixed

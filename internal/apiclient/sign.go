@@ -16,7 +16,7 @@ import (
 	"encoding/pem"
 	"strings"
 
-	"github.com/korbit-official/korbit-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
 )
 
 // Keypair is a generated ED25519 keypair in PEM form. The public key is SPKI;
@@ -170,7 +170,7 @@ func LooksLikeEd25519PublicKey(s string) bool { return isEd25519SPKI(derFromKeyM
 func LooksLikeEd25519PrivateKey(s string) bool { return isEd25519PKCS8(derFromKeyMaterial(s)) }
 
 // SignParams signs the exact encoded parameter string (with `signature`
-// excluded) and returns the base64 signature to append last. Korbit verifies
+// excluded) and returns the base64 signature to append last. Digital X verifies
 // over the raw encoded bytes in sent order, so the caller must sign exactly
 // what it sends and never re-encode afterwards.
 func SignParams(key ed25519.PrivateKey, encodedParams string) string {
@@ -193,7 +193,7 @@ type Signer interface {
 func NewEd25519Signer(key ed25519.PrivateKey) Signer { return ed25519Signer{key} }
 
 // NewHMACSHA256Signer returns a Signer that produces a lowercase-hex
-// HMAC-SHA256 MAC. The secret's raw bytes are the HMAC key (Korbit issues the
+// HMAC-SHA256 MAC. The secret's raw bytes are the HMAC key (Digital X issues the
 // secret as a text string; its UTF-8 bytes are used verbatim).
 func NewHMACSHA256Signer(secret []byte) Signer { return hmacSHA256Signer{secret} }
 

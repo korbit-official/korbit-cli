@@ -7,7 +7,7 @@ package uikit
 import (
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/config"
+	"github.com/digitalx-official/digitalx-cli/internal/config"
 )
 
 // TestColorSchemeStringRoundTrips pins String and ParseColorScheme as exact

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
 )
 
 // genPEM returns a fresh ED25519 private PEM for import-path tests.

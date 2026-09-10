@@ -23,22 +23,22 @@ import (
 	"sync"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/stream"
-	"github.com/korbit-official/korbit-cli/internal/useragent"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/useragent"
 )
 
 const (
 	// ProdBaseURL is the production REST host — the single source for the
 	// production endpoint (the base-URL fallback and the always-production IP
 	// probe both resolve to it).
-	ProdBaseURL = "https://api.korbit.co.kr"
+	ProdBaseURL = "https://api.digitalx.miraeasset.com"
 
 	// PortalURL is the developers portal — the single source for the URL where
 	// users register a public key and manage a key's IP allowlist. The key-setup
 	// link, the `ip` guidance, and doctor's allowlist fixes all point at it.
-	PortalURL = "https://developers.korbit.co.kr"
+	PortalURL = "https://developers.digitalx.miraeasset.com"
 
 	// DefaultTimeoutMs is the default per-probe timeout. It is shorter than the
 	// regular request timeout: an unreachable target must fail fast (an
@@ -89,11 +89,11 @@ func WSURLsFor(wsBase string) (publicURL, privateURL string) {
 //
 // Examples (illustrative hosts):
 //
-//	https://api.korbit.co.kr      → wss://ws-api.korbit.co.kr
-//	https://api-test.korbit.co.kr → wss://ws-api-test.korbit.co.kr
-//	https://apiz.korbit.com       → wss://ws-api.korbit.com
-//	https://api7-test.korbit.com  → wss://ws-api-test.korbit.com
-//	http://127.0.0.1:9999         → ws://127.0.0.1:9999
+//	https://api.digitalx.miraeasset.com      → wss://ws-api.digitalx.miraeasset.com
+//	https://api-test.digitalx.miraeasset.com → wss://ws-api-test.digitalx.miraeasset.com
+//	https://apix.example.com                 → wss://ws-api.example.com
+//	https://api2-test.example.com            → wss://ws-api-test.example.com
+//	http://127.0.0.1:9999                    → ws://127.0.0.1:9999
 //
 // The result is a base URL with no path; callers append /v2/public and
 // /v2/private. It returns "" only when raw cannot be parsed into a host — the
@@ -166,7 +166,7 @@ func IsLoopbackHost(host string) bool {
 
 // ---- public-IP probe ----
 
-// Report is the result of probing Korbit over both families. Each address is
+// Report is the result of probing Digital X over both families. Each address is
 // null when that family is unavailable. Allowlist is the ready-to-paste set for
 // the portal's API-key IP allowlist: the full IPv4 address (a /32) and the IPv6
 // /64 prefix.

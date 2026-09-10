@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/journal"
-	"github.com/korbit-official/korbit-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/journal"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
 )
 
 // TestReadyLogsJournalingDecision asserts the per-call Debug line explains

@@ -17,10 +17,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/keystore"
-	"github.com/korbit-official/korbit-cli/internal/keystore/keystoretest"
-	"github.com/korbit-official/korbit-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/keystore"
+	"github.com/digitalx-official/digitalx-cli/internal/keystore/keystoretest"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
 )
 
 // testEnv wires a Manager over in-memory mock backends ("file" and
@@ -119,7 +119,7 @@ func TestMetaForSelection(t *testing.T) {
 	if _, err := env.m.Add("a", "", ""); err != nil {
 		t.Fatal(err)
 	}
-	if err := env.m.SetBaseURL("a", "https://api-test.korbit.co.kr", "wss://ws-api-test.korbit.co.kr"); err != nil {
+	if err := env.m.SetBaseURL("a", "https://api-test.digitalx.miraeasset.com", "wss://ws-api-test.digitalx.miraeasset.com"); err != nil {
 		t.Fatal(err)
 	}
 	if err := env.m.SetDefaultAccountSeq("a", 3); err != nil {
@@ -128,8 +128,8 @@ func TestMetaForSelection(t *testing.T) {
 
 	// A stored selection picks up every per-key field (name "" => the default key).
 	got := env.m.MetaForSelection(Selection{Name: ""})
-	if got.BaseURL != "https://api-test.korbit.co.kr" ||
-		got.WSBaseURL != "wss://ws-api-test.korbit.co.kr" ||
+	if got.BaseURL != "https://api-test.digitalx.miraeasset.com" ||
+		got.WSBaseURL != "wss://ws-api-test.digitalx.miraeasset.com" ||
 		got.DefaultAccountSeq != "3" {
 		t.Fatalf("stored selection meta = %+v", got)
 	}
@@ -779,7 +779,7 @@ func TestRenamePreservesEverything(t *testing.T) {
 	if err := env.m.Bind("a", "KEYID-1"); err != nil {
 		t.Fatal(err)
 	}
-	if err := env.m.SetBaseURL("a", "https://api-test.korbit.co.kr", "wss://ws-api-test.korbit.co.kr"); err != nil {
+	if err := env.m.SetBaseURL("a", "https://api-test.digitalx.miraeasset.com", "wss://ws-api-test.digitalx.miraeasset.com"); err != nil {
 		t.Fatal(err)
 	}
 	before, _ := env.m.Show("a")
@@ -814,7 +814,7 @@ func TestRenamePreservesEverything(t *testing.T) {
 	if after.APIKeyID == nil || *after.APIKeyID != "KEYID-1" {
 		t.Fatalf("binding must be preserved, got %v", after.APIKeyID)
 	}
-	if after.BaseURL != "https://api-test.korbit.co.kr" || after.WSBaseURL != "wss://ws-api-test.korbit.co.kr" {
+	if after.BaseURL != "https://api-test.digitalx.miraeasset.com" || after.WSBaseURL != "wss://ws-api-test.digitalx.miraeasset.com" {
 		t.Fatalf("per-key base URLs must be preserved, got %q / %q", after.BaseURL, after.WSBaseURL)
 	}
 	// The renamed key still signs (the moved secret is intact).

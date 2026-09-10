@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
 )
 
 // syncBuf is a concurrency-safe io.Writer for capturing log output written from

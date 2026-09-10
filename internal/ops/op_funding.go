@@ -9,8 +9,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/rawapi"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/rawapi"
 )
 
 // funding histories — the honest 100-row cap over the typed layer.
@@ -60,7 +61,7 @@ func (op fundingHistoryOp) Run(ctx context.Context, a *API, in RunInput) (Result
 	if len(rows) >= args.limit {
 		res.Truncated = true
 		res.Note = fmt.Sprintf("api.%s: the endpoint returned its full %d-row limit — older rows exist but cannot be reached (the endpoint has no time range or cursor)", opJSKeyName(op.meta), args.limit)
-		fmt.Fprintf(a.stderr(), "korbit-cli: %s\n", res.Note)
+		fmt.Fprintf(a.stderr(), "%s: %s\n", progname.Name(), res.Note)
 	}
 	res.JournalErr = finishOK(a, h)
 	return res, nil

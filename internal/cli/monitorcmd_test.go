@@ -17,10 +17,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/cli"
-	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/cli"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
 )
 
 // doerFunc adapts a function to apiclient.Doer, producing a fresh response per
@@ -104,7 +104,7 @@ func TestSetBaseURLVerifies(t *testing.T) {
 		home := t.TempDir()
 		seedBoundKey(t, home)
 		out, _, code := runMonitorCLI(
-			[]string{"key", "set-base-url", "bot", "https://api-test.korbit.co.kr", "--compact"},
+			[]string{"key", "set-base-url", "bot", "https://api-test.digitalx.miraeasset.com", "--compact"},
 			map[string]string{"DIGITALX_CLI_HOME": home}, okDoer, dialFrames())
 		if code != 0 {
 			t.Fatalf("exit=%d out=%q", code, out)
@@ -121,7 +121,7 @@ func TestSetBaseURLVerifies(t *testing.T) {
 		if !doc.Verification.REST.Reachable || !doc.Verification.WS.Reachable {
 			t.Fatalf("both should be reachable: %s", out)
 		}
-		if doc.Verification.WS.URL != "wss://ws-api-test.korbit.co.kr" {
+		if doc.Verification.WS.URL != "wss://ws-api-test.digitalx.miraeasset.com" {
 			t.Fatalf("ws url wrong: %s", out)
 		}
 	})
@@ -133,7 +133,7 @@ func TestSetBaseURLVerifies(t *testing.T) {
 			return nil, errors.New("dial tcp: connection refused")
 		}
 		out, errb, code := runMonitorCLI(
-			[]string{"key", "set-base-url", "bot", "https://api-test.korbit.co.kr", "--compact"},
+			[]string{"key", "set-base-url", "bot", "https://api-test.digitalx.miraeasset.com", "--compact"},
 			map[string]string{"DIGITALX_CLI_HOME": home}, okDoer, failDial)
 		if code != 0 {
 			t.Fatalf("an unreachable endpoint must not fail the command: exit=%d", code)
@@ -147,7 +147,7 @@ func TestSetBaseURLVerifies(t *testing.T) {
 		if err := json.Unmarshal([]byte(out), &doc); err != nil {
 			t.Fatalf("parse: %v (%s)", err, out)
 		}
-		if doc.BaseURL != "https://api-test.korbit.co.kr" {
+		if doc.BaseURL != "https://api-test.digitalx.miraeasset.com" {
 			t.Fatalf("URL must still be stored: %s", out)
 		}
 		if doc.Verification.WS.Reachable {
@@ -159,7 +159,7 @@ func TestSetBaseURLVerifies(t *testing.T) {
 			t.Fatalf("set-base-url --compact must write nothing to stderr: %s", errb)
 		}
 		humanOut, humanErr, _ := runMonitorCLI(
-			[]string{"key", "set-base-url", "bot", "https://api-test.korbit.co.kr"},
+			[]string{"key", "set-base-url", "bot", "https://api-test.digitalx.miraeasset.com"},
 			map[string]string{"DIGITALX_CLI_HOME": home}, okDoer, failDial)
 		if !strings.Contains(humanOut, "--ws-base-url") || !strings.Contains(humanOut, "key set-base-url bot") {
 			t.Fatalf("fix command not shown on stdout: %s (stderr=%s)", humanOut, humanErr)
@@ -173,7 +173,7 @@ func TestSetBaseURLVerifies(t *testing.T) {
 			return nil, errors.New("dial tcp: connection refused")
 		})
 		out, errb, code := runMonitorCLI(
-			[]string{"key", "set-base-url", "bot", "https://api-test.korbit.co.kr", "--compact"},
+			[]string{"key", "set-base-url", "bot", "https://api-test.digitalx.miraeasset.com", "--compact"},
 			map[string]string{"DIGITALX_CLI_HOME": home}, failDoer, dialFrames())
 		if code != 0 {
 			t.Fatalf("an unreachable REST endpoint must not fail the command: exit=%d", code)
@@ -193,7 +193,7 @@ func TestSetBaseURLVerifies(t *testing.T) {
 			t.Fatalf("set-base-url --compact must write nothing to stderr: %s", errb)
 		}
 		humanOut, humanErr, _ := runMonitorCLI(
-			[]string{"key", "set-base-url", "bot", "https://api-test.korbit.co.kr"},
+			[]string{"key", "set-base-url", "bot", "https://api-test.digitalx.miraeasset.com"},
 			map[string]string{"DIGITALX_CLI_HOME": home}, failDoer, dialFrames())
 		if !strings.Contains(humanOut, "double-check the base URL") {
 			t.Fatalf("REST fix guidance not shown on stdout: %s (stderr=%s)", humanOut, humanErr)
@@ -209,7 +209,7 @@ func TestSetBaseURLVerifies(t *testing.T) {
 			return nil, errors.New("unexpected")
 		}
 		out, _, code := runMonitorCLI(
-			[]string{"key", "set-base-url", "bot", "https://api-test.korbit.co.kr", "--no-verify", "--compact"},
+			[]string{"key", "set-base-url", "bot", "https://api-test.digitalx.miraeasset.com", "--no-verify", "--compact"},
 			map[string]string{"DIGITALX_CLI_HOME": home}, okDoer, neverDial)
 		if code != 0 {
 			t.Fatalf("exit=%d", code)
@@ -589,7 +589,7 @@ func TestMonitorDryRunProductionWSDefaults(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
-	if !strings.Contains(out, `"wsPublicUrl":"wss://ws-api.korbit.co.kr/v2/public"`) {
+	if !strings.Contains(out, `"wsPublicUrl":"wss://ws-api.digitalx.miraeasset.com/v2/public"`) {
 		t.Errorf("production should use the default WS host: %q", out)
 	}
 }
@@ -597,7 +597,7 @@ func TestMonitorDryRunProductionWSDefaults(t *testing.T) {
 // TestMonitorWSBaseURLResolution covers the WebSocket-URL precedence and the
 // derive-from-REST fallback for the layers that don't need a signing key.
 func TestMonitorWSBaseURLResolution(t *testing.T) {
-	const wantDerived = `"wsPublicUrl":"wss://ws-api-test.korbit.co.kr/v2/public"`
+	const wantDerived = `"wsPublicUrl":"wss://ws-api-test.digitalx.miraeasset.com/v2/public"`
 	cases := []struct {
 		name string
 		args []string
@@ -606,24 +606,24 @@ func TestMonitorWSBaseURLResolution(t *testing.T) {
 	}{
 		{
 			name: "derived from --base-url",
-			args: []string{"--base-url", "https://api-test.korbit.co.kr"},
+			args: []string{"--base-url", "https://api-test.digitalx.miraeasset.com"},
 			want: wantDerived,
 		},
 		{
 			name: "--ws-base-url overrides the derivation",
-			args: []string{"--base-url", "https://api-test.korbit.co.kr", "--ws-base-url", "wss://stream.example.test"},
+			args: []string{"--base-url", "https://api-test.digitalx.miraeasset.com", "--ws-base-url", "wss://stream.example.test"},
 			want: `"wsPublicUrl":"wss://stream.example.test/v2/public"`,
 		},
 		{
 			name: "DIGITALX_CLI_WS_BASE_URL env",
-			args: []string{"--base-url", "https://api-test.korbit.co.kr"},
+			args: []string{"--base-url", "https://api-test.digitalx.miraeasset.com"},
 			env:  map[string]string{"DIGITALX_CLI_WS_BASE_URL": "wss://env-stream.example.test"},
 			want: `"wsPublicUrl":"wss://env-stream.example.test/v2/public"`,
 		},
 		{
 			name: "derived from DIGITALX_CLI_BASE_URL env",
-			env:  map[string]string{"DIGITALX_CLI_BASE_URL": "https://apiz.korbit.com"},
-			want: `"wsPublicUrl":"wss://ws-api.korbit.com/v2/public"`,
+			env:  map[string]string{"DIGITALX_CLI_BASE_URL": "https://apix.example.com"},
+			want: `"wsPublicUrl":"wss://ws-api.example.com/v2/public"`,
 		},
 	}
 	for _, tc := range cases {
@@ -644,7 +644,7 @@ func TestMonitorWSBaseURLResolution(t *testing.T) {
 // when the REST base also comes from config (no higher override).
 func TestMonitorWSBaseURLFromConfig(t *testing.T) {
 	home := t.TempDir()
-	writeConfig(t, home, `{"baseUrl":"https://api-test.korbit.co.kr","wsBaseUrl":"wss://cfg-stream.example.test"}`)
+	writeConfig(t, home, `{"baseUrl":"https://api-test.digitalx.miraeasset.com","wsBaseUrl":"wss://cfg-stream.example.test"}`)
 	out, _, code := runMonitorCLI(
 		[]string{"monitor", "--symbols", "btc_krw", "--ticker", "--dry-run", "--compact"},
 		map[string]string{"DIGITALX_CLI_HOME": home}, nil, nil)
@@ -663,14 +663,14 @@ func TestMonitorWSBaseURLFromKey(t *testing.T) {
 	t.Run("derived from per-key baseUrl", func(t *testing.T) {
 		home := t.TempDir()
 		seedBoundKey(t, home)
-		setKeyBaseURL(t, home, "bot", "https://api-test.korbit.co.kr") // empty ws → derived
+		setKeyBaseURL(t, home, "bot", "https://api-test.digitalx.miraeasset.com") // empty ws → derived
 		out, _, code := runMonitorCLI(
 			[]string{"monitor", "--symbols", "btc_krw", "--ticker", "--where", "true", "--key", "bot", "--dry-run", "--compact"},
 			map[string]string{"DIGITALX_CLI_HOME": home}, nil, nil)
 		if code != 0 {
 			t.Fatalf("exit=%d out=%q", code, out)
 		}
-		if !strings.Contains(out, `"wsPublicUrl":"wss://ws-api-test.korbit.co.kr/v2/public"`) {
+		if !strings.Contains(out, `"wsPublicUrl":"wss://ws-api-test.digitalx.miraeasset.com/v2/public"`) {
 			t.Errorf("per-key derivation wrong: %s", out)
 		}
 	})
@@ -678,7 +678,7 @@ func TestMonitorWSBaseURLFromKey(t *testing.T) {
 		home := t.TempDir()
 		seedBoundKey(t, home)
 		m := keys.NewManager(home, "file", func() int64 { return 1700000000000 }, nil)
-		if err := m.SetBaseURL("bot", "https://api-test.korbit.co.kr", "wss://key-stream.example.test"); err != nil {
+		if err := m.SetBaseURL("bot", "https://api-test.digitalx.miraeasset.com", "wss://key-stream.example.test"); err != nil {
 			t.Fatal(err)
 		}
 		out, _, code := runMonitorCLI(
@@ -770,7 +770,7 @@ func TestMonitorExperimentalGate(t *testing.T) {
 }
 
 func TestMonitorUpgradeRejectionExits3(t *testing.T) {
-	// A 4xx handshake rejection carrying a Korbit error envelope is fatal:
+	// A 4xx handshake rejection carrying a Digital X error envelope is fatal:
 	// the session emits a FATAL notice and the command exits 3 with the
 	// symbolic code preserved in the structured error.
 	dial := func(context.Context, string, http.Header) (stream.Conn, error) {

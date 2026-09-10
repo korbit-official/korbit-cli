@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/cli/probe"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/probe"
 )
 
 func TestSpliceField(t *testing.T) {
@@ -103,7 +103,7 @@ func TestValidateBaseURL(t *testing.T) {
 		signed bool
 		ok     bool
 	}{
-		{"https://api.korbit.co.kr", true, true},
+		{"https://api.digitalx.miraeasset.com", true, true},
 		{"http://127.0.0.1:9999", true, true}, // local sandbox over http is fine
 		{"http://localhost:9999", true, true},
 		{"http://evil.example", true, false}, // plaintext to remote host, signed -> refuse

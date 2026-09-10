@@ -25,7 +25,7 @@ import (
 //
 //  1. SKILL.md declares one of our skill names in its frontmatter (the field the
 //     skill system itself keys on) AND names a command this skill drives;
-//  2. its body carries this CLI's canonical repository URL, which every
+//  2. its body carries one of this CLI's repository URLs, which every
 //     revision of the skill has cited as where its source lives;
 //  3. the directory holds exactly our reference set and nothing else.
 //
@@ -45,11 +45,21 @@ var managedNames = []string{SkillName, LegacySkillName}
 // skill at one of our directory names pass.
 var managedMarkers = []string{SkillBinary, "korbit-cli"}
 
-// managedRepoMarker is this CLI's canonical repository URL. The skill body
-// cites it as where the tool's source lives, in every revision of the skill, so
-// its presence is a fact about the file's provenance rather than about its
-// subject matter.
-const managedRepoMarker = "github.com/korbit-official/korbit-cli"
+// managedRepoMarkers are the repository URLs a copy of this skill cites in its
+// body as where the tool's source lives. Every revision of the skill carries
+// one of them, so the presence of any is a fact about the file's provenance
+// rather than about its subject matter.
+//
+// Both count, and must keep counting: a binary that ships the skill citing the
+// second URL writes a copy that carries it, and such a copy — typically the one
+// at LegacySkillName — is exactly what Install has to recognise in order to
+// replace it. Judging it foreign leaves it in place beside the current skill,
+// and an agent that finds both loads two skills with the same triggers, which is
+// the outcome this file exists to prevent.
+var managedRepoMarkers = []string{
+	"github.com/digitalx-official/digitalx-cli",
+	"github.com/korbit-official/korbit-cli",
+}
 
 // managedReferences is the exact set of files our skill ships in its references
 // directory (Install prunes anything else, so an installed copy holds precisely
@@ -89,13 +99,13 @@ func managedFrontmatter(skill string) bool {
 	return slices.Contains(managedNames, name)
 }
 
-// managedBody is proof 2: the body cites this CLI's repository.
+// managedBody is proof 2: the body cites one of this CLI's repository URLs.
 func managedBody(skill string) bool {
 	_, body, ok := splitFrontmatter(skill)
 	if !ok {
 		return false
 	}
-	return strings.Contains(body, managedRepoMarker)
+	return anyContains(body, managedRepoMarkers)
 }
 
 // managedReferenceSet is proof 3: the references directory holds exactly the

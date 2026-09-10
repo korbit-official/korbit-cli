@@ -8,7 +8,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/tui/candlechart"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/candlechart"
 )
 
 func mkCandles(closes ...float64) []candlechart.Candle {

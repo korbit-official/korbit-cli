@@ -7,8 +7,8 @@ package keys
 import (
 	"strings"
 
-	"github.com/korbit-official/korbit-cli/internal/envalias"
-	"github.com/korbit-official/korbit-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/envalias"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
 )
 
 // Environment variables that choose the signing credential for an invocation.

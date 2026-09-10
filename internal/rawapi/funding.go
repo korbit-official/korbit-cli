@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
 )
 
 // CoinDeposit is one crypto deposit record.
@@ -268,7 +268,7 @@ func (c *Client) WithdrawStatus(ctx context.Context, req WithdrawStatusRequest, 
 
 // ---- krw deposit: POST /v2/krw/sendKrwDepositPush (signed) ----
 
-// KRWDepositRequest sends a KRW-deposit push to the Korbit app.
+// KRWDepositRequest sends a KRW-deposit push to the Digital X app.
 type KRWDepositRequest struct {
 	Amount     string
 	AccountSeq *int
@@ -288,7 +288,7 @@ func (c *Client) KRWDeposit(ctx context.Context, req KRWDepositRequest, pol apic
 
 // ---- krw withdraw: POST /v2/krw/sendKrwWithdrawalPush (signed) ----
 
-// KRWWithdrawRequest sends a KRW-withdrawal push to the Korbit app.
+// KRWWithdrawRequest sends a KRW-withdrawal push to the Digital X app.
 type KRWWithdrawRequest struct {
 	Amount     string
 	AccountSeq *int

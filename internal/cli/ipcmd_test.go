@@ -13,7 +13,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/cli"
+	"github.com/digitalx-official/digitalx-cli/internal/cli"
 )
 
 // fakeProbe returns canned IPs per network family; an empty string means that
@@ -109,7 +109,7 @@ func TestIPAlwaysProbesProduction(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
-	if gotBaseURL != "https://api.korbit.co.kr" {
+	if gotBaseURL != "https://api.digitalx.miraeasset.com" {
 		t.Fatalf("ip must probe production, got baseURL %q", gotBaseURL)
 	}
 }
@@ -195,7 +195,7 @@ func TestSetupSurfacesIPAllowlist(t *testing.T) {
 		t.Fatalf("setup output missing ipAllowlist: %s", out)
 	}
 	// The registration deep link prefills permissions and the probed allowlist.
-	if !strings.Contains(out, "developers.korbit.co.kr/manage/create") || !strings.Contains(out, "permissions=47") {
+	if !strings.Contains(out, "developers.digitalx.miraeasset.com/manage/create") || !strings.Contains(out, "permissions=47") {
 		t.Fatalf("setup output missing registration link: %s", out)
 	}
 	if !strings.Contains(out, "whitelist=203.0.113.7") {
@@ -226,7 +226,7 @@ func TestSetupSurvivesIPProbeFailure(t *testing.T) {
 	if strings.Contains(out, "ipAllowlist") {
 		t.Fatalf("ipAllowlist must be omitted when no IP could be determined: %s", out)
 	}
-	if !strings.Contains(out, "developers.korbit.co.kr/manage/create") || !strings.Contains(out, "permissions=47") {
+	if !strings.Contains(out, "developers.digitalx.miraeasset.com/manage/create") || !strings.Contains(out, "permissions=47") {
 		t.Fatalf("expected a registration link even without an allowlist: %s", out)
 	}
 	if strings.Contains(out, "whitelist=") {

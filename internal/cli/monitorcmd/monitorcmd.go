@@ -22,24 +22,24 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/accountseq"
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/botapi"
-	"github.com/korbit-official/korbit-cli/internal/candles"
-	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
-	"github.com/korbit-official/korbit-cli/internal/cli/probe"
-	"github.com/korbit-official/korbit-cli/internal/clock"
-	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
-	"github.com/korbit-official/korbit-cli/internal/fslock"
-	"github.com/korbit-official/korbit-cli/internal/jqfilter"
-	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/legacyfile"
-	"github.com/korbit-official/korbit-cli/internal/logging"
-	"github.com/korbit-official/korbit-cli/internal/ops"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/progname"
-	"github.com/korbit-official/korbit-cli/internal/stream"
-	"github.com/korbit-official/korbit-cli/internal/useragent"
+	"github.com/digitalx-official/digitalx-cli/internal/accountseq"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/botapi"
+	"github.com/digitalx-official/digitalx-cli/internal/candles"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/clienv"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/probe"
+	"github.com/digitalx-official/digitalx-cli/internal/clock"
+	"github.com/digitalx-official/digitalx-cli/internal/cmdmeta"
+	"github.com/digitalx-official/digitalx-cli/internal/fslock"
+	"github.com/digitalx-official/digitalx-cli/internal/jqfilter"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/legacyfile"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/ops"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/useragent"
 	"github.com/spf13/cobra"
 )
 
@@ -406,7 +406,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 				keyName, apiKeyID = resolved.Name, resolved.APIKeyID
 				// Always-shown safety disclosure (which key/account the bot signs
 				// with), not a level-gated log and not part of the stdout stream.
-				cx.IO.Notef("korbit-cli: signing as key %q", resolved.Name)
+				cx.IO.Notef("%s: signing as key %q", progname.Name(), resolved.Name)
 			}
 		}
 	}
@@ -998,7 +998,7 @@ func parseAccountSeqs(raw string) ([]int, error) {
 }
 
 // RunError classifies a fatal session error for the exit-code contract:
-// a rejected WebSocket handshake carrying a Korbit error envelope is an API
+// a rejected WebSocket handshake carrying a Digital X error envelope is an API
 // rejection (exit 3, with the symbolic code preserved); anything else surfaces
 // as-is (untyped → exit 1).
 func RunError(err error) error {

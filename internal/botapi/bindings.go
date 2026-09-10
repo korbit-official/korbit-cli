@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/digitalx-official/digitalx-cli/internal/accountseq"
+	"github.com/digitalx-official/digitalx-cli/internal/cmdmeta"
+	"github.com/digitalx-official/digitalx-cli/internal/ops"
+	"github.com/digitalx-official/digitalx-cli/internal/stream/state"
 	"github.com/dop251/goja"
-	"github.com/korbit-official/korbit-cli/internal/accountseq"
-	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
-	"github.com/korbit-official/korbit-cli/internal/ops"
-	"github.com/korbit-official/korbit-cli/internal/stream/state"
 )
 
 // The api.* surface is GENERATED from the ops catalog — every endpoint
@@ -69,9 +69,9 @@ func jsMethodName(id []string) string {
 	return jsGlobal + "." + strings.Join(parts, ".")
 }
 
-// installKorbit builds the API global from the ops catalog and binds it under
+// installAPI builds the API global from the ops catalog and binds it under
 // both of its names.
-func (r *Runtime) installKorbit(vm *goja.Runtime) error {
+func (r *Runtime) installAPI(vm *goja.Runtime) error {
 	apiObj := vm.NewObject()
 	groups := map[string]*goja.Object{}
 

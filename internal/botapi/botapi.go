@@ -55,12 +55,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/ops"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/stream/state"
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/eventloop"
-	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/ops"
-	"github.com/korbit-official/korbit-cli/internal/stream"
-	"github.com/korbit-official/korbit-cli/internal/stream/state"
 )
 
 //go:embed prelude.js
@@ -366,7 +366,7 @@ func (r *Runtime) setupOnLoop(vm *goja.Runtime) error {
 	if err := r.installConsole(vm); err != nil {
 		return err
 	}
-	if err := r.installKorbit(vm); err != nil {
+	if err := r.installAPI(vm); err != nil {
 		return err
 	}
 	if err := r.installDB(vm); err != nil {

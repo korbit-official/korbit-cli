@@ -7,8 +7,8 @@ package callrec
 import (
 	"net/http"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/cmdmeta"
 )
 
 // FailMode is how a POST-call Record failure is handled — the second axis of a

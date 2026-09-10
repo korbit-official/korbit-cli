@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Package agentskill installs and inspects the bundled Korbit Agent Skill on
+// Package agentskill installs and inspects the bundled Digital X Agent Skill on
 // disk. The skill content travels inside the binary as an embedded fs.FS (rooted
 // at the skill directory, with SKILL.md at the top); this package writes it into
 // an agent's skills directory and reports whether an on-disk copy matches the
@@ -41,7 +41,7 @@ const LegacySkillName = "korbit"
 
 // SkillBinary is the command name the bundled skill tells agents to run. It is
 // intentionally separate from the running executable name: the binary can be
-// invoked through another filename such as "korbit-cli", while the installed
+// invoked through another filename such as "digitalx-cli", while the installed
 // skill contains literal `dgx-cli ...` commands. Doctor and command metadata
 // must describe the command the skill actually executes.
 const SkillBinary = "dgx-cli"

@@ -105,12 +105,12 @@ cat >"$stage/manifest.json" <<EOF
   "name": "korbit",
   "display_name": "Digital X CLI",
   "version": "$version",
-  "description": "Operate the Korbit cryptocurrency exchange over MCP — every REST endpoint as a tool, with the same validation, signing, journaling, and retries as the CLI.",
-  "long_description": "Exposes the Korbit Open API v2 as MCP tools backed by the dgx-cli binary running locally on your machine, so your API keys never leave it. Read market data, manage orders, and check balances; the order-placement tool supports a dry-run that simulates the fill against the live order book before anything is sent. First-time users with no key yet can complete setup entirely in chat via the setup and doctor tools.",
-  "author": { "name": "Digital X Co., Ltd.", "url": "https://www.korbit.co.kr" },
-  "homepage": "https://developers.korbit.co.kr/",
-  "documentation": "https://developers.korbit.co.kr/",
-  "repository": { "type": "git", "url": "https://github.com/korbit-official/korbit-cli.git" },
+  "description": "Operate the Digital X cryptocurrency exchange over MCP — every REST endpoint as a tool, with the same validation, signing, journaling, and retries as the CLI.",
+  "long_description": "Exposes the Digital X Open API v2 as MCP tools backed by the dgx-cli binary running locally on your machine, so your API keys never leave it. Read market data, manage orders, and check balances; the order-placement tool supports a dry-run that simulates the fill against the live order book before anything is sent. First-time users with no key yet can complete setup entirely in chat via the setup and doctor tools.",
+  "author": { "name": "Digital X Co., Ltd.", "url": "https://digitalx.miraeasset.com" },
+  "homepage": "https://developers.digitalx.miraeasset.com/",
+  "documentation": "https://developers.digitalx.miraeasset.com/",
+  "repository": { "type": "git", "url": "https://github.com/digitalx-official/digitalx-cli.git" },
   "license": "Apache-2.0",
   "icon": "icon.png",
   "keywords": ["digitalx", "digitalx-cli", "dgx-cli", "korbit", "cryptocurrency", "exchange", "trading", "mcp"],
@@ -136,7 +136,7 @@ cat >"$stage/manifest.json" <<EOF
     "multi_key": {
       "type": "boolean",
       "title": "Allow multiple accounts (multi-key)",
-      "description": "Add an optional account-key argument to each authenticated tool so one server can act on any of your configured keys. Use with caution: the AI agent picks the key and can make a mistake, acting on the wrong Korbit account or API key — and keys may carry different permissions. Leave off to pin the server to your default key. Off by default.",
+      "description": "Add an optional account-key argument to each authenticated tool so one server can act on any of your configured keys. Use with caution: the AI agent picks the key and can make a mistake, acting on the wrong Digital X account or API key — and keys may carry different permissions. Leave off to pin the server to your default key. Off by default.",
       "default": false
     }
   },

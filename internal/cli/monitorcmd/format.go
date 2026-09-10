@@ -9,7 +9,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/korbit-official/korbit-cli/internal/cli/textout"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/textout"
 )
 
 // FormatText renders the --dry-run plan for human output (textout.TextFormatter);

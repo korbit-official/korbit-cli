@@ -23,11 +23,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/cli"
-	"github.com/korbit-official/korbit-cli/internal/journal"
-	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/version"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/cli"
+	"github.com/digitalx-official/digitalx-cli/internal/journal"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/version"
 )
 
 type stubDoer struct {
@@ -207,7 +208,7 @@ func TestDiagnosticsAreDebugGated(t *testing.T) {
 	if !strings.Contains(stderr, `signing as key "bot"`) {
 		t.Fatalf("the signing disclosure must show without --debug: %q", stderr)
 	}
-	if strings.Contains(stderr, "korbit-cli: debug:") {
+	if strings.Contains(stderr, logTag()+"debug:") {
 		t.Fatalf("a Debug log must be suppressed without --debug, got stderr=%q", stderr)
 	}
 
@@ -218,7 +219,7 @@ func TestDiagnosticsAreDebugGated(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("debug exit=%d stderr=%s", code, stderr)
 	}
-	if !strings.Contains(stderr, "korbit-cli: debug: GET /v2/balance") {
+	if !strings.Contains(stderr, logTag()+"debug: GET /v2/balance") {
 		t.Fatalf("expected the Debug request-target log under --debug, got stderr=%q", stderr)
 	}
 }
@@ -233,7 +234,7 @@ func TestLogLevelControlsLevelSeparately(t *testing.T) {
 	newDoer := func() *stubDoer {
 		return &stubDoer{resp: resp(200, `{"success":true,"data":{"krw":{"available":"1000"}}}`, nil)}
 	}
-	const debugLine = "korbit-cli: debug: GET /v2/balance"
+	debugLine := logTag() + "debug: GET /v2/balance"
 
 	// --log-level debug raises verbosity WITHOUT --debug: the Debug log appears.
 	_, stderr, code := runCLI(
@@ -254,7 +255,7 @@ func TestLogLevelControlsLevelSeparately(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, stderr)
 	}
-	if strings.Contains(stderr, "korbit-cli: debug:") {
+	if strings.Contains(stderr, logTag()+"debug:") {
 		t.Fatalf("--log-level off must override --debug and suppress logs, got %q", stderr)
 	}
 	if !strings.Contains(stderr, `signing as key "bot"`) {
@@ -268,7 +269,7 @@ func TestLogLevelControlsLevelSeparately(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, stderr)
 	}
-	if strings.Contains(stderr, "korbit-cli: debug:") {
+	if strings.Contains(stderr, logTag()+"debug:") {
 		t.Fatalf("DIGITALX_CLI_LOG_LEVEL=off must override --debug, got %q", stderr)
 	}
 
@@ -286,7 +287,7 @@ func TestLogLevelControlsLevelSeparately(t *testing.T) {
 func TestLogFileRedirectsOperationalLogs(t *testing.T) {
 	home := t.TempDir()
 	seedBoundKey(t, home)
-	logPath := filepath.Join(t.TempDir(), "korbit.log")
+	logPath := filepath.Join(t.TempDir(), "dgx-cli.log")
 	doer := &stubDoer{resp: resp(200, `{"success":true,"data":{"krw":{"available":"1000"}}}`, nil)}
 
 	_, stderr, code := runCLI(
@@ -295,7 +296,7 @@ func TestLogFileRedirectsOperationalLogs(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, stderr)
 	}
-	if strings.Contains(stderr, "korbit-cli: debug:") {
+	if strings.Contains(stderr, logTag()+"debug:") {
 		t.Fatalf("operational logs should go to the file, not stderr, got stderr=%q", stderr)
 	}
 	if !strings.Contains(stderr, `signing as key "bot"`) {
@@ -305,10 +306,10 @@ func TestLogFileRedirectsOperationalLogs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read log file: %v", err)
 	}
-	// In the default text format the file trail drops the "korbit-cli: " tag and
+	// In the default text format the file trail drops the "<prog>: " tag and
 	// stamps each line with a local RFC3339 timestamp, level, then the message.
-	if strings.Contains(string(b), "korbit-cli:") {
-		t.Fatalf("the --log-file text trail must drop the korbit-cli: tag, got %q", string(b))
+	if strings.Contains(string(b), logTag()) {
+		t.Fatalf("the --log-file text trail must drop the %q tag, got %q", logTag(), string(b))
 	}
 	fileLine := regexp.MustCompile(`(?m)^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2} debug GET /v2/balance`)
 	if !fileLine.MatchString(string(b)) {
@@ -641,7 +642,7 @@ func TestPlaceDryRunHumanRender(t *testing.T) {
 // market-data reads follow the normal journaling policy: a normal dry-run opens
 // no journal (so it works on a read-only home / before key setup), while a
 // --debug dry-run journals them so they're available for troubleshooting via
-// `korbit logs`.
+// `dgx-cli logs`.
 func TestPlaceDryRunJournalsPreflightOnlyInDebug(t *testing.T) {
 	book := `{"success":true,"data":{"timestamp":1,"bids":[{"price":"99000000","qty":"1"}],` +
 		`"asks":[{"price":"100000000","qty":"1"}]}}`
@@ -965,6 +966,11 @@ func TestBareGroupPrintsHelp(t *testing.T) {
 // and the structured {"error":...} envelope under --json — same exit code, only
 // the rendering differs. (stdout stays clean either way.) Uses a leaf-command
 // usage error (`order place` with required flags missing), the path agents hit.
+// logTag is the stderr prefix a tagged operational log line carries — the
+// invoked program name, read the way the logger reads it, so these assertions
+// follow a renamed binary rather than pinning one spelling.
+func logTag() string { return progname.Name() + ": " }
+
 func TestErrorRenderingHonorsMode(t *testing.T) {
 	// Default (human): a plain, untagged error line — not JSON.
 	out, stderr, code := runCLI([]string{"order", "place"}, nil, &stubDoer{})
@@ -975,7 +981,7 @@ func TestErrorRenderingHonorsMode(t *testing.T) {
 		t.Fatalf("stdout must stay clean, got: %s", out)
 	}
 	h := strings.TrimSpace(stderr)
-	if !strings.HasPrefix(h, "error: ") || strings.Contains(h, "{") || strings.Contains(h, "korbit-cli") {
+	if !strings.HasPrefix(h, "error: ") || strings.Contains(h, "{") || strings.Contains(h, logTag()) {
 		t.Fatalf("default error must be a plain untagged line, got: %q", h)
 	}
 
@@ -1309,7 +1315,7 @@ func TestPublicCommandHonorsPerKeyBaseURL(t *testing.T) {
 		t.Fatalf("default-key per-key host not honored: %s", got)
 	}
 	// no per-key override: stays on the prod default
-	if got := hostFor(t, []string{"--key", "bot"}, func(home string) {}); got.Host != "api.korbit.co.kr" {
+	if got := hostFor(t, []string{"--key", "bot"}, func(home string) {}); got.Host != "api.digitalx.miraeasset.com" {
 		t.Fatalf("expected prod default, got: %s", got)
 	}
 }
@@ -1335,22 +1341,22 @@ func TestSetBaseURLCommand(t *testing.T) {
 
 	// set (trailing slash trimmed); the WS companion is derived from the host.
 	// --no-verify keeps the test offline (the smoke test is covered separately).
-	out, _, code := runCLI([]string{"key", "set-base-url", "bot", "https://api-test.korbit.co.kr/", "--no-verify", "--compact"}, env, &stubDoer{})
+	out, _, code := runCLI([]string{"key", "set-base-url", "bot", "https://api-test.digitalx.miraeasset.com/", "--no-verify", "--compact"}, env, &stubDoer{})
 	if code != 0 {
 		t.Fatalf("set exit=%d", code)
 	}
-	if !strings.Contains(out, `"baseUrl":"https://api-test.korbit.co.kr"`) ||
-		!strings.Contains(out, `"wsBaseUrl":"wss://ws-api-test.korbit.co.kr"`) {
+	if !strings.Contains(out, `"baseUrl":"https://api-test.digitalx.miraeasset.com"`) ||
+		!strings.Contains(out, `"wsBaseUrl":"wss://ws-api-test.digitalx.miraeasset.com"`) {
 		t.Fatalf("set output: %s", out)
 	}
 	// key show reflects both
 	out, _, _ = runCLI([]string{"key", "show", "bot", "--compact"}, env, &stubDoer{})
-	if !strings.Contains(out, `"baseUrl":"https://api-test.korbit.co.kr"`) ||
-		!strings.Contains(out, `"wsBaseUrl":"wss://ws-api-test.korbit.co.kr"`) {
+	if !strings.Contains(out, `"baseUrl":"https://api-test.digitalx.miraeasset.com"`) ||
+		!strings.Contains(out, `"wsBaseUrl":"wss://ws-api-test.digitalx.miraeasset.com"`) {
 		t.Fatalf("show output: %s", out)
 	}
 	// an explicit --ws-base-url is stored verbatim instead of being derived
-	out, _, code = runCLI([]string{"key", "set-base-url", "bot", "https://api-test.korbit.co.kr",
+	out, _, code = runCLI([]string{"key", "set-base-url", "bot", "https://api-test.digitalx.miraeasset.com",
 		"--ws-base-url", "wss://stream.example.test/", "--no-verify", "--compact"}, env, &stubDoer{})
 	if code != 0 {
 		t.Fatalf("set --ws-base-url exit=%d", code)

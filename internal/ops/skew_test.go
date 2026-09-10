@@ -7,7 +7,7 @@ package ops
 import (
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
 )
 
 // TestWithTimeSkew pins the skew math the `time` op appends: offsetMs is

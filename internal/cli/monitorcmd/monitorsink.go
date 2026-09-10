@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/korbit-official/korbit-cli/internal/botapi"
-	"github.com/korbit-official/korbit-cli/internal/jqfilter"
-	"github.com/korbit-official/korbit-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/botapi"
+	"github.com/digitalx-official/digitalx-cli/internal/jqfilter"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
 )
 
 // monitorSink handles stream events for one monitor mode. runMonitor owns the

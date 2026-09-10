@@ -12,9 +12,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/colorprofile"
 
-	"github.com/korbit-official/korbit-cli/internal/stream"
-	"github.com/korbit-official/korbit-cli/internal/stream/state"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/header"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/stream/state"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/header"
 )
 
 var sgrParamsRe = regexp.MustCompile("\x1b\\[([0-9;]*)m")

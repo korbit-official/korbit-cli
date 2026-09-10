@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"encoding/json"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
 )
 
 // joinRows reassembles verbatim row documents into a JSON array. It cannot

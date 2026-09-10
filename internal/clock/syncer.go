@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/korbit-official/korbit-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
 )
 
 // DefaultCoolDownMs is the minimum spacing between server-clock measurements a
@@ -23,7 +23,7 @@ const DefaultCoolDownMs = 2000
 // (serverClock − localClock) and the lean (the measurement uncertainty,
 // RTTmin/2) to install. It performs network I/O and is called by Sync WITHOUT
 // any Syncer lock held. Returning an error leaves the previous estimate
-// untouched. It is the seam that keeps this package free of any korbit import:
+// untouched. It is the seam that keeps this package free of any apiclient import:
 // the caller wraps apiclient.MeasureClockOffset and converts the result to plain
 // int64s (offsetMs = off.OffsetMs, leanMs = off.UncertaintyMs()).
 type MeasureFunc func() (offsetMs, leanMs int64, err error)

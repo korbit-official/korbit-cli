@@ -10,11 +10,11 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"github.com/korbit-official/korbit-cli/internal/i18n"
-	"github.com/korbit-official/korbit-cli/internal/ops"
-	"github.com/korbit-official/korbit-cli/internal/stream/state"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/ladder"
-	"github.com/korbit-official/korbit-cli/internal/tui/uikit"
+	"github.com/digitalx-official/digitalx-cli/internal/i18n"
+	"github.com/digitalx-official/digitalx-cli/internal/ops"
+	"github.com/digitalx-official/digitalx-cli/internal/stream/state"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/ladder"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/uikit"
 )
 
 // The trade ladder's rendering and geometry: the ladder component fills the

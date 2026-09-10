@@ -20,13 +20,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/accountseq"
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/fslock"
-	"github.com/korbit-official/korbit-cli/internal/keystore"
-	"github.com/korbit-official/korbit-cli/internal/logging"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/accountseq"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/fslock"
+	"github.com/digitalx-official/digitalx-cli/internal/keystore"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
 )
 
 var nameRE = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$`)
@@ -37,7 +37,7 @@ var nameRE = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$`)
 //
 //   - ed25519 — the user generates the keypair and registers the public key; the
 //     stored secret is a PKCS#8 PEM, and the signature is base64.
-//   - hmac-sha256 — Korbit issues the api-key id AND a shared secret together; the
+//   - hmac-sha256 — Digital X issues the api-key id AND a shared secret together; the
 //     stored secret is that opaque string, and the signature is hex. It has no
 //     public key and is not generated locally.
 const (
@@ -49,7 +49,7 @@ const (
 const keysVersion = 1
 
 // SandboxAPIKeyPrefix is the prefix the local API sandbox gives every api-key
-// id it issues (e.g. SANDBOX_ED25519_KEY_…). A real Korbit api-key id never
+// id it issues (e.g. SANDBOX_ED25519_KEY_…). A real Digital X api-key id never
 // matches it, so a key's bound id is the single, schema-free source of truth for
 // "is this a sandbox key" — see IsSandbox. It is deliberately NOT the loopback
 // base URL: a user may legitimately point a real key at a local proxy, so the
@@ -112,11 +112,11 @@ func assertSandboxNaming(name, apiKeyID string) error {
 func assertNotKeyMaterial(apiKeyID string) error {
 	if apiclient.LooksLikeEd25519PrivateKey(apiKeyID) {
 		return output.Usagef(
-			"that value is an ED25519 PRIVATE key — never use private key material as an API key id (it is secret). Register the corresponding public key at https://developers.korbit.co.kr, then paste the KEY ID the portal issues")
+			"that value is an ED25519 PRIVATE key — never use private key material as an API key id (it is secret). Register the corresponding public key at https://developers.digitalx.miraeasset.com, then paste the KEY ID the portal issues")
 	}
 	if apiclient.LooksLikeEd25519PublicKey(apiKeyID) {
 		return output.Usagef(
-			"that value is an ED25519 public key, not an API key id — after you register the public key at https://developers.korbit.co.kr, paste the KEY ID the portal issues, not the public key itself")
+			"that value is an ED25519 public key, not an API key id — after you register the public key at https://developers.digitalx.miraeasset.com, paste the KEY ID the portal issues, not the public key itself")
 	}
 	return nil
 }
@@ -137,7 +137,7 @@ type Record struct {
 	PublicKey string  `json:"publicKey"`
 	CreatedAt int64   `json:"createdAt"`
 	// BaseURL optionally pins this key to a specific API endpoint, for the rare
-	// case where a key's account is served from an alternate Korbit API host
+	// case where a key's account is served from an alternate Digital X API host
 	// rather than the default. Empty means "use the resolved default". It is
 	// non-secret metadata, so it lives here rather than in the keystore.
 	BaseURL string `json:"baseUrl,omitempty"`
@@ -383,7 +383,7 @@ func assertSupportedType(name string, rec Record) error {
 
 // lock takes the exclusive cross-process REGISTRY lock (keys.json.lock),
 // serializing every mutating method's whole load → modify → atomic-rename
-// cycle against other korbit-cli processes (a long-running monitor bot plus
+// cycle against other digitalx-cli processes (a long-running monitor bot plus
 // ad-hoc commands). Without it, two concurrent mutations each load the same
 // snapshot and the second rename silently discards the first's change. Read-only
 // methods do NOT take it: the atomic rename guarantees they observe a complete,
@@ -405,7 +405,7 @@ func (m *Manager) lock() (func(), error) {
 		return nil, err
 	}
 	if waited := time.Since(start); waited > 50*time.Millisecond {
-		// A non-trivial wait means another korbit-cli process held the registry
+		// A non-trivial wait means another digitalx-cli process held the registry
 		// lock — high-value contention signal.
 		m.log().Warn("registry lock: acquired after contention", "lock", lockPath, "waitedMs", waited.Milliseconds())
 	} else {
@@ -685,7 +685,7 @@ func (m *Manager) AddBound(name, privatePEM, apiKeyID, backend string) (NewKey, 
 }
 
 // AddHMAC creates a new named HMAC-SHA256 key, already bound to apiKeyID. An
-// HMAC key has no keypair and no public key: Korbit issues the api-key id and the
+// HMAC key has no keypair and no public key: Digital X issues the api-key id and the
 // shared secret together, so the key is born bound (there is nothing to register)
 // — the same reason AddBound exists for an imported ED25519 key. secret is the
 // opaque shared secret; it is stored verbatim in the chosen backend. backend ""
@@ -1405,7 +1405,7 @@ func (m *Manager) Resolve(explicit string) (Resolved, error) {
 	}
 	if rec.APIKeyID == nil {
 		return Resolved{}, output.Configf(
-			"key %q has no API key id bound yet — register its public key at https://developers.korbit.co.kr, then run: %s key bind %s --api-key <KEY_ID>", name, progname.Name(), name)
+			"key %q has no API key id bound yet — register its public key at https://developers.digitalx.miraeasset.com, then run: %s key bind %s --api-key <KEY_ID>", name, progname.Name(), name)
 	}
 	store, err := m.storeFor(name, rec)
 	if err != nil {

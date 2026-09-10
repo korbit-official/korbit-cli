@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Package deno manages a pinned, checksum-verified Deno runtime that korbit-cli
+// Package deno manages a pinned, checksum-verified Deno runtime that digitalx-cli
 // downloads on demand to run the local API sandbox. The managed Deno is the
 // default runtime (it runs the bundle under a least-privilege permission sandbox
 // and fetches the bundle straight from its source URL); it ships as a single
@@ -15,10 +15,10 @@
 // copy's recorded version+sha256 are compared to the pin and any drift (a
 // missing binary, a missing/corrupt/mismatched meta, a wrong size) triggers an
 // automatic re-download of the pinned version. There is no network "is there a
-// newer Deno?" check — the pin moves only when korbit-cli itself is upgraded.
+// newer Deno?" check — the pin moves only when digitalx-cli itself is upgraded.
 //
 // Each version+target is cached in its own directory
-// (<cache>/deno/<version>_<target>/deno), so several korbit-cli versions sharing
+// (<cache>/deno/<version>_<target>/deno), so several digitalx-cli versions sharing
 // one cache coexist without clobbering each other's binary. After a successful
 // install the manager prunes only STRICTLY-OLDER versions for the same target,
 // keeping the current and any newer ones — so alternating CLI versions settle
@@ -45,7 +45,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
 )
 
 // Doer performs an HTTP request; *http.Client satisfies it. Injected so tests
@@ -70,7 +70,7 @@ var targets = map[string]string{
 func platformKey() string { return runtime.GOOS + "/" + runtime.GOARCH }
 
 // Target returns the Deno release target triple for the current platform, or an
-// error if korbit-cli has no managed-Deno build for it (e.g. Linux musl).
+// error if digitalx-cli has no managed-Deno build for it (e.g. Linux musl).
 func Target() (string, error) {
 	t, ok := targets[platformKey()]
 	if !ok {

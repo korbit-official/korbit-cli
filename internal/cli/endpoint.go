@@ -13,22 +13,22 @@ import (
 	"io"
 	"strings"
 
-	"github.com/korbit-official/korbit-cli/internal/accountseq"
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/callrec"
-	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
-	"github.com/korbit-official/korbit-cli/internal/cli/probe"
-	"github.com/korbit-official/korbit-cli/internal/cli/textout"
-	"github.com/korbit-official/korbit-cli/internal/clock"
-	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
-	"github.com/korbit-official/korbit-cli/internal/config"
-	"github.com/korbit-official/korbit-cli/internal/envalias"
-	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/ops"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/progname"
-	"github.com/korbit-official/korbit-cli/internal/rawapi"
-	"github.com/korbit-official/korbit-cli/internal/useragent"
+	"github.com/digitalx-official/digitalx-cli/internal/accountseq"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/callrec"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/clienv"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/probe"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/textout"
+	"github.com/digitalx-official/digitalx-cli/internal/clock"
+	"github.com/digitalx-official/digitalx-cli/internal/cmdmeta"
+	"github.com/digitalx-official/digitalx-cli/internal/config"
+	"github.com/digitalx-official/digitalx-cli/internal/envalias"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/ops"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/rawapi"
+	"github.com/digitalx-official/digitalx-cli/internal/useragent"
 	"github.com/spf13/cobra"
 )
 
@@ -214,7 +214,7 @@ func (rt *runtime) runEndpoint(sc surfaceCmd, cmd *cobra.Command, args []string)
 			// the same policy as every other call: public calls are journaled only in
 			// --debug (a normal run opens no DB, so the dry-run still works before any
 			// key is set up and on a read-only home), which is exactly what lets a
-			// `--debug` session troubleshoot the preflight from `korbit logs`.
+			// `--debug` session troubleshoot the preflight from `dgx-cli logs`.
 			sim, ws, skipErr := rt.preplaceCheck(home, baseURL, params, timeoutMs)
 			if skipErr != nil {
 				doc.ChecksSkipped = fmt.Sprintf("market simulation/safety checks skipped: %v", skipErr)
@@ -274,7 +274,7 @@ func (rt *runtime) runEndpoint(sc surfaceCmd, cmd *cobra.Command, args []string)
 		creds = &apiclient.Credentials{APIKeyID: resolved.APIKeyID, Signer: signer}
 		// Always-shown safety disclosure (which key/account is acting), not a
 		// level-gated log and not part of the stdout result.
-		rt.io.Notef("korbit-cli: signing as key %q", resolved.Name)
+		rt.io.Notef("%s: signing as key %q", progname.Name(), resolved.Name)
 	}
 
 	// --time-sync on (proactive): measure the server clock once before the first
@@ -556,7 +556,7 @@ func quoteUnit(quoteCurrency string) string {
 //
 // The public reads go through the shared journal-backed recorder under the same
 // "cli" policy as every other command: public calls are journaled only in
-// --debug (a normal run opens no DB), so the preflight shows up in `korbit logs`
+// --debug (a normal run opens no DB), so the preflight shows up in `dgx-cli logs`
 // for a --debug troubleshooting session, and a normal dry-run still touches
 // nothing. A post-write failure is non-fatal here (a preview shouldn't die over
 // it) — it is surfaced as a stderr warning.

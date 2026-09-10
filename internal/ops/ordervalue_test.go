@@ -7,7 +7,7 @@ package ops
 import (
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/rawapi"
+	"github.com/digitalx-official/digitalx-cli/internal/rawapi"
 )
 
 func TestBoundsForSymbol(t *testing.T) {

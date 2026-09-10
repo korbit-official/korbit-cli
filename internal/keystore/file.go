@@ -18,10 +18,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/fslock"
-	"github.com/korbit-official/korbit-cli/internal/logging"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/fslock"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
 )
 
 // The file backend protects keys from CASUAL disclosure (grep, log scrapers,

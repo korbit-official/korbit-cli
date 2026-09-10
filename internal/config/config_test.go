@@ -107,7 +107,7 @@ func TestLoadMissingFileDefaults(t *testing.T) {
 
 func TestLoadValid(t *testing.T) {
 	dir := t.TempDir()
-	write(t, dir, `{"keystore":"keychain","baseUrl":"https://api.korbit.co.kr/"}`)
+	write(t, dir, `{"keystore":"keychain","baseUrl":"https://api.digitalx.miraeasset.com/"}`)
 	cfg, err := Load(dir, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -115,19 +115,19 @@ func TestLoadValid(t *testing.T) {
 	if cfg.Keystore != "keychain" {
 		t.Fatalf("keystore = %q", cfg.Keystore)
 	}
-	if cfg.BaseURL != "https://api.korbit.co.kr" { // trailing slash stripped
+	if cfg.BaseURL != "https://api.digitalx.miraeasset.com" { // trailing slash stripped
 		t.Fatalf("baseUrl = %q", cfg.BaseURL)
 	}
 }
 
 func TestLoadWSBaseURL(t *testing.T) {
 	dir := t.TempDir()
-	write(t, dir, `{"baseUrl":"https://api-test.korbit.co.kr","wsBaseUrl":"wss://ws-api-test.korbit.co.kr/"}`)
+	write(t, dir, `{"baseUrl":"https://api-test.digitalx.miraeasset.com","wsBaseUrl":"wss://ws-api-test.digitalx.miraeasset.com/"}`)
 	cfg, err := Load(dir, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.WSBaseURL != "wss://ws-api-test.korbit.co.kr" { // trailing slash stripped
+	if cfg.WSBaseURL != "wss://ws-api-test.digitalx.miraeasset.com" { // trailing slash stripped
 		t.Fatalf("wsBaseUrl = %q", cfg.WSBaseURL)
 	}
 }
@@ -243,7 +243,7 @@ func TestSetTUIColorSchemePreservesOtherFields(t *testing.T) {
 	dir := t.TempDir()
 	// Top-level fields (incl. an unknown one) and a sibling key inside "tui" must
 	// all survive persisting colorScheme.
-	write(t, dir, `{"keystore":"keychain","baseUrl":"https://api.korbit.co.kr","futureField":42,"tui":{"layout":"wide"}}`)
+	write(t, dir, `{"keystore":"keychain","baseUrl":"https://api.digitalx.miraeasset.com","futureField":42,"tui":{"layout":"wide"}}`)
 	if err := SetTUIColorScheme(dir, "red-blue", nil); err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +251,7 @@ func TestSetTUIColorSchemePreservesOtherFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Keystore != "keychain" || cfg.BaseURL != "https://api.korbit.co.kr" || cfg.TUIColorScheme != "red-blue" {
+	if cfg.Keystore != "keychain" || cfg.BaseURL != "https://api.digitalx.miraeasset.com" || cfg.TUIColorScheme != "red-blue" {
 		t.Fatalf("fields not preserved: %+v", cfg)
 	}
 	raw, _ := os.ReadFile(filepath.Join(dir, "config.json"))
@@ -320,7 +320,7 @@ func TestSetTUIColorSchemeReplacesMalformedBlock(t *testing.T) {
 func TestSetKeystorePreservesOtherFields(t *testing.T) {
 	dir := t.TempDir()
 	// A config with baseUrl plus a field this version doesn't model.
-	write(t, dir, `{"keystore":"file","baseUrl":"https://api.korbit.co.kr","futureField":42}`)
+	write(t, dir, `{"keystore":"file","baseUrl":"https://api.digitalx.miraeasset.com","futureField":42}`)
 
 	if err := SetKeystore(dir, "keychain", nil); err != nil {
 		t.Fatal(err)
@@ -332,7 +332,7 @@ func TestSetKeystorePreservesOtherFields(t *testing.T) {
 	if cfg.Keystore != "keychain" {
 		t.Fatalf("keystore = %q", cfg.Keystore)
 	}
-	if cfg.BaseURL != "https://api.korbit.co.kr" {
+	if cfg.BaseURL != "https://api.digitalx.miraeasset.com" {
 		t.Fatalf("baseUrl not preserved: %q", cfg.BaseURL)
 	}
 	// The unknown field must survive the round-trip untouched.

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
 )
 
 // signedClient builds a Client over the stub d with a real ED25519 signer, so

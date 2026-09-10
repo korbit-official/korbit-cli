@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
 )
 
 // TestInstallLogsSHA256VerifyAndInstall asserts the good-path install logs the

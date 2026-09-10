@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Package useragent composes the User-Agent header sent on Korbit API requests
+// Package useragent composes the User-Agent header sent on Digital X API requests
 // (both REST and the WebSocket upgrade). The string identifies the CLI and its
 // version, the host environment (OS name, OS/kernel version, CPU architecture,
 // and locale), and the call context — which frontend and sub-context issued the
@@ -11,18 +11,18 @@
 //
 // Format:
 //
-//	korbit-cli/<version> (<os>[/<osver>]; <arch>[; <lang>]) ctx:<surface>[/<detail>]
+//	digitalx-cli/<version> (<os>[/<osver>]; <arch>[; <lang>]) ctx:<surface>[/<detail>]
 //
 // e.g.
 //
-//	korbit-cli/1.2.3 (darwin/25.6.0; arm64; ko_KR) ctx:cli/order.place
-//	korbit-cli/1.2.3 (linux/6.1.0; amd64; en_US) ctx:monitor/botapi
-//	korbit-cli/1.2.3 (windows/10.0.22631; amd64) ctx:doctor
+//	digitalx-cli/1.2.3 (darwin/25.6.0; arm64; ko_KR) ctx:cli/order.place
+//	digitalx-cli/1.2.3 (linux/6.1.0; amd64; en_US) ctx:monitor/botapi
+//	digitalx-cli/1.2.3 (windows/10.0.22631; amd64) ctx:doctor
 //
-// It is applied ONLY to Korbit requests. This package deliberately lives ABOVE
+// It is applied ONLY to Digital X requests. This package deliberately lives ABOVE
 // the wire layer (internal/apiclient): that package gathers no OS info and only
 // carries the UserAgent seam, so callers compose the rich value here and inject
-// it down. Nothing else (any future non-Korbit HTTP) should use this.
+// it down. Nothing else (any future non-Digital X HTTP) should use this.
 package useragent
 
 import (
@@ -31,7 +31,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/korbit-official/korbit-cli/internal/version"
+	"github.com/digitalx-official/digitalx-cli/internal/version"
 )
 
 // env is the host-environment snapshot that forms the comment block. It is
@@ -62,7 +62,7 @@ func current() env {
 	return currentEnv
 }
 
-// For returns the full User-Agent for a Korbit call attributed to the given
+// For returns the full User-Agent for a Digital X call attributed to the given
 // surface (the frontend identity, e.g. "cli", "monitor", "doctor") and optional
 // finer detail (e.g. the command key, or "botapi"). Both map straight onto the
 // apiclient.Origin{Surface,Detail} the caller already sets on the request.
@@ -72,8 +72,7 @@ func For(surface, detail string) string { return compose(current(), surface, det
 // testable.
 func compose(e env, surface, detail string) string {
 	var b strings.Builder
-	b.WriteString("korbit-cli/")
-	b.WriteString(version.Version)
+	b.WriteString(version.Token())
 	b.WriteString(" (")
 	b.WriteString(clean(e.OS))
 	if v := clean(e.Version); v != "" {

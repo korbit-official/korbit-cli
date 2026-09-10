@@ -69,8 +69,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/logging"
-	"github.com/korbit-official/korbit-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
 	"github.com/shopspring/decimal"
 )
 

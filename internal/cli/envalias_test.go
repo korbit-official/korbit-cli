@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
 )
 
 // TestLegacyHomeEnvIsHonored: an installation whose shell profile or CI job

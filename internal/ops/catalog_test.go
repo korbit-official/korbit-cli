@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
+	"github.com/digitalx-official/digitalx-cli/internal/cmdmeta"
 )
 
 var kebabRE = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)

@@ -8,8 +8,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/cmdmeta"
 )
 
 // OpMeta is an operation's presentation + validation metadata; the catalog is

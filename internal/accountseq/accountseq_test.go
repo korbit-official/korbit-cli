@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
+	"github.com/digitalx-official/digitalx-cli/internal/cmdmeta"
 )
 
 func TestResolvePrecedence(t *testing.T) {

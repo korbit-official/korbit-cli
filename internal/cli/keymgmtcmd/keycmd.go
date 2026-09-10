@@ -14,18 +14,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
-	"github.com/korbit-official/korbit-cli/internal/cli/doctorcmd"
-	"github.com/korbit-official/korbit-cli/internal/cli/probe"
-	"github.com/korbit-official/korbit-cli/internal/cli/textout"
-	"github.com/korbit-official/korbit-cli/internal/config"
-	"github.com/korbit-official/korbit-cli/internal/envalias"
-	"github.com/korbit-official/korbit-cli/internal/i18n"
-	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/progname"
-	"github.com/korbit-official/korbit-cli/internal/spec"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/clienv"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/doctorcmd"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/probe"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/textout"
+	"github.com/digitalx-official/digitalx-cli/internal/config"
+	"github.com/digitalx-official/digitalx-cli/internal/envalias"
+	"github.com/digitalx-official/digitalx-cli/internal/i18n"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/spec"
 )
 
 // portalCreatePath is the create-form route that accepts prefill query params
@@ -51,7 +51,7 @@ const (
 // deep link. It namespaces the key in the developers portal so a CLI-issued key
 // is recognizable at a glance among any others on the account.
 func registrationLabel(name string) string {
-	return "korbit-cli: " + name
+	return "dgx-cli: " + name
 }
 
 // registrationLink builds the developers-portal create-form deep link that
@@ -222,7 +222,7 @@ func (ctx KeyContext) claimStopNotice(code string) string {
 }
 
 // ipAllowlistStopNotice explains an IP-allowlist rejection using the probed
-// public IP(s), mirroring doctor's "Korbit sees you from:" guidance so the user
+// public IP(s), mirroring doctor's "Digital X sees you from:" guidance so the user
 // knows exactly which entries to add. Falls back to a generic line when the IPs
 // couldn't be determined.
 func (ctx KeyContext) ipAllowlistStopNotice() string {
@@ -233,7 +233,7 @@ func (ctx KeyContext) ipAllowlistStopNotice() string {
 	if len(ips) == 0 {
 		return i18n.T("Auto-claim was blocked by the key's IP allowlist. Add this machine's public IP to the key's allowlist.")
 	}
-	return i18n.T("Auto-claim was blocked by the key's IP allowlist. Korbit sees you from: %s — add these to the key's allowlist.", strings.Join(ips, ", "))
+	return i18n.T("Auto-claim was blocked by the key's IP allowlist. Digital X sees you from: %s — add these to the key's allowlist.", strings.Join(ips, ", "))
 }
 
 // hardClaimReject reports whether a post-claim whoami rejection is a permanent
@@ -455,7 +455,7 @@ func keystoreFlag(flags map[string]string) (string, error) {
 
 // readSecretFile reads an HMAC-SHA256 shared secret from a file, or from stdin
 // when path is "-". Trailing whitespace (a stray editor newline) is trimmed so a
-// secret saved to a file signs identically to one typed without it — a Korbit
+// secret saved to a file signs identically to one typed without it — a Digital X
 // secret is a whitespace-free token. The secret is never echoed.
 func readSecretFile(path string) (string, error) {
 	var raw []byte
@@ -515,13 +515,13 @@ func RunKeyCommand(c *spec.Command, flags map[string]string, positionals []strin
 		}
 		switch keyType {
 		case keys.TypeHMACSHA256:
-			// HMAC keys carry a Korbit-issued shared secret and are born bound (no
+			// HMAC keys carry a Digital X-issued shared secret and are born bound (no
 			// keypair, no public key). --from-pem-file is an ED25519-only path.
 			if flags["from-pem-file"] != "" {
 				return output.Usagef("--from-pem-file imports an ED25519 PEM; an hmac-sha256 key takes its secret via --secret-file")
 			}
 			if apiKey == "" {
-				return output.Usagef("--type hmac-sha256 requires --api-key <KEY_ID> (Korbit issues the id and secret together)")
+				return output.Usagef("--type hmac-sha256 requires --api-key <KEY_ID> (Digital X issues the id and secret together)")
 			}
 			if strings.HasPrefix(apiKey, keys.SandboxAPIKeyPrefix) {
 				if err := keys.AssertSandboxKeyName(name); err != nil {
@@ -676,7 +676,7 @@ func RunKeyCommand(c *spec.Command, flags map[string]string, positionals []strin
 
 	case "key set-base-url":
 		if len(positionals) == 0 {
-			return output.Usagef("key name is required, e.g. `%s key set-base-url trading-bot https://api.korbit.co.kr`", progname.Name())
+			return output.Usagef("key name is required, e.g. `%s key set-base-url trading-bot https://api.digitalx.miraeasset.com`", progname.Name())
 		}
 		if len(positionals) > 2 {
 			return output.Usagef("unexpected argument %q", positionals[2])
@@ -691,7 +691,7 @@ func RunKeyCommand(c *spec.Command, flags map[string]string, positionals []strin
 		case clear && url != "":
 			return output.Usagef("pass either a base URL or --clear, not both")
 		case !clear && url == "":
-			return output.Usagef("provide a base URL (e.g. https://api.korbit.co.kr) or --clear to revert this key to the default")
+			return output.Usagef("provide a base URL (e.g. https://api.digitalx.miraeasset.com) or --clear to revert this key to the default")
 		case clear:
 			if err := ctx.KM.ClearBaseURL(name); err != nil {
 				return err

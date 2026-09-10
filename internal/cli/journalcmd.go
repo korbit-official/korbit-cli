@@ -13,11 +13,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/cli/textout"
-	"github.com/korbit-official/korbit-cli/internal/config"
-	"github.com/korbit-official/korbit-cli/internal/journal"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/version"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/textout"
+	"github.com/digitalx-official/digitalx-cli/internal/config"
+	"github.com/digitalx-official/digitalx-cli/internal/journal"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -129,7 +129,7 @@ type bundleKey struct {
 
 // runDebugBundle implements the `debug bundle` command: gather a redacted
 // diagnostic file (CLI/OS info, config, key metadata, recent journal rows) for
-// sending to Korbit support. Writes the file and prints where it went.
+// sending to Digital X support. Writes the file and prints where it went.
 func (rt *runtime) runDebugBundle(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		return output.Usagef("unexpected argument %q — `debug bundle` takes flags only (--limit, --out)", args[0])
@@ -319,7 +319,7 @@ func fmtBundleSummary(s bundleSummary) string {
 		{"apiCalls", strconv.Itoa(s.APICalls)},
 		{"orders", strconv.Itoa(s.Orders)},
 		{"keys", strconv.Itoa(s.Keys)},
-	}) + "\n\nSend this file to Korbit support (it contains no secrets — no private keys)."
+	}) + "\n\nSend this file to Digital X support (it contains no secrets — no private keys)."
 }
 
 func dashIfEmpty(s string) string {

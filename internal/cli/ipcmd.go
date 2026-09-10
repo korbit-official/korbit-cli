@@ -9,9 +9,9 @@ import (
 	"io"
 	"strings"
 
-	"github.com/korbit-official/korbit-cli/internal/cli/probe"
-	"github.com/korbit-official/korbit-cli/internal/cli/textout"
-	"github.com/korbit-official/korbit-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/probe"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/textout"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -39,7 +39,7 @@ func (v ipView) FormatText(w io.Writer) {
 	fmt.Fprint(w, out)
 }
 
-// runIP implements the `ip` command: report the public IP(s) Korbit sees, for
+// runIP implements the `ip` command: report the public IP(s) Digital X sees, for
 // the API-key IP allowlist.
 func (rt *runtime) runIP(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {

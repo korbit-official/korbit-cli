@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/agentskill"
+	"github.com/digitalx-official/digitalx-cli/internal/agentskill"
 )
 
 // The bundled skill and the code that installs it must agree. The skill system

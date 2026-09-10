@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
 )
 
 // realSecret is a real-looking ED25519 PKCS#8 PEM used to prove no secret

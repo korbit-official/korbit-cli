@@ -3,7 +3,7 @@ Copyright (c) 2026 Digital X Co., Ltd.
 SPDX-License-Identifier: Apache-2.0
 -->
 
-# Releasing korbit-cli
+# Releasing digitalx-cli
 
 Releases are built with [GoReleaser](https://goreleaser.com). The configuration
 is [`.goreleaser.yaml`](.goreleaser.yaml); it cross-compiles every target,
@@ -54,11 +54,11 @@ Intel macOS (`darwin/amd64`) is intentionally not built.
 
 ## Versioning
 
-The version reported by `korbit --version` (and embedded in the User-Agent
+The version reported by `dgx-cli --version` (and embedded in the User-Agent
 header and the `commands` catalog) is injected at build time from the git tag:
 
 ```
--ldflags "-X github.com/korbit-official/korbit-cli/internal/version.Version=<tag>"
+-ldflags "-X github.com/digitalx-official/digitalx-cli/internal/version.Version=<tag>"
 ```
 
 GoReleaser does this automatically (`{{ .Version }}` is the tag with any leading
@@ -135,8 +135,8 @@ signs hook), keyed from the environment:
   (`scripts/openssl-sign.sh`); verify with openssl. Only the **private** key is
   referenced here; its public half is held by the verifier and can be rotated
   there without touching this repo. The verifiers are the evergreen installers
-  (which embed the cert) and `korbit self update`, which fetches the cert from
-  `https://docs.korbit.co.kr/release-signing-cert.pem` — a managed host separate
+  (which embed the cert) and `dgx-cli self update`, which fetches the cert from
+  `https://docs.digitalx.miraeasset.com/release-signing-cert.pem` — a managed host separate
   from the GitHub release, so the pin defends against a compromised release.
   Publishing an empty cert there disables the self-updater's signature check.
 
@@ -155,7 +155,7 @@ distribute the cert to the verifier:
 ```sh
 openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
   -keyout release-signing-key.pem -out release-signing-cert.pem \
-  -subj "/CN=korbit-cli release signing"
+  -subj "/CN=digitalx-cli release signing"
 ```
 
 Verify a download with openssl:
@@ -234,6 +234,22 @@ Keep `asc-key.json` and the `.p8` out of the repo.
 
 ## Publishing (separate, via `gh`)
 
+### The release repository must already carry the current name
+
+`DefaultRepo` (`internal/selfupdate/selfupdate.go`) and `REPO` / `$Repo` in both
+installers resolve to **`digitalx-official/digitalx-cli`**. A release built from
+this source is therefore publishable only once the GitHub organisation and
+repository carry that name: publish it earlier and `self update`, `install.sh`,
+and `install.ps1` all resolve a repository that does not exist. Publish the
+release **after** the org/repo rename, and keep the previous org name registered
+so the redirect below cannot be taken over.
+
+Binaries already on users' machines are unaffected either way: they request
+`releases/latest` under the org/repo name compiled into them, and GitHub
+redirects that to the renamed repository. They then download the
+`korbit_<os>_<arch>` asset set, which every release still publishes (see
+[Two archive sets](#two-archive-sets-per-release)).
+
 Building and publishing are separate steps. `make release` **never contacts
 GitHub** — it only builds, signs, and (with `make notarize`) reaches Apple. The
 artifacts are uploaded later with `make publish`, which uses the `gh` CLI, so
@@ -255,7 +271,7 @@ release; they embed this release's archive checksums, so they must ship in the
 same release as those archives — `make release` fills them from this tag's
 `checksums.txt` (see the `release` target's comment). Note that the `curl … | sh`
 / `irm … | iex` one-liners the README advertises fetch the evergreen installer
-hosted at `docs.korbit.co.kr`, not these release-attached copies.
+hosted at `docs.digitalx.miraeasset.com`, not these release-attached copies.
 Push the release commit/tag to the target repo first (so `gh` attaches the
 release to the right commit).
 
@@ -273,7 +289,7 @@ make notarize                   # notarize the signed macOS binaries
 
 # 3. Publish — staging repo first for review, then the public repo (same artifacts).
 KORBIT_RELEASE_REPO=<staging-owner>/<repo>      make publish
-KORBIT_RELEASE_REPO=korbit-official/korbit-cli  make publish
+KORBIT_RELEASE_REPO=digitalx-official/digitalx-cli  make publish
 ```
 
 Windows binaries are shipped unsigned (Authenticode signing is not configured).

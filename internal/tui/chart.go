@@ -11,12 +11,12 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/korbit-official/korbit-cli/internal/candles"
-	"github.com/korbit-official/korbit-cli/internal/i18n"
-	"github.com/korbit-official/korbit-cli/internal/stream/state"
-	"github.com/korbit-official/korbit-cli/internal/tui/candlechart"
-	"github.com/korbit-official/korbit-cli/internal/tui/chartind"
-	"github.com/korbit-official/korbit-cli/internal/tui/uikit"
+	"github.com/digitalx-official/digitalx-cli/internal/candles"
+	"github.com/digitalx-official/digitalx-cli/internal/i18n"
+	"github.com/digitalx-official/digitalx-cli/internal/stream/state"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/candlechart"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/chartind"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/uikit"
 )
 
 // chartIndicatorOptions is the cycle of overlay indicators the chart key 'i'

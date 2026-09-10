@@ -39,7 +39,7 @@ back into a duplicate of the source:
 
 ## Project
 
-`korbit-cli` — a self-contained, single-binary CLI for the Korbit Open API v2,
+`digitalx-cli` — a self-contained, single-binary CLI for the Digital X Open API v2,
 designed as a stable tool surface for AI trading agents. ED25519 and
 HMAC-SHA256 signing. Written in Go.
 
@@ -65,7 +65,7 @@ reasoning is the part worth keeping). Almost every choice is in service of
 ## Build & commands
 
 ```sh
-go build -o korbit .   # build the binary
+go build -o dgx-cli .   # build the binary
 go test ./...          # run the suite (fast; run after every change)
 go vet ./...           # static checks
 gofmt -l .             # must print nothing
@@ -347,7 +347,7 @@ with `synchronous=OFF`).
   (auto-minted UUIDv7 when omitted) and echoes it; `--dry-run` does **not**
   auto-mint one. The mint logic + rationale is commented at the place-mint block
   in `cli/endpoint.go`; the protocol is in `ops/op_place.go` and `ops/doc.go`.
-- **Key soundness & secrets:** keys may belong to different Korbit accounts —
+- **Key soundness & secrets:** keys may belong to different Digital X accounts —
   never silently pick a different key (removing the default *unsets* it, never
   reassigns). Every private call prints `signing as key "<name>"` to stderr (a
   side-channel safety disclosure, not a log). Private key material lives only
@@ -442,7 +442,7 @@ enumerate terminal statuses).
 
 ### `sandbox` (`internal/sandbox` + `cli/sandboxcmd`)
 
-A lifecycle manager for the Korbit API Sandbox — a single-file local mock with a
+A lifecycle manager for the Digital X API Sandbox — a single-file local mock with a
 real signature verifier, for full-stack signing/order-protocol checks without
 touching production. All logic lives in `internal/sandbox` (+ `sandbox/deno`);
 the cli layer only dispatches and formats. The detail — Deno-only/no-bundle-cache,
@@ -517,7 +517,7 @@ new file; `TestEveryGoFileHasSPDXHeader` fails the build if a Go file is missing
 The binary statically links open-source Go modules whose permissive licenses
 require their notices to accompany every copy. `THIRD_PARTY_LICENSES.txt` (repo
 root) carries them; it ships inside every release archive (the archive `files`
-list in `.goreleaser.yaml`) and `korbit license` links to it in the source repo.
+list in `.goreleaser.yaml`) and `dgx-cli license` links to it in the source repo.
 The file is **generated** — regenerate with `make licenses` (see
 `tools/licensegen`) after any dependency change and commit it;
 `make licenses-check` fails on drift.

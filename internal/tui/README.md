@@ -1,6 +1,6 @@
 # `internal/tui` — the interactive trading terminal
 
-The full-screen terminal behind `korbit-cli tui`: live market data (ticker,
+The full-screen terminal behind `dgx-cli tui`: live market data (ticker,
 orderbook, trades) plus the account's open orders, fills, and balances, with
 order entry. Built on Bubble Tea v2 (`charm.land/bubbletea/v2`), with the
 textinput bubble and lipgloss for layout. The lists (markets, open orders,
@@ -296,7 +296,7 @@ Facts to preserve:
 - **Up/down coloring is color-scheme- and profile-aware (`uikit/colors.go`).** The semantic
   up/down colors (rising/falling, bid/ask, buy/sell) are NOT fixed styles — they
   resolve from a `uikit.ColorScheme` (green-red, the default, or red-blue as in the
-  Korbit app; `C` toggles, and the scheme in effect at exit is written to
+  Digital X app; `C` toggles, and the scheme in effect at exit is written to
   `config.json`'s `tui` block via the `Config.SaveColorScheme` seam — once, on
   quit, so it survives the next launch without a per-keypress write) and
   the terminal's detected color profile (arrived via
@@ -1021,7 +1021,7 @@ preserve:
   deliberately not the sticky banner); OSC 52 support depends on the terminal.
 - **Every request passes an explicit in-pane confirm step**, and its outcome
   handling is asymmetric on purpose (`applyActionResult`): a **definite
-  rejection** (a Korbit error envelope or a validation error — provably not
+  rejection** (a Digital X error envelope or a validation error — provably not
   executed) returns to the form with the error inline and inputs preserved; an
   **ambiguous failure** (timeout/transport) is NEVER retried — the view lands
   on the freshly refetched history under a standing "outcome UNKNOWN — verify

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/progname"
-	"github.com/korbit-official/korbit-cli/internal/selfupdate"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/selfupdate"
 )
 
 // TestDoctorViewStatesProblemsInline pins the contract that `self doctor`'s text

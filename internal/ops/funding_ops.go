@@ -8,9 +8,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
-	"github.com/korbit-official/korbit-cli/internal/rawapi"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/cmdmeta"
+	"github.com/digitalx-official/digitalx-cli/internal/rawapi"
 )
 
 func init() {
@@ -156,7 +156,7 @@ func init() {
 				{Name: "address", Type: "string", Desc: "withdrawal address"},
 				{Name: "secondaryAddress", Type: "string", Desc: "destination tag / memo (absent if none)"},
 			},
-			Notes:    []string{"`withdraw request` can only send to an address listed here — addresses are registered out-of-band in the Korbit app/portal, not via this CLI."},
+			Notes:    []string{"`withdraw request` can only send to an address listed here — addresses are registered out-of-band in the Digital X app/portal, not via this CLI."},
 			Examples: []string{"{prog} withdraw addresses"},
 			Auth:     signedAuth("readWithdrawals"),
 			Safety:   cmdmeta.SafetyReadOnly,
@@ -212,7 +212,7 @@ func init() {
 			Notes: []string{
 				"Withdrawals only go to addresses pre-registered for OpenAPI use; an unregistered address returns UNREGISTERED_WITHDRAWAL_ADDRESS.",
 				"Requires the writeWithdrawals permission — provision it with `{prog} setup --with-transfers`.",
-				"A `pending`/`actionRequired`/`reviewing` status is not final: confirm with `{prog} withdraw status <currency> --id <coinWithdrawalId>`. Korbit may also require email/app confirmation before it proceeds.",
+				"A `pending`/`actionRequired`/`reviewing` status is not final: confirm with `{prog} withdraw status <currency> --id <coinWithdrawalId>`. Digital X may also require email/app confirmation before it proceeds.",
 				"Preview the exact request first with --dry-run.",
 				"Common errors: WITHDRAWAL_SUSPENDED, FORBIDDEN_WITHDRAWAL_ADDRESS, WITHDRAWAL_ALREADY_IN_PROGRESS, NO_BALANCE, DAILY_LIMIT_EXCEEDED, INVALID_USER_STATUS.",
 			},
@@ -313,11 +313,11 @@ func init() {
 		meta: OpMeta{
 			ID: []string{"krw", "deposit", "request"}, Section: cmdmeta.SectionFunding,
 			Method: "POST", Path: "/v2/krw/sendKrwDepositPush",
-			Summary:     "send a KRW-deposit push to your Korbit app (you confirm there)",
+			Summary:     "send a KRW-deposit push to your Digital X app (you confirm there)",
 			Positionals: []cmdmeta.Positional{{Name: "amount", API: "amount", Kind: cmdmeta.KindDecimal, Required: true, Desc: "KRW amount to deposit"}},
 			Params:      []cmdmeta.Param{accountSeq},
 			Notes: []string{
-				"This only sends a push notification — you must complete verification in the Korbit mobile app for the deposit to proceed (enable app push notifications first).",
+				"This only sends a push notification — you must complete verification in the Digital X mobile app for the deposit to proceed (enable app push notifications first).",
 				"Requires the writeDeposits permission (`{prog} setup --with-transfers`).",
 				"Track it with `{prog} krw deposit history`.",
 			},
@@ -339,11 +339,11 @@ func init() {
 		meta: OpMeta{
 			ID: []string{"krw", "withdraw", "request"}, Section: cmdmeta.SectionFunding,
 			Method: "POST", Path: "/v2/krw/sendKrwWithdrawalPush",
-			Summary:     "send a KRW-withdrawal push to your Korbit app (you confirm there)",
+			Summary:     "send a KRW-withdrawal push to your Digital X app (you confirm there)",
 			Positionals: []cmdmeta.Positional{{Name: "amount", API: "amount", Kind: cmdmeta.KindDecimal, Required: true, Desc: "KRW amount to withdraw"}},
 			Params:      []cmdmeta.Param{accountSeq},
 			Notes: []string{
-				"This only sends a push notification — you must complete verification in the Korbit mobile app for the withdrawal to proceed (enable app push notifications first).",
+				"This only sends a push notification — you must complete verification in the Digital X mobile app for the withdrawal to proceed (enable app push notifications first).",
 				"Requires the writeWithdrawals permission (`{prog} setup --with-transfers`).",
 				"Track it with `{prog} krw withdraw history`.",
 			},

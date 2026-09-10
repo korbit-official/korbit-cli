@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
 )
 
 // RetryPolicy configures ExecuteWithRetry. The zero value (Idempotent false /

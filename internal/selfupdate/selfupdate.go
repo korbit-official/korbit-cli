@@ -44,12 +44,12 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/korbit-official/korbit-cli/internal/config"
-	"github.com/korbit-official/korbit-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/config"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
 )
 
 // DefaultRepo is the public release repository self update resolves against.
-const DefaultRepo = "korbit-official/korbit-cli"
+const DefaultRepo = "digitalx-official/digitalx-cli"
 
 // DefaultReleaseCertURL is where self update fetches the release-signing
 // certificate to verify a release's checksums.txt signature. It is served from
@@ -57,7 +57,7 @@ const DefaultRepo = "korbit-official/korbit-cli"
 // the GitHub release it authenticates — so the pin defends against a compromised
 // release even though the archive, its checksums, and the signature all come
 // from GitHub. See verify.go for the fetch/verify policy.
-const DefaultReleaseCertURL = "https://docs.korbit.co.kr/release-signing-cert.pem"
+const DefaultReleaseCertURL = "https://docs.digitalx.miraeasset.com/release-signing-cert.pem"
 
 // MethodManagedScript is the manifest `method` for an install created by the
 // managed install script / `self install`. It is the only method self update
@@ -80,8 +80,9 @@ type Doer interface {
 // so the whole package is unit-testable against a temp home, a stub HTTP client,
 // and a fixed clock.
 type Config struct {
-	// Getenv reads the process environment (KORBIT_CLI_HOME, HOME/USERPROFILE,
-	// LOCALAPPDATA, PATH). Injectable so tests point it at a temp dir.
+	// Getenv reads the process environment (DIGITALX_CLI_HOME and the legacy
+	// KORBIT_CLI_HOME, HOME/USERPROFILE, LOCALAPPDATA, PATH). Injectable so
+	// tests point it at a temp dir.
 	Getenv func(string) string
 	// Now is the local clock in unix-ms, stamped into the manifest's installedAt.
 	Now func() int64
@@ -185,8 +186,8 @@ func (c Config) requireReleaseBuild() error {
 
 // Layout computes the install paths from the environment. Paths derive from two
 // roots: the CLI home (config.Home — the manifest + lock) and the OS user home
-// (the installed binary dir), so $KORBIT_CLI_HOME relocates the manifest without
-// moving the installed binary.
+// (the installed binary dir), so $DIGITALX_CLI_HOME relocates the manifest
+// without moving the installed binary.
 type Layout struct {
 	getenv func(string) string
 	goos   string
@@ -197,15 +198,16 @@ func (c Config) Layout() Layout {
 	return Layout{getenv: orGetenv(c.Getenv), goos: c.os()}
 }
 
-// Home is the CLI home (config.Home): $KORBIT_CLI_HOME else ~/.korbit-cli. The
-// manifest and the lock live under it.
+// Home is the CLI home (config.Home): $DIGITALX_CLI_HOME (or the legacy
+// $KORBIT_CLI_HOME) when set, else ~/.digitalx-cli, falling back to an existing
+// ~/.korbit-cli. The manifest and the lock live under it.
 func (l Layout) Home() string { return config.Home(l.getenv) }
 
 // ManifestPath is the install manifest: <home>/install.json.
 func (l Layout) ManifestPath() string { return filepath.Join(l.Home(), "install.json") }
 
 // LockPath is the advisory lock serializing install/update/uninstall against a
-// concurrent korbit-cli process mutating the same store.
+// concurrent digitalx-cli process mutating the same store.
 func (l Layout) LockPath() string { return filepath.Join(l.Home(), "self.lock") }
 
 // BinName is the installed binary/stored binary's filename: dgx-cli, or

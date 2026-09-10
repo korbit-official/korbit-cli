@@ -18,7 +18,7 @@ import (
 // depends on: when the input is decoded with json.Number (UseNumber), a program
 // that does NOT do arithmetic on a number (select / identity / field access /
 // comparison) leaves that number as a verbatim json.Number — no float64
-// rounding. Korbit money/quantity values are decimal strings (gojq never
+// rounding. Digital X money/quantity values are decimal strings (gojq never
 // touches strings), but this guards the numeric-field case too. If a future
 // gojq bump reverts to eagerly normalizing decimals to float64, this fails.
 func TestGojqPreservesJSONNumber(t *testing.T) {

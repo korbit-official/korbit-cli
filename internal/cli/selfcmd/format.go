@@ -9,8 +9,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/korbit-official/korbit-cli/internal/progname"
-	"github.com/korbit-official/korbit-cli/internal/selfupdate"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/selfupdate"
 )
 
 // The view types embed a selfupdate result so they marshal to the SAME JSON

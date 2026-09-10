@@ -12,20 +12,20 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/korbit-official/korbit-cli/internal/accountseq"
-	"github.com/korbit-official/korbit-cli/internal/i18n"
-	"github.com/korbit-official/korbit-cli/internal/stream/state"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/balances"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/fills"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/footer"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/header"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/keystrip"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/notices"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/orderbook"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/orders"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/sidebar"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/trades"
-	"github.com/korbit-official/korbit-cli/internal/tui/uikit"
+	"github.com/digitalx-official/digitalx-cli/internal/accountseq"
+	"github.com/digitalx-official/digitalx-cli/internal/i18n"
+	"github.com/digitalx-official/digitalx-cli/internal/stream/state"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/balances"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/fills"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/footer"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/header"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/keystrip"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/notices"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/orderbook"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/orders"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/sidebar"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/trades"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/uikit"
 )
 
 const (
@@ -78,7 +78,7 @@ func (m model) render() string {
 	}
 	minW, minH, recW, recH := m.sizeFloors()
 	if m.w < minW || m.h < minH {
-		return uikit.Wrap(i18n.T("terminal too small (%s) — korbit-cli tui needs at least %s (%s recommended); resize the terminal to continue",
+		return uikit.Wrap(i18n.T("terminal too small (%s) — dgx-cli tui needs at least %s (%s recommended); resize the terminal to continue",
 			fmt.Sprintf("%dx%d", m.w, m.h), fmt.Sprintf("%dx%d", minW, minH), fmt.Sprintf("%dx%d", recW, recH)), maxInt(10, m.w-1))
 	}
 

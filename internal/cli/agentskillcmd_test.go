@@ -14,8 +14,8 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/korbit-official/korbit-cli/internal/cli"
-	"github.com/korbit-official/korbit-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/cli"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
 )
 
 func skillFixture() fstest.MapFS {
@@ -32,7 +32,7 @@ func skillFixture() fstest.MapFS {
 func legacySkillFixture() fstest.MapFS {
 	fs := fstest.MapFS{
 		"SKILL.md": {Data: []byte("---\nname: korbit\ndescription: through the korbit-cli tool\n---\n" +
-			"# skill\n\nSource: https://github.com/korbit-official/korbit-cli\n")},
+			"# skill\n\nSource: https://github.com/digitalx-official/digitalx-cli\n")},
 	}
 	for _, r := range []string{"debugging.md", "funding.md", "monitoring.md", "sandbox.md"} {
 		fs["references/"+r] = &fstest.MapFile{Data: []byte("playbook\n")}
@@ -247,10 +247,10 @@ func TestAgentSkillDoctorChecksSkillCommandEvenWhenInvokedUnderAnotherName(t *te
 	// hard-coding a name here silently rewrites the default for every test that
 	// runs after this one.
 	prevProgname := progname.Name()
-	progname.Set("korbit-cli")
+	progname.Set("digitalx-cli")
 	t.Cleanup(func() { progname.Set(prevProgname) })
 
-	if err := os.WriteFile(filepath.Join(path, "korbit-cli"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(path, "digitalx-cli"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, code := runSkillCLI([]string{"agent", "skill", "install", "--claude"}, home, skillFixture()); code != 0 {
@@ -274,9 +274,9 @@ func TestAgentSkillDoctorChecksSkillCommandEvenWhenInvokedUnderAnotherName(t *te
 	if rep.Binary != "dgx-cli" || rep.OnPath || !strings.Contains(rep.PathFix, `"dgx-cli"`) {
 		t.Fatalf("doctor checked wrong binary: %+v", rep)
 	}
-	// The executable's own invoked name is checked and flagged: it's "korbit-cli",
+	// The executable's own invoked name is checked and flagged: it's "digitalx-cli",
 	// not the "dgx-cli" the skill shells out to, and the fix names both.
-	if rep.InvokedAs != "korbit-cli" || rep.NameMatches {
+	if rep.InvokedAs != "digitalx-cli" || rep.NameMatches {
 		t.Fatalf("name check wrong: invokedAs=%q nameMatches=%v", rep.InvokedAs, rep.NameMatches)
 	}
 	if !strings.Contains(rep.NameFix, "ln -s") || !strings.Contains(rep.NameFix, "/dgx-cli") {
@@ -296,7 +296,7 @@ func TestAgentSkillDoctorNameMismatchIsHealthyWhenSkillCommandOnPath(t *testing.
 	// hard-coding a name here silently rewrites the default for every test that
 	// runs after this one.
 	prevProgname := progname.Name()
-	progname.Set("korbit-cli")
+	progname.Set("digitalx-cli")
 	t.Cleanup(func() { progname.Set(prevProgname) })
 
 	// A proper "dgx-cli" command exists on PATH.

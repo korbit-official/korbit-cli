@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/clock"
-	"github.com/korbit-official/korbit-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/clock"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
 )
 
 // ---------------------------------------------------------------------------
@@ -381,7 +381,7 @@ func testAuth(t *testing.T) (*apiclient.Credentials, ed25519.PublicKey) {
 	return &apiclient.Credentials{APIKeyID: "test-key-id", Signer: apiclient.NewEd25519Signer(priv)}, pub
 }
 
-// testClient builds the stream's single Korbit API handle for tests: a
+// testClient builds the stream's single Digital X API handle for tests: a
 // apiclient.Client over the given REST doer with a real shared clock + Syncer
 // (measuring /v2/time through the doer, so the proactive-measure and
 // EXCEED_TIME_WINDOW-resync paths run the real machinery), optional creds for
@@ -1711,7 +1711,7 @@ func TestUpgrade4xxWithoutEnvelopeRetries(t *testing.T) {
 		Tunables:      testTunables(),
 	})
 
-	tp.waitNotice(ConnectFailed) // not Fatal: no Korbit error envelope
+	tp.waitNotice(ConnectFailed) // not Fatal: no Digital X error envelope
 	tp.waitNotice(Connected)
 }
 

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
 )
 
 // newHoldStore builds a Store with a controllable clock (default 1_000 ms,

@@ -8,9 +8,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
-	"github.com/korbit-official/korbit-cli/internal/rawapi"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/cmdmeta"
+	"github.com/digitalx-official/digitalx-cli/internal/rawapi"
 )
 
 func init() {
@@ -175,7 +175,7 @@ func init() {
 		meta: OpMeta{
 			ID: []string{"time"}, Section: cmdmeta.SectionMarket,
 			Method: "GET", Path: "/v2/time",
-			Summary: "Korbit server time (unix ms), plus the local-clock skew (offsetMs/rttMs) — use to check clock drift",
+			Summary: "Digital X server time (unix ms), plus the local-clock skew (offsetMs/rttMs) — use to check clock drift",
 			Response: []cmdmeta.ResponseField{
 				{Name: "time", Type: "number", Desc: "server time (unix ms)"},
 			},

@@ -5,10 +5,10 @@
 # filled with this release's version + archive checksums and attached to the
 # GitHub release, fetchable directly at:
 #
-#   curl -fsSL https://github.com/korbit-official/korbit-cli/releases/latest/download/install.sh | sh
+#   curl -fsSL https://github.com/digitalx-official/digitalx-cli/releases/latest/download/install.sh | sh
 #
 # (The README's advertised one-liner instead fetches the evergreen installer
-# hosted at https://docs.korbit.co.kr/install.sh.)
+# hosted at https://docs.digitalx.miraeasset.com/install.sh.)
 #
 # What it does: detect your platform, download that release's archive, verify its
 # SHA-256 against the value embedded below, extract it, and hand off to
@@ -23,7 +23,7 @@ PIN_VERSION=""
 PIN_SHA256=""
 # <<< release-pin <<<
 
-REPO="korbit-official/korbit-cli"
+REPO="digitalx-official/digitalx-cli"
 
 err() { echo "install: $*" >&2; exit 1; }
 

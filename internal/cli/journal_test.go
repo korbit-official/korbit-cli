@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/journal"
+	"github.com/digitalx-official/digitalx-cli/internal/journal"
 )
 
 func openJournal(t *testing.T, home string) *journal.Logger {

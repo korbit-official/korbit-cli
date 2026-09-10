@@ -27,7 +27,7 @@ const (
 type Param struct {
 	// Flag is the CLI flag name without leading dashes (kebab-case).
 	Flag string
-	// API is the Korbit parameter name the value is sent as.
+	// API is the Digital X parameter name the value is sent as.
 	API  string
 	Kind ValueKind
 	Desc string

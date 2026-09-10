@@ -37,7 +37,7 @@ const moduleRoot = "../.."
 
 // i18nImportPath is this package's import path — the anchor the extractor
 // resolves each file's local package name (usually "i18n") from.
-const i18nImportPath = "github.com/korbit-official/korbit-cli/internal/i18n"
+const i18nImportPath = "github.com/digitalx-official/digitalx-cli/internal/i18n"
 
 // surfaceScopes maps each locale file to the source scope its keys must be
 // live in (module-relative path prefixes; the most specific match wins, so

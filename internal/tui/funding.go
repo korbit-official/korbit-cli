@@ -15,12 +15,12 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/shopspring/decimal"
 
-	"github.com/korbit-official/korbit-cli/internal/accountseq"
-	"github.com/korbit-official/korbit-cli/internal/i18n"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/stream/state"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/curlist"
-	"github.com/korbit-official/korbit-cli/internal/tui/components/transfers"
+	"github.com/digitalx-official/digitalx-cli/internal/accountseq"
+	"github.com/digitalx-official/digitalx-cli/internal/i18n"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/stream/state"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/curlist"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/components/transfers"
 )
 
 // The funding screen (modeFunding): a full-screen master–detail view for
@@ -864,7 +864,7 @@ func (f fundingModel) apply(msg fundingMsg) (fundingModel, tea.Cmd) {
 // applyActionResult lands a money action's outcome. Three cases:
 //   - accepted: back to browse on the action's history tab, freshly refetched,
 //     with the receipt on the banner;
-//   - definite rejection (a Korbit error envelope or a validation error — the
+//   - definite rejection (a Digital X error envelope or a validation error — the
 //     request provably did not execute): the form reopens with the error
 //     inline and the inputs preserved;
 //   - ambiguous (timeout / transport): NO retry, ever — browse on the history
@@ -918,9 +918,9 @@ func (f fundingModel) applyActionResult(msg fundingActionMsg) (fundingModel, tea
 			}
 			f.setNoteAt(cur, tab, i18n.T("withdrawal %d requested — status %s", msg.receipt.ID, msg.receipt.Status), kind)
 		case factKRWDeposit:
-			f.setNoteAt(cur, tab, i18n.T("deposit push sent — complete the verification in the Korbit app"), bannerOK)
+			f.setNoteAt(cur, tab, i18n.T("deposit push sent — complete the verification in the Digital X app"), bannerOK)
 		case factKRWWithdraw:
-			f.setNoteAt(cur, tab, i18n.T("withdrawal push sent — complete the verification in the Korbit app"), bannerOK)
+			f.setNoteAt(cur, tab, i18n.T("withdrawal push sent — complete the verification in the Digital X app"), bannerOK)
 		case factCancel:
 			f.setNoteAt(cur, tab, i18n.T("cancel of withdrawal %d accepted", act.cancelID), bannerOK)
 		}
@@ -965,7 +965,7 @@ func (f *fundingModel) setNoteAt(cur string, tab fundingTab, text string, kind b
 }
 
 // isDefiniteRejection reports whether an action error proves the request did
-// not execute: a Korbit error envelope (the server received and rejected it)
+// not execute: a Digital X error envelope (the server received and rejected it)
 // or a client-side validation error (nothing was sent). Anything else —
 // timeout, connection drop — is ambiguous: the request may have executed.
 func isDefiniteRejection(err error) bool {

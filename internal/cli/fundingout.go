@@ -7,7 +7,7 @@ package cli
 import (
 	"encoding/json"
 
-	"github.com/korbit-official/korbit-cli/internal/cli/textout"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/textout"
 )
 
 // Human-readable formatters for the funding (deposit/withdrawal) commands.

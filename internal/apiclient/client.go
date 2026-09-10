@@ -18,9 +18,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/korbit-official/korbit-cli/internal/logging"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/version"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/version"
 )
 
 // Doer performs an HTTP request. *http.Client satisfies it; tests inject a stub.
@@ -58,14 +58,16 @@ type Options struct {
 	Doer       Doer
 	Now        func() int64
 	// UserAgent overrides the User-Agent header. Empty string keeps the default
-	// ("korbit-cli/<version>"). Composing a richer string (program version, OS,
+	// ("digitalx-cli/<version>"). Composing a richer string (program version, OS,
 	// Origin) is the CALLER's job at wiring time. This package gathers no OS
 	// info; it only carries the seam.
 	UserAgent string
 }
 
-// defaultUserAgent is the User-Agent used when none is supplied.
-func defaultUserAgent() string { return "korbit-cli/" + version.Version }
+// defaultUserAgent is the User-Agent used when none is supplied: the bare
+// product/version token from internal/version, with no environment detail.
+// Composing the richer value is the caller's job (see Options.UserAgent).
+func defaultUserAgent() string { return version.Token() }
 
 // Built is a fully-formed HTTP request, ready to send or display (dry-run).
 type Built struct {
@@ -82,7 +84,7 @@ func now(opts Options) int64 {
 	return time.Now().UnixMilli()
 }
 
-// Build forms the HTTP request, signing private calls the way Korbit verifies
+// Build forms the HTTP request, signing private calls the way Digital X verifies
 // them: the ED25519 signature is computed over the exact url-encoded parameter
 // string that is sent, with `signature` appended last. GET/DELETE carry params
 // in the query string; POST carries them in a form-encoded body.

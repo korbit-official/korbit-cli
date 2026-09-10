@@ -84,7 +84,7 @@ func TestLockCreatesHomeAndFile(t *testing.T) {
 }
 
 // TestLockWritesNote proves the lock file carries the human-readable note, so a
-// user who inspects it learns it is safe to delete when korbit-cli is not
+// user who inspects it learns it is safe to delete when digitalx-cli is not
 // running. It also checks the note survives a release/re-lock unchanged (no
 // trailing bytes, idempotent rewrite).
 func TestLockWritesNote(t *testing.T) {

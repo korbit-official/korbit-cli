@@ -24,7 +24,7 @@ const cliHMACSecret = "ZwKS2evdxj9j3Neir2s0UHAmpNFfo4a0iHawEElGCBs"
 
 // assertHMACSignedQuery recomputes the HMAC-SHA256 over the exact sent query
 // (everything before the appended &signature=) and checks the wire signature
-// matches — the way Korbit verifies it. Returns the signed-over string.
+// matches — the way Digital X verifies it. Returns the signed-over string.
 func assertHMACSignedQuery(t *testing.T, rawQuery, secret string) {
 	t.Helper()
 	idx := strings.LastIndex(rawQuery, "&signature=")

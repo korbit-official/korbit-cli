@@ -10,7 +10,7 @@
 // check in the same session.
 //
 // This package is purely the UI. It knows nothing about keys, signing, or the
-// Korbit API: the caller passes the guidance lines and registration URL to display
+// Digital X API: the caller passes the guidance lines and registration URL to display
 // and a Submit callback that performs the bind + health check and returns the lines.
 // That keeps the whole interactive layer isolated behind two function types, so
 // the non-interactive setup path (and the MCP server, which drives setup with a
@@ -29,7 +29,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/korbit-official/korbit-cli/internal/i18n"
+	"github.com/digitalx-official/digitalx-cli/internal/i18n"
 	"github.com/mdp/qrterminal/v3"
 )
 

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
 )
 
 // --- event constructors (raw stream events fed through Ingest) ----------------

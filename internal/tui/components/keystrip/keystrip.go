@@ -35,7 +35,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/korbit-official/korbit-cli/internal/tui/uikit"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/uikit"
 )
 
 // Button is one clickable key cap. Glyph is the drawn key text (e.g. "x", "X",

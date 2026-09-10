@@ -12,21 +12,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
 )
 
-// End-to-end tests against a live server (normally the Korbit API Sandbox,
+// End-to-end tests against a live server (normally the Digital X API Sandbox,
 // which implements both WebSocket endpoints with a real signature verifier).
 // Skipped unless configured:
 //
-//	KORBIT_STREAM_E2E_BASE=http://127.0.0.1:9971   (REST base; ws:// is derived)
-//	KORBIT_STREAM_E2E_KEY_ID=...                   (optional: enables the private test)
-//	KORBIT_STREAM_E2E_PEM_FILE=/path/to/key.pem    (optional: enables the private test)
+//	DIGITALX_STREAM_E2E_BASE=http://127.0.0.1:9971   (REST base; ws:// is derived)
+//	DIGITALX_STREAM_E2E_KEY_ID=...                   (optional: enables the private test)
+//	DIGITALX_STREAM_E2E_PEM_FILE=/path/to/key.pem    (optional: enables the private test)
 func e2eBase(t *testing.T) (rest, ws string) {
 	t.Helper()
-	base := os.Getenv("KORBIT_STREAM_E2E_BASE")
+	base := os.Getenv("DIGITALX_STREAM_E2E_BASE")
 	if base == "" {
-		t.Skip("KORBIT_STREAM_E2E_BASE not set")
+		t.Skip("DIGITALX_STREAM_E2E_BASE not set")
 	}
 	return base, "ws" + strings.TrimPrefix(base, "http")
 }
@@ -75,12 +75,12 @@ func TestE2EPublicStream(t *testing.T) {
 
 // TestE2EPublicSoak holds a public connection open across multiple ping
 // intervals (both directions: our client pings and the server's heartbeat)
-// and fails on any disconnect. Set KORBIT_STREAM_E2E_SOAK_MS (e.g. 40000).
+// and fails on any disconnect. Set DIGITALX_STREAM_E2E_SOAK_MS (e.g. 40000).
 func TestE2EPublicSoak(t *testing.T) {
 	rest, ws := e2eBase(t)
-	soakMs := os.Getenv("KORBIT_STREAM_E2E_SOAK_MS")
+	soakMs := os.Getenv("DIGITALX_STREAM_E2E_SOAK_MS")
 	if soakMs == "" {
-		t.Skip("KORBIT_STREAM_E2E_SOAK_MS not set")
+		t.Skip("DIGITALX_STREAM_E2E_SOAK_MS not set")
 	}
 	dur, err := time.ParseDuration(soakMs + "ms")
 	if err != nil {
@@ -123,10 +123,10 @@ func TestE2EPublicSoak(t *testing.T) {
 
 func TestE2EPrivateStream(t *testing.T) {
 	rest, ws := e2eBase(t)
-	keyID := os.Getenv("KORBIT_STREAM_E2E_KEY_ID")
-	pemFile := os.Getenv("KORBIT_STREAM_E2E_PEM_FILE")
+	keyID := os.Getenv("DIGITALX_STREAM_E2E_KEY_ID")
+	pemFile := os.Getenv("DIGITALX_STREAM_E2E_PEM_FILE")
 	if keyID == "" || pemFile == "" {
-		t.Skip("KORBIT_STREAM_E2E_KEY_ID / KORBIT_STREAM_E2E_PEM_FILE not set")
+		t.Skip("DIGITALX_STREAM_E2E_KEY_ID / DIGITALX_STREAM_E2E_PEM_FILE not set")
 	}
 	pemBytes, err := os.ReadFile(pemFile)
 	if err != nil {

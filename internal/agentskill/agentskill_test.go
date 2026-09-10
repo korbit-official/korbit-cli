@@ -152,12 +152,21 @@ func TestAgentDirHelpers(t *testing.T) {
 	}
 }
 
+// repoURL / legacyRepoURL are the two repository URLs a copy of the skill can
+// cite, written out LITERALLY rather than read from the package's own marker
+// list: a fixture built from the constant it is meant to pin would validate
+// whatever that constant happens to say, so editing it could never fail a test.
+const (
+	repoURL       = "github.com/digitalx-official/digitalx-cli"
+	legacyRepoURL = "github.com/korbit-official/korbit-cli"
+)
+
 // ourSkillMD is a SKILL.md carrying every proof Managed requires: one of our
-// skill names and a command we drive in the frontmatter, and this CLI's
-// repository URL in the body.
+// skill names and a command we drive in the frontmatter, and one of this CLI's
+// repository URLs in the body.
 func ourSkillMD(name string) string {
 	return "---\nname: " + name + "\ndescription: drives " + SkillBinary +
-		"\n---\n# skill\n\nSource: https://" + managedRepoMarker + "\n"
+		"\n---\n# skill\n\nSource: https://" + repoURL + "\n"
 }
 
 // writeOurCopy materializes a complete copy of the skill (SKILL.md plus the
@@ -213,12 +222,22 @@ func TestManagedRecognizesOurCopiesOnly(t *testing.T) {
 		{
 			name:  "quoted frontmatter name",
 			skill: LegacySkillName,
-			edits: map[string]*string{skillFile: ptr("---\nname: \"korbit\"\ndescription: the korbit-cli tool\n---\nsee https://" + managedRepoMarker + "\n")},
+			edits: map[string]*string{skillFile: ptr("---\nname: \"korbit\"\ndescription: the korbit-cli tool\n---\nsee https://" + repoURL + "\n")},
 			want:  true,
 		},
 		// The shape a hand-written skill about this CLI has: it names the tool in
 		// its description, and nothing else. Naming the tool is not owning the
 		// directory — this must survive untouched.
+		// A copy whose body cites the repository by its other URL. Every copy
+		// written by a binary that ships that spelling carries it, and it is the
+		// copy Install must be able to replace: read as foreign it would survive
+		// beside the current skill, leaving two skills with the same triggers.
+		{
+			name:  "body cites the legacy repository URL",
+			skill: LegacySkillName,
+			edits: map[string]*string{skillFile: ptr("---\nname: " + LegacySkillName + "\ndescription: drives " + SkillBinary + "\n---\n# skill\n\nSource: https://" + legacyRepoURL + "\n")},
+			want:  true,
+		},
 		{
 			name:  "hand-written skill naming this CLI",
 			skill: LegacySkillName,
@@ -261,20 +280,20 @@ func TestManagedRecognizesOurCopiesOnly(t *testing.T) {
 		{
 			name:  "no frontmatter",
 			skill: SkillName,
-			edits: map[string]*string{skillFile: ptr("# just markdown naming " + SkillBinary + " and https://" + managedRepoMarker + "\n")},
+			edits: map[string]*string{skillFile: ptr("# just markdown naming " + SkillBinary + " and https://" + repoURL + "\n")},
 			want:  false,
 		},
 		{
 			name:  "unterminated frontmatter",
 			skill: SkillName,
-			edits: map[string]*string{skillFile: ptr("---\nname: " + SkillName + "\ndescription: " + SkillBinary + "\nhttps://" + managedRepoMarker + "\n")},
+			edits: map[string]*string{skillFile: ptr("---\nname: " + SkillName + "\ndescription: " + SkillBinary + "\nhttps://" + repoURL + "\n")},
 			want:  false,
 		},
 		// An indented `name:` belongs to some other mapping, not the skill.
 		{
 			name:  "nested name key",
 			skill: SkillName,
-			edits: map[string]*string{skillFile: ptr("---\nmeta:\n  name: " + SkillName + "\ndescription: " + SkillBinary + "\n---\nhttps://" + managedRepoMarker + "\n")},
+			edits: map[string]*string{skillFile: ptr("---\nmeta:\n  name: " + SkillName + "\ndescription: " + SkillBinary + "\n---\nhttps://" + repoURL + "\n")},
 			want:  false,
 		},
 	}

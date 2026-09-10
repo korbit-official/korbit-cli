@@ -11,7 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/korbit-official/korbit-cli/internal/candles"
+	"github.com/digitalx-official/digitalx-cli/internal/candles"
 )
 
 // TestRenderBodyRectangularAcrossResizes: the fixed-geometry HJoin/VJoin assembly

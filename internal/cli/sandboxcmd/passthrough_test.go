@@ -10,7 +10,7 @@ import (
 	goruntime "runtime"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/clienv"
 )
 
 // passthroughExit forwards a streamed sandbox subprocess's non-zero exit as the

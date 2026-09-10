@@ -11,7 +11,7 @@
 #
 # A raw RSA/SHA-256 detached signature is verifiable with openssl and other
 # common crypto libraries. Its public cert is pinned by the evergreen installer
-# and fetched by `korbit self update` (see RELEASING.md).
+# and fetched by `dgx-cli self update` (see RELEASING.md).
 #
 # The signing key is a path in the environment:
 #   KORBIT_RSA_SIGN_KEY   path to the PEM private key to sign with

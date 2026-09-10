@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/korbit-official/korbit-cli/internal/sandbox/deno"
+	"github.com/digitalx-official/digitalx-cli/internal/sandbox/deno"
 )
 
 // RuntimeKind selects which Deno runs the bundle. There is no Node runtime: the

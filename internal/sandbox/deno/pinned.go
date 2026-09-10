@@ -7,7 +7,7 @@
 
 package deno
 
-// Version is the pinned Deno release korbit-cli downloads as the managed
+// Version is the pinned Deno release digitalx-cli downloads as the managed
 // sandbox runtime. Bump it by re-running scripts/update-deno.sh.
 const Version = "v2.9.1"
 

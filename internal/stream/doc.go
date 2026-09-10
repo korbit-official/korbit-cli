@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Package stream is the resilient real-time data layer over the Korbit
+// Package stream is the resilient real-time data layer over the Digital X
 // WebSocket API. It owns everything between "I want these channels" and a
 // single ordered stream of events: connection management (signed upgrade for
 // the private endpoint, reconnection with backoff, resubscription), REST
@@ -23,7 +23,7 @@
 //
 // # The two endpoints, and the recovery matrix that follows
 //
-// The two Korbit WebSocket endpoints have different reliability contracts, and
+// The two Digital X WebSocket endpoints have different reliability contracts, and
 // the recovery strategy per channel follows from them.
 //
 // Public is lossy — the server may drop messages under load — but every
@@ -223,7 +223,7 @@
 // delivery-delay check kicking a resync when it suspects lag against an
 // unmeasured clock (Client.Resync, the shared clock.Syncer, leaned into the past
 // by the measurement uncertainty). A 4xx upgrade rejection carrying
-// a Korbit error envelope is fatal (reconnecting cannot fix credentials); a 4xx
+// a Digital X error envelope is fatal (reconnecting cannot fix credentials); a 4xx
 // WITHOUT the envelope may come from an intermediary and is retried with backoff.
 //
 // # One Client, one shared clock
@@ -259,9 +259,9 @@
 //
 // stream_test.go drives the full lifecycle through fake conns/dialers and a stub
 // REST doer; dialer_test.go exercises the real coder/websocket adapter against an
-// in-process server. e2e_test.go is opt-in (KORBIT_STREAM_E2E_BASE pointing at a
-// running sandbox, plus KORBIT_STREAM_E2E_KEY_ID/KORBIT_STREAM_E2E_PEM_FILE for
-// the private test and KORBIT_STREAM_E2E_SOAK_MS for a hold-open soak) and
+// in-process server. e2e_test.go is opt-in (DIGITALX_STREAM_E2E_BASE pointing at a
+// running sandbox, plus DIGITALX_STREAM_E2E_KEY_ID/DIGITALX_STREAM_E2E_PEM_FILE for
+// the private test and DIGITALX_STREAM_E2E_SOAK_MS for a hold-open soak) and
 // verifies snapshots, the signed upgrade, REST backfill, and a real placed order
 // arriving on myOrder.
 package stream

@@ -132,7 +132,7 @@ func TestSignWireBytes(t *testing.T) {
 // TestHMACSHA256SignerVector pins the HMAC-SHA256 signer to a well-known test
 // vector (Wikipedia's HMAC example: key "key", the quick-brown-fox message),
 // proving the wire form is lowercase hex of HMAC-SHA256 keyed by the secret's
-// raw bytes — exactly what Korbit verifies (crypto.createHmac("sha256", secret)
+// raw bytes — exactly what Digital X verifies (crypto.createHmac("sha256", secret)
 // .update(query).digest("hex")).
 func TestHMACSHA256SignerVector(t *testing.T) {
 	s := NewHMACSHA256Signer([]byte("key"))
@@ -194,7 +194,7 @@ func TestLooksLikeEd25519PublicKey(t *testing.T) {
 
 	negative := map[string]string{
 		"empty":                "",
-		"portal-style id":      "korbit-ak-9f3c2b7e",
+		"portal-style id":      "dgx-ak-9f3c2b7e",
 		"sandbox id":           "SANDBOX_ED25519_KEY_00000001_0000002",
 		"uuid":                 "018f1a2b-3c4d-7e5f-8a9b-0c1d2e3f4a5b",
 		"short base64":         base64.StdEncoding.EncodeToString([]byte("hello")),
@@ -235,7 +235,7 @@ func TestLooksLikeEd25519PrivateKey(t *testing.T) {
 			t.Errorf("%s: expected a private key to be detected", name)
 		}
 	}
-	for _, in := range []string{"", "korbit-ak-9f3c2b7e", "SANDBOX_ED25519_KEY_00000001_0000002"} {
+	for _, in := range []string{"", "dgx-ak-9f3c2b7e", "SANDBOX_ED25519_KEY_00000001_0000002"} {
 		if LooksLikeEd25519PrivateKey(in) {
 			t.Errorf("%q must not be flagged as a private key", in)
 		}

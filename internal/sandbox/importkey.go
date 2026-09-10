@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/korbit-official/korbit-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
 )
 
 // keyImportBackend is the keystore backend the seeded key is forced into:

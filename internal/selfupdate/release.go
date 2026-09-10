@@ -16,7 +16,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/korbit-official/korbit-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
 )
 
 // maxArchiveBytes caps a downloaded release archive (defensive against a

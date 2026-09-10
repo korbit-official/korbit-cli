@@ -6,7 +6,7 @@
 // over a stream of JSON documents to filter and/or transform them. It is the
 // engine behind the monitor command's --jq flag.
 //
-// Number fidelity is the load-bearing property. Korbit money/quantity values
+// Number fidelity is the load-bearing property. Digital X money/quantity values
 // are decimal strings on the wire, and gojq passes strings through untouched.
 // Numeric JSON values are decoded as json.Number (UseNumber) and gojq preserves
 // json.Number verbatim for any operation that does not do arithmetic on that

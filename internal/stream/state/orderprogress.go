@@ -13,7 +13,7 @@ import "github.com/shopspring/decimal"
 // is the order's own event time, so neither can correctly order two views of
 // one order.
 //
-// It rests on one invariant of the Korbit order lifecycle: while an order rests
+// It rests on one invariant of the Digital X order lifecycle: while an order rests
 // on the book it only ever moves FORWARD — its status advances
 // (pending → open → partiallyFilled) or its cumulative filledQty grows — and
 // once it leaves the book it is terminal and frozen. So the tuple

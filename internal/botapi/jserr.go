@@ -9,8 +9,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/digitalx-official/digitalx-cli/internal/output"
 	"github.com/dop251/goja"
-	"github.com/korbit-official/korbit-cli/internal/output"
 )
 
 // jsError converts a Go error into the JS value a api.*/db.* promise

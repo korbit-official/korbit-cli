@@ -13,9 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/cli/probe"
-	"github.com/korbit-official/korbit-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/probe"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
 )
 
 func TestRegistrationLink(t *testing.T) {
@@ -28,7 +28,7 @@ func TestRegistrationLink(t *testing.T) {
 	if err != nil {
 		t.Fatalf("link is not a valid URL: %v (%s)", err, link)
 	}
-	if u.Scheme != "https" || u.Host != "developers.korbit.co.kr" || u.Path != portalCreatePath {
+	if u.Scheme != "https" || u.Host != "developers.digitalx.miraeasset.com" || u.Path != portalCreatePath {
 		t.Fatalf("unexpected link base: %s", link)
 	}
 	q := u.Query()
@@ -56,7 +56,7 @@ func TestRegistrationLink(t *testing.T) {
 }
 
 // TestNewKeyGuidanceLabelsLink pins the default key label prefilled into the
-// registration deep link: "korbit-cli: <key name>", so a CLI-issued key is
+// registration deep link: "dgx-cli: <key name>", so a CLI-issued key is
 // recognizable in the developers portal.
 func TestNewKeyGuidanceLabelsLink(t *testing.T) {
 	kp, err := apiclient.GenerateKeypair()
@@ -68,8 +68,8 @@ func TestNewKeyGuidanceLabelsLink(t *testing.T) {
 	if err != nil {
 		t.Fatalf("link is not a valid URL: %v (%s)", err, link)
 	}
-	if got := u.Query().Get("label"); got != "korbit-cli: trading-bot" {
-		t.Fatalf("label = %q, want %q", got, "korbit-cli: trading-bot")
+	if got := u.Query().Get("label"); got != "dgx-cli: trading-bot" {
+		t.Fatalf("label = %q, want %q", got, "dgx-cli: trading-bot")
 	}
 }
 

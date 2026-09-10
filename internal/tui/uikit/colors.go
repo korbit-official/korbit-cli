@@ -18,7 +18,7 @@ const (
 	// ColorSchemeGreenRed is the Western convention: up/bid green, down/ask red.
 	// The zero value, so it is the default.
 	ColorSchemeGreenRed ColorScheme = iota
-	// ColorSchemeRedBlue is the East-Asian convention (the Korbit app's own
+	// ColorSchemeRedBlue is the East-Asian convention (the Digital X app's own
 	// coloring): up/bid red, down/ask blue.
 	ColorSchemeRedBlue
 )

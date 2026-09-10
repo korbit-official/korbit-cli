@@ -9,9 +9,9 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/korbit-official/korbit-cli/internal/accountseq"
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/rawapi"
+	"github.com/digitalx-official/digitalx-cli/internal/accountseq"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/rawapi"
 )
 
 // passthroughOp is a catalog entry whose Run is a single typed rawapi call under

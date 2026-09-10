@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/cli"
-	"github.com/korbit-official/korbit-cli/internal/cli/setupui"
-	"github.com/korbit-official/korbit-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/cli"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/setupui"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
 )
 
 // The `setup --wait` headless auto-claim path reuses the same claim/whoami doer
@@ -328,7 +328,7 @@ func TestSetupPortalBaseURLOverride(t *testing.T) {
 	if !strings.Contains(out, portal+"/manage/create") {
 		t.Fatalf("registration link must point at the overridden portal host:\n%s", out)
 	}
-	if strings.Contains(out, "developers.korbit.co.kr") || strings.Contains(stderr, "developers.korbit.co.kr") {
+	if strings.Contains(out, "developers.digitalx.miraeasset.com") || strings.Contains(stderr, "developers.digitalx.miraeasset.com") {
 		t.Fatalf("override must replace the production portal host entirely:\nstdout=%s\nstderr=%s", out, stderr)
 	}
 }

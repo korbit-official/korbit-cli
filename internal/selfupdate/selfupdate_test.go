@@ -303,7 +303,7 @@ func TestManagedBlockGuardsAgainstDuplicatePATH(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("POSIX sh block is unix-only")
 	}
-	const dir = "/opt/korbit/bin"
+	const dir = "/opt/dgx/bin"
 	block := managedBlock(pathBlockBody(dir))
 	// Fresh PATH, source the block twice, then count how many components equal dir.
 	script := "PATH=/usr/bin:/bin\n" + block + block +
@@ -769,7 +769,7 @@ func TestManagedThroughSymlinkedHome(t *testing.T) {
 // absolute operand pointing at the same file).
 func TestResolveOrClean(t *testing.T) {
 	// Nonexistent path: still returns an absolute, cleaned form (no resolution).
-	if got := resolveOrClean("/no/such/korbit/./bin"); got != "/no/such/korbit/bin" {
+	if got := resolveOrClean("/no/such/dgx/./bin"); got != "/no/such/dgx/bin" {
 		t.Errorf("nonexistent path: got %q", got)
 	}
 
@@ -953,7 +953,7 @@ func TestUninstallRemovesCaches(t *testing.T) {
 	c.exeOverride = l.ExecutablePath()
 
 	stateDir := mkArtifact(t, filepath.Join(l.Home(), "sandbox"))
-	cacheDir := mkArtifact(t, filepath.Join(t.TempDir(), "korbit-cli"))
+	cacheDir := mkArtifact(t, filepath.Join(t.TempDir(), "digitalx-cli"))
 	// A non-existent artifact must be silently ignored (neither removed nor reported).
 	absent := filepath.Join(t.TempDir(), "does-not-exist")
 
@@ -987,7 +987,7 @@ func TestUninstallKeepsCachesWhenNotSelected(t *testing.T) {
 	c.exeOverride = l.ExecutablePath()
 
 	stateDir := mkArtifact(t, filepath.Join(l.Home(), "sandbox"))
-	cacheDir := mkArtifact(t, filepath.Join(t.TempDir(), "korbit-cli"))
+	cacheDir := mkArtifact(t, filepath.Join(t.TempDir(), "digitalx-cli"))
 
 	if _, err := c.Uninstall(UninstallOptions{RemoveBinary: true, Artifacts: []string{stateDir, cacheDir}}); err != nil {
 		t.Fatal(err)
@@ -1038,7 +1038,7 @@ func TestUninstallCachesRefusesHomeContainingArtifact(t *testing.T) {
 }
 
 // TestUninstallPrunesEmptyHome pins that when a data removal empties the CLI home
-// (only korbit's own lock files remain), the home dir itself is removed.
+// (only the CLI's own lock files remain), the home dir itself is removed.
 func TestUninstallPrunesEmptyHome(t *testing.T) {
 	home := t.TempDir()
 	c := testConfig(home)
@@ -1456,7 +1456,7 @@ func newSignerKit(t *testing.T) *signerKit {
 	}
 	tmpl := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
-		Subject:      pkix.Name{CommonName: "korbit-cli release signing (test)"},
+		Subject:      pkix.Name{CommonName: "digitalx-cli release signing (test)"},
 		NotBefore:    time.Unix(0, 0),
 		NotAfter:     time.Unix(1<<31, 0),
 	}

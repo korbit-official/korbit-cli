@@ -7,7 +7,7 @@ package spec
 import (
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/ops"
+	"github.com/digitalx-official/digitalx-cli/internal/ops"
 )
 
 // TestCandleHistoryMaxMatchesOpsCap pins the monitor --candle-history ceiling

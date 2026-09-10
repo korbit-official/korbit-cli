@@ -10,8 +10,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/korbit-official/korbit-cli/internal/cli/textout"
-	"github.com/korbit-official/korbit-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/textout"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
 )
 
 // This file owns the human-readable output mode. The output package owns the
@@ -107,8 +107,8 @@ var endpointFormatters = map[string]endpointFormatter{
 	"withdraw cancel":      ackFmt("withdrawal cancellation accepted (confirm with `{prog} withdraw status <currency> --id <id>`)"),
 	"withdraw history":     arrayTableFmt("(no withdrawals)", colsCoinWithdrawal),
 	"withdraw status":      objectKVFmt(colsCoinWithdrawalDetail),
-	"krw deposit request":  ackFmt("KRW deposit push sent — confirm it in the Korbit app (track with `{prog} krw deposit history`)"),
-	"krw withdraw request": ackFmt("KRW withdrawal push sent — confirm it in the Korbit app (track with `{prog} krw withdraw history`)"),
+	"krw deposit request":  ackFmt("KRW deposit push sent — confirm it in the Digital X app (track with `{prog} krw deposit history`)"),
+	"krw withdraw request": ackFmt("KRW withdrawal push sent — confirm it in the Digital X app (track with `{prog} krw withdraw history`)"),
 	"krw deposit history":  arrayTableFmt("(no KRW deposits)", colsKrwDeposit),
 	"krw withdraw history": arrayTableFmt("(no KRW withdrawals)", colsKrwWithdrawal),
 }

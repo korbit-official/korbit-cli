@@ -133,7 +133,7 @@ func TestTAInvalidInputThrows(t *testing.T) {
 
 // wantTASurface is the EXACT set of dotted ta.* / ta.stream.* method names —
 // the golden surface pin for the indicator API, in the spirit of
-// TestGoldenKorbitMethodSet. Adding an indicator adds a line here; renaming or
+// TestGoldenAPIMethodSet. Adding an indicator adds a line here; renaming or
 // removing one breaks an existing line. Extend additively.
 var wantTASurface = []string{
 	"ta.adx", "ta.aroon", "ta.atr", "ta.bbands", "ta.cci", "ta.dema", "ta.ema",

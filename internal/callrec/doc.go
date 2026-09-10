@@ -108,7 +108,7 @@
 // # No secrets
 //
 // Only pre-signing facts are ever written: the public api-key id and the
-// pre-signing params (korbit assembles the timestamp/recvWindow/signature AFTER
+// pre-signing params (apiclient assembles the timestamp/recvWindow/signature AFTER
 // the CallInfo is captured, so none of them reach a Recorder). The keystore is
 // never read for journaling. This is the same no-secrets rule the journal
 // package itself documents.

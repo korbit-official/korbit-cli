@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
 )
 
 // ---- ticker: GET /v2/tickers (public) ----
@@ -238,7 +238,7 @@ func (c *Client) Currencies(ctx context.Context, _ CurrenciesRequest, pol apicli
 // TimeRequest has no parameters.
 type TimeRequest struct{}
 
-// ServerTime is the Korbit server time.
+// ServerTime is the Digital X server time.
 type ServerTime struct {
 	Time int64 `json:"time"`
 }

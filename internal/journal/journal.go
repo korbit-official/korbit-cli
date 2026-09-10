@@ -16,7 +16,7 @@
 // truth of what it actually did — when a human asks "what did you do?", the
 // agent can read the journal back instead of guessing. Second, support: when a
 // user hits a problem, the journal (or a redacted `debug bundle` of it) is the
-// diagnostic record to send to Korbit.
+// diagnostic record to send to Digital X.
 //
 // It never stores secrets — only the public API-key id and the pre-signing
 // request parameters (the ED25519 signature and private key never reach here).
@@ -30,10 +30,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/korbit-official/korbit-cli/internal/envalias"
-	"github.com/korbit-official/korbit-cli/internal/fslock"
-	"github.com/korbit-official/korbit-cli/internal/legacyfile"
-	"github.com/korbit-official/korbit-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/envalias"
+	"github.com/digitalx-official/digitalx-cli/internal/fslock"
+	"github.com/digitalx-official/digitalx-cli/internal/legacyfile"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
 	_ "modernc.org/sqlite" // pure-Go SQLite driver (no cgo — keeps cross-compiles working)
 )
 
@@ -212,7 +212,7 @@ type Logger struct {
 }
 
 // Open opens (creating if needed) the journal database at path and ensures the
-// schema exists. It enables WAL so concurrent korbit-cli invocations can read
+// schema exists. It enables WAL so concurrent digitalx-cli invocations can read
 // while one writes, and a busy_timeout so a writer waits for the lock instead
 // of failing with SQLITE_BUSY. A single pooled connection (SetMaxOpenConns(1))
 // serializes all in-process access, so no additional application-level locking

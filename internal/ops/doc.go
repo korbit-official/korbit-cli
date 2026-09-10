@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Package ops is the L2 operations layer: the Korbit Open API v2 with THIS
+// Package ops is the L2 operations layer: the Digital X Open API v2 with THIS
 // CLI's guarantees layered on top of the L1 primitive client (internal/apiclient).
 //
 // # Where it sits
@@ -40,7 +40,7 @@
 //
 // # Backend contract assumptions (the money-safety foundation)
 //
-// The place protocol's safety rests on three properties of the Korbit backend.
+// The place protocol's safety rests on three properties of the Digital X backend.
 // Each line states the property and the code path that depends on it; if a
 // property stops holding, that path is unsafe.
 //

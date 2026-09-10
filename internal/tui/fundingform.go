@@ -9,7 +9,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"github.com/korbit-official/korbit-cli/internal/i18n"
+	"github.com/digitalx-official/digitalx-cli/internal/i18n"
 )
 
 // The request pane's form state helpers and validation. The form is not a
@@ -105,7 +105,7 @@ func (f fundingModel) validateWithdraw() string {
 		return i18n.T("registered withdrawal addresses are still loading — try again in a moment")
 	}
 	if len(f.wdAddrChoices()) == 0 {
-		return i18n.T("no addresses are registered for API withdrawals of %s here — register one in the Korbit developers portal, then press r to refresh", strings.ToUpper(f.selected))
+		return i18n.T("no addresses are registered for API withdrawals of %s here — register one in the Digital X developers portal, then press r to refresh", strings.ToUpper(f.selected))
 	}
 	a, ok := f.chosenWdAddr()
 	if !ok {

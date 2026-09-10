@@ -10,7 +10,7 @@
 // Every mutation of keys.json (the registry), keystore.json (the file vault),
 // and config.json is a load → modify → atomic-rename cycle. The atomic rename
 // prevents a torn file, but it does NOT prevent a lost update: two concurrent
-// korbit-cli processes — the expected case is a long-running monitor bot plus
+// digitalx-cli processes — the expected case is a long-running monitor bot plus
 // ad-hoc human commands — can each read the same snapshot and last-writer-wins
 // the whole file. For the file vault that can silently drop a freshly-added
 // key's PRIVATE material while its registry record survives (unrecoverable;
@@ -37,7 +37,7 @@
 // do and the lock file is never deleted by the CLI (deleting it would race a
 // concurrent acquirer holding it open). A leftover ".lock" file is expected and
 // harmless; it carries only a human-readable note (see lockNote) explaining that
-// a user is free to delete it whenever no korbit-cli process is running.
+// a user is free to delete it whenever no digitalx-cli process is running.
 //
 // # Lock ordering (callers' contract)
 //
@@ -57,16 +57,16 @@ import (
 )
 
 // lockNote is written into every lock file so a user who inspects one understands
-// what it is and that removing it is safe when no korbit-cli process is running.
+// what it is and that removing it is safe when no digitalx-cli process is running.
 // The file holds no application data; this text is purely informational.
-const lockNote = `korbit-cli lock file
+const lockNote = `digitalx-cli lock file
 
-korbit-cli writes this file to coordinate concurrent updates to its on-disk
+digitalx-cli writes this file to coordinate concurrent updates to its on-disk
 state (keys, key store, config). It holds no data of its own.
 
-The actual lock is an OS advisory lock held only while a korbit-cli process is
+The actual lock is an OS advisory lock held only while a digitalx-cli process is
 running; the OS releases it automatically when that process exits, even on a
-crash. So this file is safe to delete whenever no korbit-cli process is running
+crash. So this file is safe to delete whenever no digitalx-cli process is running
 — it is recreated as needed.
 `
 

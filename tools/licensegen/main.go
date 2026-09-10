@@ -3,12 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Command licensegen regenerates THIRD_PARTY_LICENSES.txt at the repository root: the
-// attribution notices for every third-party Go module linked into the korbit
+// attribution notices for every third-party Go module linked into the digitalx-cli
 // binary. The compiled binary statically links these modules, so their
 // permissive licenses (MIT / BSD / ISC / Apache-2.0) require their copyright and
 // permission notices to travel with every copy we distribute. The generated file
 // is shipped inside each release archive (see the archive `files` list in
-// .goreleaser.yaml) and `korbit license` points at it in the source repository.
+// .goreleaser.yaml) and `dgx-cli license` points at it in the source repository.
 //
 // Run from the module root:
 //
@@ -46,7 +46,7 @@ import (
 // mainModule is the module whose linked dependencies are credited. The binary
 // is `package main` at the module root, so its transitive deps are exactly what
 // ships in the binary.
-const mainModule = "github.com/korbit-official/korbit-cli"
+const mainModule = "github.com/digitalx-official/digitalx-cli"
 
 // defaultOut is written relative to the module root (the working directory when
 // run via `go run ./tools/licensegen` or `make licenses`). It sits at the
@@ -223,7 +223,7 @@ func run(out string) error {
 const sep = "================================================================================"
 
 func writeHeader(buf *bytes.Buffer) {
-	fmt.Fprintf(buf, "Third-party software notices for korbit-cli\n")
+	fmt.Fprintf(buf, "Third-party software notices for digitalx-cli\n")
 	fmt.Fprintf(buf, "%s\n\n", sep)
 }
 

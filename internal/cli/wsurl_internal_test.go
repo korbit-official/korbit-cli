@@ -10,8 +10,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/cli/probe"
-	"github.com/korbit-official/korbit-cli/internal/stream"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/probe"
+	"github.com/digitalx-official/digitalx-cli/internal/stream"
 )
 
 type fnDoer func(*http.Request) (*http.Response, error)
@@ -39,30 +39,30 @@ func TestProbeEndpoints(t *testing.T) {
 	}
 
 	// REST: 200 reachable, 500 reachable-with-warning, transport error unreachable.
-	if c := probe.REST(context.Background(), rest200, "https://api-test.korbit.co.kr"); !c.Reachable {
+	if c := probe.REST(context.Background(), rest200, "https://api-test.digitalx.miraeasset.com"); !c.Reachable {
 		t.Errorf("200 should be reachable: %+v", c)
 	}
-	if c := probe.REST(context.Background(), rest500, "https://api-test.korbit.co.kr"); !c.Reachable {
+	if c := probe.REST(context.Background(), rest500, "https://api-test.digitalx.miraeasset.com"); !c.Reachable {
 		t.Errorf("500 host is still reachable: %+v", c)
 	}
-	if c := probe.REST(context.Background(), restErr, "https://api-test.korbit.co.kr"); c.Reachable {
+	if c := probe.REST(context.Background(), restErr, "https://api-test.digitalx.miraeasset.com"); c.Reachable {
 		t.Errorf("transport error should be unreachable: %+v", c)
 	}
 
 	// WS: a clean dial is reachable; a refused upgrade is still reachable (the
 	// host answered); a transport error is unreachable.
-	if c := probe.WS(context.Background(), dialOK, "wss://ws-api-test.korbit.co.kr"); !c.Reachable {
+	if c := probe.WS(context.Background(), dialOK, "wss://ws-api-test.digitalx.miraeasset.com"); !c.Reachable {
 		t.Errorf("clean dial should be reachable: %+v", c)
 	}
-	if c := probe.WS(context.Background(), dialRejected, "wss://ws-api-test.korbit.co.kr"); !c.Reachable {
+	if c := probe.WS(context.Background(), dialRejected, "wss://ws-api-test.digitalx.miraeasset.com"); !c.Reachable {
 		t.Errorf("refused upgrade means the host answered (reachable): %+v", c)
 	}
-	if c := probe.WS(context.Background(), dialErr, "wss://ws-api-test.korbit.co.kr"); c.Reachable {
+	if c := probe.WS(context.Background(), dialErr, "wss://ws-api-test.digitalx.miraeasset.com"); c.Reachable {
 		t.Errorf("transport error should be unreachable: %+v", c)
 	}
 
 	// Nil deps are reported "not checked", never as a failure.
-	v := probe.Endpoints(nil, nil, "https://api-test.korbit.co.kr", "wss://ws-api-test.korbit.co.kr", 1000)
+	v := probe.Endpoints(nil, nil, "https://api-test.digitalx.miraeasset.com", "wss://ws-api-test.digitalx.miraeasset.com", 1000)
 	if !v.REST.Reachable || !v.WS.Reachable {
 		t.Errorf("nil deps must not be reported unreachable: %+v", v)
 	}
@@ -91,17 +91,17 @@ func (stubConn) Close() error                         { return nil }
 // host; the scheme maps http→ws and https→wss.
 func TestDeriveWSBaseURL(t *testing.T) {
 	cases := []struct{ rest, want string }{
-		{"https://api.korbit.co.kr", "wss://ws-api.korbit.co.kr"},
-		{"https://api-test.korbit.co.kr", "wss://ws-api-test.korbit.co.kr"},
-		{"https://apiz.korbit.com", "wss://ws-api.korbit.com"},           // trailing chunk dropped
-		{"https://api7-test.korbit.com", "wss://ws-api-test.korbit.com"}, // digit dropped, suffix kept
-		{"http://127.0.0.1:9999", "ws://127.0.0.1:9999"},                 // sandbox: same host, port kept
-		{"https://localhost:8443", "wss://localhost:8443"},               // non-api host unchanged
-		{"https://api-test.korbit.co.kr/", "wss://ws-api-test.korbit.co.kr"},
-		{"http://[::1]:9999", "ws://[::1]:9999"},                                    // IPv6 literal: re-bracketed, port kept
-		{"https://APIz.korbit.com", "wss://ws-api.korbit.com"},                      // prefix match is case-insensitive
-		{"https://user:pw@api-test.korbit.co.kr", "wss://ws-api-test.korbit.co.kr"}, // userinfo dropped
-		{"https://api", "wss://ws-api"},                                             // single label
+		{"https://api.digitalx.miraeasset.com", "wss://ws-api.digitalx.miraeasset.com"},
+		{"https://api-test.digitalx.miraeasset.com", "wss://ws-api-test.digitalx.miraeasset.com"},
+		{"https://apix.example.com", "wss://ws-api.example.com"},           // trailing chunk dropped
+		{"https://api2-test.example.com", "wss://ws-api-test.example.com"}, // digit dropped, suffix kept
+		{"http://127.0.0.1:9999", "ws://127.0.0.1:9999"},                   // sandbox: same host, port kept
+		{"https://localhost:8443", "wss://localhost:8443"},                 // non-api host unchanged
+		{"https://api-test.digitalx.miraeasset.com/", "wss://ws-api-test.digitalx.miraeasset.com"},
+		{"http://[::1]:9999", "ws://[::1]:9999"},                                                          // IPv6 literal: re-bracketed, port kept
+		{"https://APIx.example.com", "wss://ws-api.example.com"},                                          // prefix match is case-insensitive
+		{"https://user:pw@api-test.digitalx.miraeasset.com", "wss://ws-api-test.digitalx.miraeasset.com"}, // userinfo dropped
+		{"https://api", "wss://ws-api"},                                                                   // single label
 		{"not a url", ""},
 	}
 	for _, c := range cases {

@@ -20,7 +20,7 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/korbit-official/korbit-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/logging"
 )
 
 // Subscription is one channel subscription. Channel must be one of the
@@ -328,7 +328,7 @@ func (m *connManager) run(ctx context.Context) error {
 				}
 				if ue.Status >= 400 && ue.Status < 500 && ue.Status != 429 &&
 					ue.Code != "" && ue.Code != "EXCEED_TIME_WINDOW" {
-					// A 4xx carrying a Korbit error envelope is a definitive
+					// A 4xx carrying a Digital X error envelope is a definitive
 					// auth/permission/config-class rejection: reconnecting
 					// cannot fix it. A 4xx WITHOUT the envelope may come from
 					// an intermediary (proxy/LB) and is retried with backoff
@@ -861,7 +861,7 @@ func (m *connManager) log() *slog.Logger {
 
 // redactURL strips the query string from a ws URL for logging: the private
 // upgrade carries the signed timestamp/signature there, which must never reach a
-// log. Only the scheme://host/path (e.g. wss://ws-api.korbit.co.kr/v2/private)
+// log. Only the scheme://host/path (e.g. wss://ws-api.digitalx.miraeasset.com/v2/private)
 // is kept — enough to tell a wrong host/path from an auth problem.
 func redactURL(raw string) string {
 	if u, err := url.Parse(raw); err == nil && u.Host != "" {

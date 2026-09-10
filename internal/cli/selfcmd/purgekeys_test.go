@@ -8,8 +8,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/keystore"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/keystore"
 )
 
 // TestPurgeKeysRemovesAll pins that a data purge clears every key's material from

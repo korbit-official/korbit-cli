@@ -12,14 +12,14 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/korbit-official/korbit-cli/internal/apiclient"
-	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
-	"github.com/korbit-official/korbit-cli/internal/cli/doctorcmd"
-	"github.com/korbit-official/korbit-cli/internal/cli/probe"
-	"github.com/korbit-official/korbit-cli/internal/i18n"
-	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/output"
-	"github.com/korbit-official/korbit-cli/internal/progname"
+	"github.com/digitalx-official/digitalx-cli/internal/apiclient"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/clienv"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/doctorcmd"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/probe"
+	"github.com/digitalx-official/digitalx-cli/internal/i18n"
+	"github.com/digitalx-official/digitalx-cli/internal/keys"
+	"github.com/digitalx-official/digitalx-cli/internal/output"
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
 )
 
 // setupResumeResult is a `setup` re-run on an existing but unbound key: it
@@ -623,7 +623,7 @@ func verifyError(err error) error {
 		if detail == "" {
 			detail = apiErr.Message
 		}
-		return errors.New(i18n.T("Korbit rejected this key id (%s) — check it and try again, or press Esc to finish later", detail))
+		return errors.New(i18n.T("Digital X rejected this key id (%s) — check it and try again, or press Esc to finish later", detail))
 	}
 	return errors.New(i18n.T("could not verify the key id (%s) — check connectivity and retry, or press Ctrl-C and bind with `%s`", err.Error(), progname.Name()+" setup --no-interactive --api-key <KEY_ID>"))
 }

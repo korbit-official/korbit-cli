@@ -31,7 +31,7 @@ var ExitCodes = map[string]string{
 	strconv.Itoa(ExitSuccess):  "success",
 	strconv.Itoa(ExitInternal): "network failure or internal error",
 	strconv.Itoa(ExitUsage):    "usage error — the command line is invalid (fix the invocation)",
-	strconv.Itoa(ExitAPI):      "the Korbit API rejected the request (see error.code)",
+	strconv.Itoa(ExitAPI):      "the Digital X API rejected the request (see error.code)",
 	strconv.Itoa(ExitConfig):   "key or configuration problem — fix with `{prog} key ...` or config.json",
 }
 
@@ -123,7 +123,7 @@ func (io IO) EmitError(err error, jsonMode, compact bool) int {
 // emitErr renders one classified error to stderr: the JSON envelope when jsonMode
 // is set, otherwise a single human-readable line. The human line carries no
 // program/log tag — unlike the operational logger and stderr notices (which mark
-// out-of-band diagnostics with "korbit-cli: …"), this IS the direct outcome of
+// out-of-band diagnostics with "<prog>: …"), this IS the direct outcome of
 // the command the user ran, so it reads as a plain "error: <message>".
 func (io IO) emitErr(jsonMode, compact bool, payload any, humanMsg string) {
 	if jsonMode {

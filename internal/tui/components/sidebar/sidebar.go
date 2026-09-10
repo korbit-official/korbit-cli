@@ -20,8 +20,8 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"github.com/korbit-official/korbit-cli/internal/i18n"
-	"github.com/korbit-official/korbit-cli/internal/tui/uikit"
+	"github.com/digitalx-official/digitalx-cli/internal/i18n"
+	"github.com/digitalx-official/digitalx-cli/internal/tui/uikit"
 )
 
 // Key is the comparable cache key: equal Keys render identically. TickerRev is

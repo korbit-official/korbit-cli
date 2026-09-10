@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/digitalx-official/digitalx-cli/internal/progname"
 )
 
 // LevelOff is a threshold above every real record level, so a logger created
@@ -95,11 +97,12 @@ type Format int
 
 const (
 	// FormatText is the human-readable one-line form. On stderr it is tagged
-	// "korbit-cli: <level>: <message>[ k=v …]"; with [Style.Timestamp] set (the
+	// "<prog>: <level>: <message>[ k=v …]" — <prog> being the invoked program
+	// name ([progname.Name]); with [Style.Timestamp] set (the
 	// form used when logs are diverted to a file) it is stamped with a local
 	// RFC3339 timestamp instead of the tag — "<ts> <level> <message>[ k=v …]" —
 	// since a file trail wants a wall-clock anchor and has no terminal session to
-	// scope the "korbit-cli:" tag to.
+	// scope the "<prog>:" tag to.
 	FormatText Format = iota
 	// FormatJSON emits one JSON object per record via slog's JSON handler (the
 	// standard time/level/msg keys, then the attributes), with the level rendered
@@ -109,18 +112,18 @@ const (
 
 // Style is the resolved presentation for a logger: which [Format], and — for
 // FormatText only — whether to stamp lines with a timestamp instead of the
-// "korbit-cli: " tag. The zero Style is the stderr default (text, tagged, no
+// "<prog>: " tag. The zero Style is the stderr default (text, tagged, no
 // timestamp).
 type Style struct {
 	Format Format
 	// Timestamp applies to FormatText only: prefix each line with a local
-	// RFC3339 timestamp and drop the "korbit-cli: " tag. FormatJSON always
+	// RFC3339 timestamp and drop the "<prog>: " tag. FormatJSON always
 	// carries a timestamp (slog's time key), so this field is ignored there.
 	Timestamp bool
 }
 
 // New returns a logger that writes human diagnostic lines to w at or above
-// level in the default stderr style (text, "korbit-cli: " tagged). Each record
+// level in the default stderr style (text, "<prog>: " tagged). Each record
 // is assembled into a single line and written under an internal lock, so the
 // returned logger and every logger derived from it are safe to use concurrently.
 func New(w io.Writer, level slog.Level) *slog.Logger {
@@ -155,7 +158,7 @@ func jsonReplaceAttr(_ []string, a slog.Attr) slog.Attr {
 	return a
 }
 
-// textHandler renders slog records as text — "korbit-cli: <level>: <message>[ k=v …]"
+// textHandler renders slog records as text — "<prog>: <level>: <message>[ k=v …]"
 // by default, or "<rfc3339> <level> <message>[ k=v …]" when timestamp is set
 // (the FormatJSON path uses slog's own JSON handler instead). Derived handlers
 // (With/WithGroup) share the same writer and mutex pointer, so all writes to one
@@ -164,7 +167,7 @@ type textHandler struct {
 	w         io.Writer
 	mu        *sync.Mutex
 	level     slog.Level
-	timestamp bool // stamp an RFC3339 (local) time and drop the "korbit-cli: " tag
+	timestamp bool // stamp an RFC3339 (local) time and drop the "<prog>: " tag
 	attrs     []slog.Attr
 	group     string // dotted prefix applied to attribute keys ("" = none)
 }
@@ -181,7 +184,8 @@ func (h *textHandler) Handle(_ context.Context, r slog.Record) error {
 		b.WriteString(levelTag(r.Level))
 		b.WriteByte(' ')
 	} else {
-		b.WriteString("korbit-cli: ")
+		b.WriteString(progname.Name())
+		b.WriteString(": ")
 		b.WriteString(levelTag(r.Level))
 		b.WriteString(": ")
 	}
