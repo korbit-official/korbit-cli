@@ -2,16 +2,16 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
-# GoReleaser configuration — the release build for korbit-cli. It replaces the
-# old `make dist` cross-compile loop: same target matrix, same -trimpath and
-# release ldflags, plus version injection from the git tag and macOS code
-# signing. See RELEASING.md for the full workflow (signing creds, notarization).
+# GoReleaser configuration — the release build for digitalx-cli: the target
+# matrix, -trimpath and release ldflags, version injection from the git tag, and
+# macOS code signing. See RELEASING.md for the full workflow (signing creds,
+# notarization) and for the dual-named archive sets this file produces.
 #
 # Local smoke test (no publish, no notarization; signing is skipped when no
 # signing identity is configured):  goreleaser release --snapshot --clean
 version: 2
 
-project_name: korbit
+project_name: dgx-cli
 
 before:
   hooks:
@@ -22,8 +22,10 @@ before:
     - ./scripts/check-licenses.sh
 
 builds:
-  - id: korbit
-    binary: korbit
+  # The primary build. Its binary is what a release installs and what
+  # `self update` extracts from the archive, by exact basename.
+  - id: dgx-cli
+    binary: dgx-cli
     main: .
     env:
       - CGO_ENABLED=0 # pure-Go deps (modernc sqlite, coder/websocket); no C toolchain needed
@@ -68,18 +70,58 @@ builds:
             - GOARCH={{ .Arch }}
             - VERSION={{ .Version }}
 
-archives:
+  # The legacy-named build. Byte-for-byte the same program as the primary — same
+  # main, flags, ldflags, and target matrix — compiled under the binary name
+  # `korbit`. It exists for updaters that download korbit_<os>_<arch> and extract
+  # the archive entry whose basename is exactly `korbit`: both the asset name and
+  # the name INSIDE it are part of that contract, so neither may change.
+  #
+  # It runs the macOS signing hook (these binaries ship, so they must be signed
+  # and notarizable) but NOT the .mcpb hook: a Desktop Extension is installed
+  # fresh rather than self-updated, so one bundle per platform — built from the
+  # primary — is the whole set.
   - id: korbit
+    binary: korbit
+    main: .
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/korbit-official/korbit-cli/internal/version.Version={{ .Version }}
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: darwin
+        goarch: amd64
+    hooks:
+      post:
+        - cmd: ./scripts/macos-sign.sh "{{ .Path }}"
+          env:
+            - GOOS={{ .Os }}
+            - IS_SNAPSHOT={{ .IsSnapshot }}
+
+# Two archive sets, same contents, different names — see the korbit build above
+# for why the legacy set exists. Both are listed in the one checksums.txt below,
+# so a single signature authenticates every download.
+archives:
+  - id: dgx-cli
     ids:
-      - korbit
-    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+      - dgx-cli
+    name_template: "dgx-cli_{{ .Os }}_{{ .Arch }}"
     formats:
       - tar.gz
     format_overrides:
       - goos: windows
         formats:
           - zip
-    files:
+    files: &archiveFiles
       - LICENSE
       - NOTICE
       - THIRD_PARTY_LICENSES.txt
@@ -88,6 +130,22 @@ archives:
       - README.md
       - README.ko.md
 
+  # The legacy asset set. The archive name AND the binary inside it are both
+  # fixed by what an older updater looks for, so neither may be renamed.
+  - id: korbit
+    ids:
+      - korbit
+    name_template: "korbit_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files: *archiveFiles
+
+# One checksums.txt over everything a release publishes: both archive sets and
+# the .mcpb bundles.
 checksum:
   name_template: "checksums.txt"
   # Fold the per-platform .mcpb bundles (built by the build-mcpb.sh post hook)

@@ -61,7 +61,7 @@ func TestUpdateViewTextRendersSuggestion(t *testing.T) {
 	var withSkill strings.Builder
 	updateView{UpdateResult: base, Skill: suggestSkillRefresh()}.FormatText(&withSkill)
 	out := withSkill.String()
-	if !strings.Contains(out, "updated korbit v1.0.0 → v1.1.0") {
+	if !strings.Contains(out, "updated dgx-cli v1.0.0 → v1.1.0") {
 		t.Errorf("missing update line: %q", out)
 	}
 	if !strings.Contains(out, "agent skill doctor") {

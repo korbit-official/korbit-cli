@@ -7,8 +7,8 @@ package progname
 import "testing"
 
 func TestNameDefault(t *testing.T) {
-	if got := Name(); got != "korbit" {
-		t.Fatalf("default Name() = %q, want %q", got, "korbit")
+	if got := Name(); got != "dgx-cli" {
+		t.Fatalf("default Name() = %q, want %q", got, "dgx-cli")
 	}
 }
 

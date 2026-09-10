@@ -42,6 +42,11 @@ type UpdateResult struct {
 	// was applied (dry-run / already-latest), so an agent can audit from --json
 	// output whether the binary it now runs was signature-verified.
 	SignatureCheck string `json:"signatureCheck,omitempty"`
+	// Aliases are the extra command names now pointing at the updated binary (see
+	// alias.go). Absent on an install that carries none.
+	Aliases []string `json:"aliases,omitempty"`
+	// Warnings are non-fatal problems with an otherwise applied update.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // Update resolves the target release (latest, or targetVersion when set),
@@ -135,24 +140,36 @@ func (c Config) Update(ctx context.Context, targetVersion string, dryRun bool) (
 	newSum := sha256Bytes(binBytes)
 	c.log().Debug("binary extracted from archive", "binary", l.BinName(), "bytes", len(binBytes), "sha256", newSum)
 
-	// Replace the installed binary in place. minio handles the Windows running-exe
-	// move; OldSavePath is empty so it manages and cleans up its own outgoing-binary
-	// swap file. We don't pass Options.Checksum: it is a pre-write guard over the
+	// Replace the installed binary in place, BEFORE any alias is touched. On the
+	// layout where the running binary is the alias name and the primary name is not
+	// on disk yet, writing the primary first means the alias is only ever replaced
+	// once there is a working binary for it to point at. minio handles the Windows
+	// running-exe move; OldSavePath is empty so it manages and cleans up its own
+	// outgoing-binary swap file. We don't pass Options.Checksum: it is a pre-write guard over the
 	// same bytes we hand to Apply, so it could only compare a hash of binBytes
 	// against a hash of binBytes. The meaningful verification already happened above
 	// — the archive was checked against the signature-authenticated checksum — and
 	// no independent hash of the extracted binary exists to re-check here.
 	c.log().Debug("applying in-place binary swap", "path", l.ExecutablePath())
-	if err := selfupdate.Apply(bytes.NewReader(binBytes), selfupdate.Options{
-		TargetPath: l.ExecutablePath(),
-		TargetMode: 0o755,
-	}); err != nil {
-		if rerr := selfupdate.RollbackError(err); rerr != nil {
-			c.log().Debug("in-place swap failed and rollback failed", "err", err.Error(), "rollbackErr", rerr.Error())
-			return nil, fmt.Errorf("update failed and rollback also failed: %v (rollback: %v)", err, rerr)
-		}
-		c.log().Debug("in-place swap failed, rolled back", "err", err.Error())
-		return nil, fmt.Errorf("applying the update: %w", err)
+	if err := c.placePrimary(l, binBytes); err != nil {
+		return nil, err
+	}
+
+	// The primary binary is in place; now bring every alias command name this
+	// install OWNS onto it, so both names run the version just installed. An
+	// install with no alias gets none. A failed alias write is a warning, not a
+	// failure: the primary is already updated and usable, and the next
+	// install/update retries. The manifest read here is the PRIOR one — the new
+	// one is written below — which is what records an already-adopted alias.
+	exe, _ := c.runningExe()
+	prevManifest, _, _ := loadManifest(l.ManifestPath())
+	wanted, ownWarnings := c.aliasesToKeep(l, prevManifest, exe)
+	aliases, aliasWarnings := c.syncAliases(l, wanted)
+	res.Aliases = aliases
+	res.Warnings = append(res.Warnings, ownWarnings...)
+	res.Warnings = append(res.Warnings, aliasWarnings...)
+	for _, w := range res.Warnings {
+		c.progressf("warning: %s", w)
 	}
 
 	// Record the new installed version in the manifest.
@@ -165,10 +182,19 @@ func (c Config) Update(ctx context.Context, targetVersion string, dryRun bool) (
 		SHA256:      newSum,
 		Repo:        c.repo(),
 		InstalledAt: strconv.FormatInt(c.now(), 10),
+		Aliases:     aliases,
 	}
 	if err := m.save(l.ManifestPath()); err != nil {
 		return nil, err
 	}
+	// Clear the swap/scratch files the in-place replacements just left behind —
+	// minio's .<bin>.old on the alias copy path (windows), and any temp file an
+	// interrupted write dropped. Best-effort and last: the update itself has
+	// already succeeded, and a leftover hidden file is untidy, not broken.
+	if swept := c.sweepLeftovers(l); swept {
+		c.log().Debug("swept leftover temp/swap files after update", "dir", l.ExecutableDir())
+	}
+
 	c.log().Debug("self update applied", "from", c.Version, "to", target, "sha256", newSum, "signatureCheck", sigCheck)
 	res.Updated = true
 	res.SHA256 = newSum
@@ -176,9 +202,44 @@ func (c Config) Update(ctx context.Context, targetVersion string, dryRun bool) (
 	return res, nil
 }
 
+// placePrimary writes the freshly extracted binary to the primary path.
+//
+// When a binary is already at that path, the write goes through
+// minio/selfupdate: it renames the outgoing binary aside (which is how a RUNNING
+// executable is replaced on Windows) and rolls the old one back if the write
+// fails. It cannot create a target that is not there — it starts by renaming the
+// existing file — so the alias-only layout, where the binary on PATH carries the
+// alias name and the primary name is absent, takes the plain atomic create
+// instead. Nothing is running at the primary path in that case, so there is no
+// swap to perform and nothing to roll back to.
+func (c Config) placePrimary(l Layout, binBytes []byte) error {
+	if !fileExists(l.ExecutablePath()) {
+		if err := writeBytesAtomic(l.ExecutablePath(), binBytes, 0o755); err != nil {
+			return fmt.Errorf("installing the binary to %s: %w", l.ExecutablePath(), err)
+		}
+		c.log().Debug("created the primary binary", "path", l.ExecutablePath())
+		return nil
+	}
+	err := selfupdate.Apply(bytes.NewReader(binBytes), selfupdate.Options{
+		TargetPath: l.ExecutablePath(),
+		TargetMode: 0o755,
+	})
+	if err == nil {
+		return nil
+	}
+	if rerr := selfupdate.RollbackError(err); rerr != nil {
+		c.log().Debug("in-place swap failed and rollback failed", "err", err.Error(), "rollbackErr", rerr.Error())
+		return fmt.Errorf("update failed and rollback also failed: %v (rollback: %v)", err, rerr)
+	}
+	c.log().Debug("in-place swap failed, rolled back", "err", err.Error())
+	return fmt.Errorf("applying the update: %w", err)
+}
+
 // assertManaged verifies the running binary is a managed-script install: a
-// manifest with method managed-script exists AND the running executable is the
-// installed binary on PATH. Otherwise it returns a ProvenanceError with
+// manifest with method managed-script exists AND the running executable is a
+// binary this install owns on PATH — the primary name, or its alias name in the
+// same directory (Layout.isManagedBinary), so an install invoked under either
+// name manages itself. Otherwise it returns a ProvenanceError with
 // method-specific guidance so a copy dragged elsewhere, or a Homebrew/go-install
 // binary, is never updated in place.
 func (c Config) assertManaged(l Layout) error {
@@ -199,7 +260,7 @@ func (c Config) assertManaged(l Layout) error {
 	if err != nil {
 		return err
 	}
-	if !l.isInstalledBinary(exe) {
+	if !l.isManagedBinary(exe) {
 		return &ProvenanceError{
 			Message:  fmt.Sprintf("the running binary (%s) is not the managed installed binary (%s)", exe, l.ExecutablePath()),
 			Guidance: "run the managed copy on your PATH, or re-run the install one-liner",

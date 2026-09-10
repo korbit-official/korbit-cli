@@ -1,5 +1,5 @@
 #!/bin/sh
-# korbit-cli installer (Linux / macOS).
+# digitalx-cli installer (Linux / macOS).
 #
 # This is a TEMPLATE for the release-pinned installer. The runnable copy is
 # filled with this release's version + archive checksums and attached to the
@@ -12,7 +12,7 @@
 #
 # What it does: detect your platform, download that release's archive, verify its
 # SHA-256 against the value embedded below, extract it, and hand off to
-# `korbit self install`, which places the binary, wires PATH, and writes the
+# `dgx-cli self install`, which places the binary, wires PATH, and writes the
 # install manifest. Trust is TLS + SHA-256.
 set -eu
 
@@ -51,7 +51,7 @@ if [ "$os" = darwin ] && [ "$arch" = amd64 ]; then
   err "Intel Macs aren't supported — build from source with 'go install github.com/$REPO@latest'"
 fi
 
-asset="korbit_${os}_${arch}.tar.gz"
+asset="dgx-cli_${os}_${arch}.tar.gz"
 
 # The expected hash for this platform's archive, from the embedded pin block.
 expected=$(printf '%s\n' "$PIN_SHA256" | awk -v a="$asset" '$2==a {print $1}' | head -n1)
@@ -61,7 +61,7 @@ expected=$(printf '%s\n' "$PIN_SHA256" | awk -v a="$asset" '$2==a {print $1}' | 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 url="https://github.com/$REPO/releases/download/$PIN_VERSION/$asset"
-echo "install: downloading korbit $PIN_VERSION ($os/$arch)…" >&2
+echo "install: downloading dgx-cli $PIN_VERSION ($os/$arch)…" >&2
 if command -v curl >/dev/null 2>&1; then
   curl -fsSL "$url" -o "$tmp/$asset" || err "download failed: $url"
 elif command -v wget >/dev/null 2>&1; then
@@ -84,12 +84,12 @@ fi
 
 # --- extract and hand off to the binary ---
 tar -xzf "$tmp/$asset" -C "$tmp" || err "failed to extract $asset"
-[ -f "$tmp/korbit" ] || err "archive did not contain the korbit binary"
-chmod +x "$tmp/korbit"
+[ -f "$tmp/dgx-cli" ] || err "archive did not contain the dgx-cli binary"
+chmod +x "$tmp/dgx-cli"
 
 # The binary owns install policy (PATH location, PATH entry, manifest) and is
 # reconciling, so this both installs fresh and repairs a broken install. It
 # copies itself to its PATH location before returning, so the temp dir (cleaned
 # by the EXIT trap) is no longer needed afterward. Run it rather than exec so
 # cleanup still fires.
-"$tmp/korbit" self install "$@"
+"$tmp/dgx-cli" self install "$@"

@@ -252,7 +252,7 @@ func TestLicenseSetsFooterCommandEnv(t *testing.T) {
 	if err := m.License(context.Background(), []string{"--show-banner"}, &out, &out); err != nil {
 		t.Fatalf("License: %v", err)
 	}
-	if !strings.Contains(out.String(), "LICENSE_CMD=korbit sandbox license") {
+	if !strings.Contains(out.String(), "LICENSE_CMD=dgx-cli sandbox license") {
 		t.Errorf("expected the footer command override in the env, got: %q", out.String())
 	}
 }

@@ -13,6 +13,8 @@ import (
 
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
+
+	"github.com/korbit-official/korbit-cli/internal/progname"
 )
 
 // unsafeToRewrite has no unix ownership/hard-link semantics to check on Windows,
@@ -47,7 +49,7 @@ func (c Config) wirePath(dir string) (PathResult, error) {
 			}
 			if !ok {
 				pr.Action = pathActionInstructions
-				pr.Hint = "add " + dir + " to your User PATH to run korbit from any directory"
+				pr.Hint = "add " + dir + " to your User PATH to run " + progname.Name() + " from any directory"
 				return pr, nil
 			}
 		}

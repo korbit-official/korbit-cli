@@ -41,16 +41,55 @@ func key(targets []target) string {
 // YAML (the module has no YAML dependency, and adding one for a test would put
 // it in front of every contributor). The scan is deliberately strict — an
 // unexpected shape fails the test rather than silently matching less.
+//
+// The file declares MORE THAN ONE build (the same program compiled under two
+// binary names, so a release carries both archive sets). They are required to
+// share one matrix: they are the same program on the same platforms, and one
+// notices file ships in every archive. So each build's matrix is read
+// separately and they must agree — a build that quietly targets a different set
+// fails here rather than shipping an archive whose notices file was computed for
+// other platforms.
 func goreleaserTargets(t *testing.T, src string) []target {
+	var perBuild [][]target
 	var goos, goarch []string
 	var ignored []target
 	var pending target
 	list := "" // which sequence the following "- item" lines belong to
 
+	// flush closes the build being scanned, recording its matrix.
+	flush := func() {
+		if len(goos) == 0 && len(goarch) == 0 {
+			return
+		}
+		if len(goos) == 0 || len(goarch) == 0 {
+			t.Fatalf("incomplete build matrix in .goreleaser.yaml (goos=%v goarch=%v)", goos, goarch)
+		}
+		skip := map[target]bool{}
+		for _, ig := range ignored {
+			skip[ig] = true
+		}
+		var out []target
+		for _, sys := range goos {
+			for _, arch := range goarch {
+				if tg := (target{sys, arch}); !skip[tg] {
+					out = append(out, tg)
+				}
+			}
+		}
+		perBuild = append(perBuild, out)
+		goos, goarch, ignored, pending = nil, nil, nil, target{}
+	}
+
 	for _, line := range buildsBlock(t, src) {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
+		}
+		// A build item starts at exactly two spaces of indent; every list item
+		// inside a build is indented further, so this cannot misfire on one.
+		if strings.HasPrefix(line, "  - ") {
+			flush()
+			list = ""
 		}
 		switch trimmed {
 		case "goos:", "goarch:", "ignore:":
@@ -76,23 +115,17 @@ func goreleaserTargets(t *testing.T, src string) []target {
 			list = "" // any other key ends the sequence
 		}
 	}
-	if len(goos) == 0 || len(goarch) == 0 {
-		t.Fatalf("no build matrix found in .goreleaser.yaml (goos=%v goarch=%v)", goos, goarch)
-	}
+	flush()
 
-	skip := map[target]bool{}
-	for _, ig := range ignored {
-		skip[ig] = true
+	if len(perBuild) == 0 {
+		t.Fatal("no build matrix found in .goreleaser.yaml")
 	}
-	var out []target
-	for _, sys := range goos {
-		for _, arch := range goarch {
-			if tg := (target{sys, arch}); !skip[tg] {
-				out = append(out, tg)
-			}
+	for _, m := range perBuild[1:] {
+		if key(m) != key(perBuild[0]) {
+			t.Fatalf("the builds in .goreleaser.yaml target different platforms; they must share one matrix\n  %s\n  %s", key(perBuild[0]), key(m))
 		}
 	}
-	return out
+	return perBuild[0]
 }
 
 // buildsBlock returns the lines under the top-level `builds:` key, so keys that

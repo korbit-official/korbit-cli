@@ -84,3 +84,81 @@ func TestRemoveBlockFromPreservesMode(t *testing.T) {
 		t.Errorf("permission bits not preserved across rewrite: got %o want 640", perm)
 	}
 }
+
+// altManagedBlock wraps body in the alternate marker pair — what an rc file
+// wired by an earlier-named installer carries. Only tests write it; the code
+// always writes the primary pair.
+func altManagedBlock(body string) string {
+	return altPathBlockBegin + "\n" + body + "\n" + altPathBlockEnd + "\n"
+}
+
+// TestBothMarkerPairsAreIdempotent pins that an rc file already carrying EITHER
+// marker pair is treated as wired: nothing is appended, so a second block never
+// stacks a duplicate PATH entry on a shell that sources the file.
+func TestBothMarkerPairsAreIdempotent(t *testing.T) {
+	body := pathBlockBody("$HOME/.local/bin")
+	for name, existing := range map[string]string{
+		"primary": "keep me\n" + managedBlock(body),
+		"alt":     "keep me\n" + altManagedBlock(body),
+	} {
+		if add := blockToAppend([]byte(existing), body); add != nil {
+			t.Errorf("%s: blockToAppend wanted to append %q to an already-wired file", name, add)
+		}
+		rc := filepath.Join(t.TempDir(), "rc")
+		if err := os.WriteFile(rc, []byte(existing), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		wrote, err := appendBlockTo(rc, body)
+		if err != nil || wrote {
+			t.Errorf("%s: appendBlockTo wrote=%v err=%v, want no write", name, wrote, err)
+		}
+		if got := mustContent(t, rc); got != existing {
+			t.Errorf("%s: file changed:\n%s", name, got)
+		}
+	}
+}
+
+// TestRemoveBlockFromHandlesAltMarkers pins that uninstall strips whichever
+// marker pair an rc file carries — including both in one file — and that
+// blockLines previews exactly what it removes.
+func TestRemoveBlockFromHandlesAltMarkers(t *testing.T) {
+	body := pathBlockBody("$HOME/.local/bin")
+	rc := filepath.Join(t.TempDir(), "rc")
+	content := "keep me\n" + altManagedBlock(body) + "and me\n" + managedBlock(body)
+	if err := os.WriteFile(rc, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if lines := blockLines(rc); len(lines) != 12 { // 2 blocks x (2 markers + 4 body lines)
+		t.Errorf("blockLines previewed %d lines, want both blocks (12)", len(lines))
+	}
+	removed, err := removeBlockFrom(rc)
+	if err != nil || !removed {
+		t.Fatalf("removeBlockFrom: removed=%v err=%v", removed, err)
+	}
+	got := mustContent(t, rc)
+	for _, marker := range []string{pathBlockBegin, pathBlockEnd, altPathBlockBegin, altPathBlockEnd} {
+		if strings.Contains(got, marker) {
+			t.Errorf("marker %q survived:\n%s", marker, got)
+		}
+	}
+	if !strings.Contains(got, "keep me") || !strings.Contains(got, "and me") {
+		t.Errorf("user content dropped:\n%s", got)
+	}
+}
+
+// TestAppendWritesPrimaryMarkers pins that a NEW block is always written with
+// the primary marker pair, never the alternate one.
+func TestAppendWritesPrimaryMarkers(t *testing.T) {
+	rc := filepath.Join(t.TempDir(), "rc")
+	wrote, err := appendBlockTo(rc, pathBlockBody("$HOME/.local/bin"))
+	if err != nil || !wrote {
+		t.Fatalf("appendBlockTo: wrote=%v err=%v", wrote, err)
+	}
+	got := mustContent(t, rc)
+	if !strings.Contains(got, pathBlockBegin) || !strings.Contains(got, pathBlockEnd) {
+		t.Errorf("primary markers missing:\n%s", got)
+	}
+	if strings.Contains(got, altPathBlockBegin) {
+		t.Errorf("the alternate marker pair must never be written:\n%s", got)
+	}
+}

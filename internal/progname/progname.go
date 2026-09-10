@@ -15,7 +15,7 @@ package progname
 // synchronization. The default is the name the binary ships as, used when the
 // entrypoint supplies nothing (an unusual exec) and in tests, which call the
 // command layer directly without going through main().
-var name = "korbit"
+var name = "dgx-cli"
 
 // Name returns the program name to use in help, examples, and guidance strings.
 func Name() string { return name }

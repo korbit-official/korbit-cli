@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-BINARY := korbit
+BINARY := dgx-cli
 
 .PHONY: build test vet fmt check licenses licenses-check dist dist-unsigned release release-unsigned notarize publish clean
 
@@ -51,4 +51,4 @@ publish: ## Upload built dist/ artifacts to a GitHub Release (gh; KORBIT_RELEASE
 	./scripts/publish.sh dist
 
 clean: ## Remove build artifacts
-	rm -rf $(BINARY) dist
+	rm -rf $(BINARY) korbit dist

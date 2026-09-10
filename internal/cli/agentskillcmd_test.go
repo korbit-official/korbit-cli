@@ -205,8 +205,12 @@ func TestAgentSkillDoctorChecksKorbitCommandEvenWhenInvokedUnderAnotherName(t *t
 	home := t.TempDir()
 	path := t.TempDir()
 	t.Setenv("PATH", path)
+	// Restore whatever the process name was, rather than assuming the default:
+	// hard-coding a name here silently rewrites the default for every test that
+	// runs after this one.
+	prevProgname := progname.Name()
 	progname.Set("korbit-cli")
-	t.Cleanup(func() { progname.Set("korbit") })
+	t.Cleanup(func() { progname.Set(prevProgname) })
 
 	if err := os.WriteFile(filepath.Join(path, "korbit-cli"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
@@ -250,8 +254,12 @@ func TestAgentSkillDoctorNameMismatchIsHealthyWhenKorbitOnPath(t *testing.T) {
 	home := t.TempDir()
 	path := t.TempDir()
 	t.Setenv("PATH", path)
+	// Restore whatever the process name was, rather than assuming the default:
+	// hard-coding a name here silently rewrites the default for every test that
+	// runs after this one.
+	prevProgname := progname.Name()
 	progname.Set("korbit-cli")
-	t.Cleanup(func() { progname.Set("korbit") })
+	t.Cleanup(func() { progname.Set(prevProgname) })
 
 	// A proper "korbit" command exists on PATH.
 	if err := os.WriteFile(filepath.Join(path, "korbit"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {

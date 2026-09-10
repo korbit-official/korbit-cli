@@ -21,7 +21,7 @@ import (
 type installView struct{ *selfupdate.InstallResult }
 
 func (v installView) FormatText(w io.Writer) {
-	fmt.Fprintf(w, "installed korbit %s\n", v.Version)
+	fmt.Fprintf(w, "installed %s %s\n", progname.Name(), v.Version)
 	fmt.Fprintf(w, "  binary:  %s", v.Executable)
 	for _, r := range v.Repaired {
 		fmt.Fprintf(w, "\n  repaired: %s", r)
@@ -54,7 +54,7 @@ type skillResult struct {
 func (v updateView) FormatText(w io.Writer) {
 	switch {
 	case v.Updated:
-		fmt.Fprintf(w, "updated korbit %s → %s", v.PreviousVersion, v.LatestVersion)
+		fmt.Fprintf(w, "updated %s %s → %s", progname.Name(), v.PreviousVersion, v.LatestVersion)
 		if v.SignatureCheck == selfupdate.SigDisabled {
 			fmt.Fprint(w, " (release signature verification disabled — verified on TLS + SHA-256 only)")
 		}
@@ -82,9 +82,9 @@ func (v uninstallView) FormatText(w io.Writer) {
 	case nothingDone:
 		head = "Nothing removed."
 	case len(r.Failed) > 0:
-		head = "Uninstalled korbit-cli — some items were left behind (see below)."
+		head = "Uninstalled digitalx-cli — some items were left behind (see below)."
 	default:
-		head = "Uninstalled korbit-cli."
+		head = "Uninstalled digitalx-cli."
 	}
 
 	var sections []string
@@ -118,7 +118,7 @@ func (v uninstallView) FormatText(w io.Writer) {
 	if len(r.KeptPaths) > 0 {
 		lines := []string{"Kept:"}
 		for _, p := range r.KeptPaths {
-			lines = append(lines, "  "+abbrev(p, v.home)+" — edit it yourself to remove the korbit-cli entry")
+			lines = append(lines, "  "+abbrev(p, v.home)+" — edit it yourself to remove the digitalx-cli entry")
 		}
 		section(lines)
 	}
@@ -155,7 +155,7 @@ func (v doctorView) FormatText(w io.Writer) {
 		}
 	}
 
-	b = append(b, fmt.Sprintf("korbit self doctor — %s", status))
+	b = append(b, fmt.Sprintf("%s self doctor — %s", progname.Name(), status))
 	line("running version", r.RunningVersion)
 	if r.InstalledVersion != "" {
 		line("installed version", r.InstalledVersion)
@@ -163,12 +163,32 @@ func (v doctorView) FormatText(w io.Writer) {
 	line("managed install", yesNo(r.Managed))
 	problemLine(selfupdate.FieldManaged)
 	line("binary", r.Executable)
+	if r.LegacyLayout {
+		b = append(b, "    - running as `korbit`; the next `"+progname.Name()+" self update` installs dgx-cli and keeps korbit as an alias")
+	}
 	problemLine(selfupdate.FieldBinary)
+	for _, a := range r.Aliases {
+		switch {
+		case !a.Present:
+			line("alias "+a.Name, "missing")
+		case a.Target != "":
+			line("alias "+a.Name, a.Path+" → "+a.Target)
+		default:
+			line("alias "+a.Name, a.Path)
+		}
+	}
+	problemLine(selfupdate.FieldAlias)
 	line("on PATH", yesNo(r.OnPath))
 	problemLine(selfupdate.FieldPath)
 	// Any problem not tied to a shown diagnosis (defensive; none today).
+	shown := map[string]bool{
+		selfupdate.FieldManaged: true,
+		selfupdate.FieldBinary:  true,
+		selfupdate.FieldAlias:   true,
+		selfupdate.FieldPath:    true,
+	}
 	for _, p := range r.Problems {
-		if p.Field != selfupdate.FieldManaged && p.Field != selfupdate.FieldBinary && p.Field != selfupdate.FieldPath {
+		if !shown[p.Field] {
 			b = append(b, "    ! "+p.Message)
 		}
 	}

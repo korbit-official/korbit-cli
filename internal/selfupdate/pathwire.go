@@ -35,11 +35,31 @@ const (
 
 // Managed-block markers delimiting the PATH lines this installer owns in a shell
 // rc file, so a re-run is idempotent and uninstall can remove exactly its own
-// lines.
+// lines. A new block is always written with this pair.
 const (
-	pathBlockBegin = "# >>> korbit-cli >>>"
-	pathBlockEnd   = "# <<< korbit-cli <<<"
+	pathBlockBegin = "# >>> digitalx-cli >>>"
+	pathBlockEnd   = "# <<< digitalx-cli <<<"
 )
+
+// A managed block may instead carry this alternate marker pair. It names the
+// same block and puts the same directory on PATH, so it is recognised
+// everywhere the primary pair is — for idempotence (an rc file carrying it is
+// already wired: appending a second block would stack a duplicate) and for
+// removal (uninstall strips whichever pair is present). It is never written.
+const (
+	altPathBlockBegin = "# >>> korbit-cli >>>"
+	altPathBlockEnd   = "# <<< korbit-cli <<<"
+)
+
+// isPathBlockBegin / isPathBlockEnd report whether a trimmed rc-file line is a
+// managed block's begin/end marker, in either pair.
+func isPathBlockBegin(line string) bool {
+	return line == pathBlockBegin || line == altPathBlockBegin
+}
+
+func isPathBlockEnd(line string) bool {
+	return line == pathBlockEnd || line == altPathBlockEnd
+}
 
 // homeForm rewrites dir to a $HOME-relative form for a shell rc line when it sits
 // under the user's home (so the exported line is portable), else returns dir
@@ -102,7 +122,7 @@ func (l Layout) rcFiles() []string {
 // re-run is idempotent. It is the single source of the appended text, so the
 // diff preview (additionFor) and the write can never drift.
 func blockToAppend(existing []byte, body string) []byte {
-	if bytes.Contains(existing, []byte(pathBlockBegin)) {
+	if bytes.Contains(existing, []byte(pathBlockBegin)) || bytes.Contains(existing, []byte(altPathBlockBegin)) {
 		return nil
 	}
 	prefix := ""
@@ -134,9 +154,9 @@ func appendBlockTo(path, body string) (bool, error) {
 	return true, nil
 }
 
-// removeBlockFrom strips every managed block (markers inclusive) from one rc
-// file, writing the result atomically (temp file + rename) so a crash mid-edit
-// can't truncate the user's shell profile. It removes ONLY its own marker lines
+// removeBlockFrom strips every managed block (markers inclusive, either marker
+// pair) from one rc file, writing the result atomically (temp file + rename) so
+// a crash mid-edit can't truncate the user's shell profile. It removes ONLY its own marker lines
 // and the lines between them, preserving the rest of the file byte-for-byte
 // (blank lines and the final newline included). When the path is a symlink (a
 // dotfiles-managed rc file), it resolves to and rewrites the real target so the
@@ -161,11 +181,11 @@ func removeBlockFrom(path string) (bool, error) {
 	var out []string
 	removed, inBlock := false, false
 	for _, ln := range lines {
-		switch strings.TrimSpace(ln) {
-		case pathBlockBegin:
+		switch t := strings.TrimSpace(ln); {
+		case isPathBlockBegin(t):
 			inBlock, removed = true, true
 			continue
-		case pathBlockEnd:
+		case isPathBlockEnd(t):
 			inBlock = false
 			continue
 		}
@@ -204,7 +224,7 @@ type skipEditError struct {
 }
 
 func (e *skipEditError) Error() string {
-	return fmt.Sprintf("left the korbit-cli block in %s — %s", e.path, e.reason)
+	return fmt.Sprintf("left the digitalx-cli block in %s — %s", e.path, e.reason)
 }
 
 // DiffLine is one line of a pending PATH-undo edit shown to the user before it is
@@ -307,9 +327,9 @@ func additionFor(path, body string) *PathAddition {
 	}
 }
 
-// blockLines returns the lines of EVERY managed block (markers inclusive) with
-// their 1-based line numbers, or nil if path has no block. It matches exactly
-// what removeBlockFrom deletes, so the diff preview never under-represents the
+// blockLines returns the lines of EVERY managed block (markers inclusive,
+// either pair) with their 1-based line numbers, or nil if path has no block. It
+// matches exactly what removeBlockFrom deletes, so the diff preview never under-represents the
 // edit (a hand-duplicated block shows both).
 func blockLines(path string) []DiffLine {
 	raw, err := os.ReadFile(path)
@@ -320,13 +340,13 @@ func blockLines(path string) []DiffLine {
 	inBlock := false
 	for i, ln := range strings.Split(string(raw), "\n") {
 		t := strings.TrimSpace(ln)
-		if t == pathBlockBegin {
+		if isPathBlockBegin(t) {
 			inBlock = true
 		}
 		if inBlock {
 			out = append(out, DiffLine{Num: i + 1, Text: ln})
 		}
-		if t == pathBlockEnd {
+		if isPathBlockEnd(t) {
 			inBlock = false
 		}
 	}

@@ -1,4 +1,4 @@
-# korbit-cli installer (Windows / PowerShell).
+# digitalx-cli installer (Windows / PowerShell).
 #
 # This is a TEMPLATE for the release-pinned installer. The runnable copy is
 # filled with this release's version + archive checksums and attached to the
@@ -11,15 +11,15 @@
 #
 # What it does: detect your architecture, download that release's .zip, verify
 # its SHA-256 against the value embedded below, extract it, and hand off to
-# `korbit self install`, which places the binary, wires the User PATH, and writes
-# the install manifest. Trust is TLS + SHA-256.
+# `dgx-cli self install`, which places the binary, wires the User PATH, and
+# writes the install manifest. Trust is TLS + SHA-256.
 #
 # The whole body runs inside `& { … } @args` so that a failure (a `throw`) or
 # the normal end of the script returns to the caller's prompt instead of
 # terminating it. Under `irm … | iex` the script's text executes in the CURRENT
 # session, so a top-level `exit` would kill the hosting PowerShell and close the
 # terminal window. `@args` is forwarded into the block so any passthrough
-# arguments still reach `korbit self install`.
+# arguments still reach `dgx-cli self install`.
 & {
   $ErrorActionPreference = 'Stop'
 
@@ -52,7 +52,7 @@ $PIN_SHA256 = @'
     'ARM64' { $arch = 'arm64' }
     default { Die "unsupported architecture: $($env:PROCESSOR_ARCHITECTURE)" }
   }
-  $asset = "korbit_windows_$arch.zip"
+  $asset = "dgx-cli_windows_$arch.zip"
 
   # Expected hash for this platform's archive, from the embedded pin block.
   $expected = $null
@@ -63,12 +63,12 @@ $PIN_SHA256 = @'
   if (-not $expected) { Die "no embedded checksum for $asset in this installer" }
 
   # --- download ---
-  $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("korbit-" + [System.Guid]::NewGuid().ToString('N'))
+  $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("dgx-cli-" + [System.Guid]::NewGuid().ToString('N'))
   New-Item -ItemType Directory -Path $tmp -Force | Out-Null
   try {
     $url = "https://github.com/$Repo/releases/download/$PIN_VERSION/$asset"
     $zip = Join-Path $tmp $asset
-    Write-Host "install: downloading korbit $PIN_VERSION (windows/$arch)..."
+    Write-Host "install: downloading dgx-cli $PIN_VERSION (windows/$arch)..."
     Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
 
     # --- verify SHA-256 (always enforced; no skip) ---
@@ -79,13 +79,13 @@ $PIN_SHA256 = @'
 
     # --- extract and hand off to the binary ---
     Expand-Archive -Path $zip -DestinationPath $tmp -Force
-    $exe = Join-Path $tmp 'korbit.exe'
-    if (-not (Test-Path $exe)) { Die "archive did not contain korbit.exe" }
+    $exe = Join-Path $tmp 'dgx-cli.exe'
+    if (-not (Test-Path $exe)) { Die "archive did not contain dgx-cli.exe" }
 
     # The binary owns install policy (PATH location, PATH entry, manifest) and is
     # reconciling, so this both installs fresh and repairs a broken install.
     & $exe self install @args
-    if ($LASTEXITCODE -ne 0) { Die "korbit self install exited with code $LASTEXITCODE" }
+    if ($LASTEXITCODE -ne 0) { Die "dgx-cli self install exited with code $LASTEXITCODE" }
   }
   finally {
     Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue

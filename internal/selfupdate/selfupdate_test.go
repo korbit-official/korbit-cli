@@ -118,7 +118,7 @@ func TestInstallRepairsDeletedBinary(t *testing.T) {
 	if _, err := c.Install(); err != nil {
 		t.Fatal(err)
 	}
-	// The named case: the user deleted ~/.local/bin/korbit.
+	// The named case: the user deleted the installed binary from ~/.local/bin.
 	if err := os.Remove(c.Layout().ExecutablePath()); err != nil {
 		t.Fatal(err)
 	}
@@ -712,7 +712,7 @@ func TestUninstall(t *testing.T) {
 }
 
 // TestManagedThroughSymlinkedHome pins that a symlinked home (e.g. HOME points
-// at a link onto another volume, so ~/.local/bin/korbit resolves to a different
+// at a link onto another volume, so ~/.local/bin/dgx-cli resolves to a different
 // real path than its literal form) does not make the installed binary look
 // unmanaged. os.Executable resolves the running binary, so the provenance check
 // must resolve the layout path too — otherwise update/uninstall wrongly refuse
@@ -1317,21 +1317,25 @@ func TestInstallUpgradeIsNotARepair(t *testing.T) {
 // ---- helper unit tests ----
 
 func TestParseChecksums(t *testing.T) {
-	data := []byte("aa11  korbit_linux_amd64.tar.gz\nbb22 *korbit_windows_amd64.zip\n\n")
+	data := []byte("aa11  dgx-cli_linux_amd64.tar.gz\nbb22 *dgx-cli_windows_amd64.zip\ncc33  korbit_linux_amd64.tar.gz\n\n")
 	m := parseChecksums(data)
-	if m["korbit_linux_amd64.tar.gz"] != "aa11" {
-		t.Errorf("linux hash = %q", m["korbit_linux_amd64.tar.gz"])
+	if m["dgx-cli_linux_amd64.tar.gz"] != "aa11" {
+		t.Errorf("linux hash = %q", m["dgx-cli_linux_amd64.tar.gz"])
 	}
-	if m["korbit_windows_amd64.zip"] != "bb22" { // "*" binary-mode marker stripped
-		t.Errorf("windows hash = %q", m["korbit_windows_amd64.zip"])
+	if m["dgx-cli_windows_amd64.zip"] != "bb22" { // "*" binary-mode marker stripped
+		t.Errorf("windows hash = %q", m["dgx-cli_windows_amd64.zip"])
+	}
+	// One checksums.txt covers both archive sets a release publishes.
+	if m["korbit_linux_amd64.tar.gz"] != "cc33" {
+		t.Errorf("legacy asset hash = %q", m["korbit_linux_amd64.tar.gz"])
 	}
 }
 
 func TestExtractBinary(t *testing.T) {
 	for _, goos := range []string{"linux", "windows"} {
-		bin := "korbit"
+		bin := "dgx-cli"
 		if goos == "windows" {
-			bin = "korbit.exe"
+			bin = "dgx-cli.exe"
 		}
 		archive := makeArchive(t, goos, bin, "PAYLOAD")
 		got, err := extractBinary(archive, goos, bin)

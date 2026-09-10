@@ -17,6 +17,7 @@ import (
 	"github.com/korbit-official/korbit-cli/internal/cli"
 	"github.com/korbit-official/korbit-cli/internal/keys"
 	"github.com/korbit-official/korbit-cli/internal/keystore"
+	"github.com/korbit-official/korbit-cli/internal/progname"
 	"github.com/korbit-official/korbit-cli/internal/stream"
 )
 
@@ -615,7 +616,11 @@ func TestSetupReportsAlreadyConfigured(t *testing.T) {
 	}
 	// The replacement options ride the result's `next`, and the complementary health
 	// check its `doctor` — both on stdout; --json writes nothing to stderr.
-	if !strings.Contains(out, "korbit key remove bot") || !strings.Contains(out, "korbit key add bot") {
+	// The guidance names the command as the user invoked it, so assert against
+	// progname rather than a literal — a hard-coded name here passes or fails on
+	// whatever an earlier test left in that global, not on this code.
+	prog := progname.Name()
+	if !strings.Contains(out, prog+" key remove bot") || !strings.Contains(out, prog+" key add bot") {
 		t.Fatalf("expected guidance offering replacement via remove+add: %s", out)
 	}
 	if !strings.Contains(out, `"doctor":`) {

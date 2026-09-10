@@ -10,12 +10,19 @@
 // formatting lives here.
 //
 // The model is a single installed binary on PATH plus a manifest. The binary
-// sits at a stable name on PATH (~/.local/bin/korbit on unix,
-// %LOCALAPPDATA%\bin\korbit.exe on windows) — a real file, not a symlink
+// sits at a stable name on PATH (~/.local/bin/dgx-cli on unix,
+// %LOCALAPPDATA%\bin\dgx-cli.exe on windows) — a real file, not a symlink
 // (Windows file symlinks need admin/Developer Mode). <home>/install.json records
-// what was installed (version, sha256, provenance) and is what gates self update.
-// self update replaces the binary in place with github.com/minio/selfupdate,
-// which also handles the Windows running-exe swap.
+// what was installed (version, sha256, provenance, aliases) and is what gates
+// self update. self update replaces the binary in place with
+// github.com/minio/selfupdate, which also handles the Windows running-exe swap.
+//
+// An install may additionally carry ALIASES — extra command names on PATH in the
+// same directory that run the same binary (a relative symlink on unix, a second
+// copy on windows, since an unprivileged Windows install has no usable file
+// symlink). Layout.LegacyBinName is the one alias name this package manages, so
+// the `korbit` command keeps working on an install that has it. install and
+// update keep every alias current; uninstall removes them with the primary.
 //
 // Trust is TLS + sha256 + a release signature: self update fetches the release
 // checksums.txt and verifies the downloaded archive's sha256 against it before
@@ -201,10 +208,21 @@ func (l Layout) ManifestPath() string { return filepath.Join(l.Home(), "install.
 // concurrent korbit-cli process mutating the same store.
 func (l Layout) LockPath() string { return filepath.Join(l.Home(), "self.lock") }
 
-// BinName is the installed binary/stored binary's filename: korbit, or korbit.exe on
-// Windows. It is the fixed canonical name (not the possibly-renamed program
-// basename) so the installed binary is predictable.
+// BinName is the installed binary/stored binary's filename: dgx-cli, or
+// dgx-cli.exe on Windows. It is the fixed canonical name (not the
+// possibly-renamed program basename) so the installed binary is predictable.
 func (l Layout) BinName() string {
+	if l.goos == "windows" {
+		return "dgx-cli.exe"
+	}
+	return "dgx-cli"
+}
+
+// LegacyBinName is the alias command name an install may carry alongside the
+// primary binary: korbit, or korbit.exe on Windows. An install that has it on
+// PATH keeps it working — pointed at the primary binary — so both command names
+// run the same version.
+func (l Layout) LegacyBinName() string {
 	if l.goos == "windows" {
 		return "korbit.exe"
 	}
@@ -226,6 +244,16 @@ func (l Layout) ExecutableDir() string {
 
 // ExecutablePath is the active binary's stable path on PATH.
 func (l Layout) ExecutablePath() string { return filepath.Join(l.ExecutableDir(), l.BinName()) }
+
+// LegacyExecutablePath is where the LegacyBinName alias sits — next to the
+// primary binary, so one PATH entry serves both command names.
+func (l Layout) LegacyExecutablePath() string {
+	return filepath.Join(l.ExecutableDir(), l.LegacyBinName())
+}
+
+// AliasPath is where the alias named name sits: in the install dir, next to the
+// primary binary.
+func (l Layout) AliasPath(name string) string { return filepath.Join(l.ExecutableDir(), name) }
 
 // userHome resolves the OS user's home directory the way os.UserHomeDir does —
 // USERPROFILE on Windows, HOME elsewhere — but through the injected getenv so
@@ -253,6 +281,12 @@ func orGetenv(getenv func(string) string) func(string) string {
 	return os.Getenv
 }
 
+// tmpPattern is the os.CreateTemp pattern for this package's scratch files. It
+// is a hidden name in the destination directory so the write + rename stays
+// atomic on one filesystem, and sweepLeftovers can recognize and clear one an
+// interrupted run left behind.
+const tmpPattern = ".dgx-cli-*.tmp"
+
 // fileExists reports whether path exists and is a regular file.
 func fileExists(path string) bool {
 	fi, err := os.Stat(path)
@@ -274,7 +308,7 @@ func copyFileAtomic(dst, src string, mode os.FileMode) error {
 		return err
 	}
 	defer in.Close()
-	tmp, err := os.CreateTemp(filepath.Dir(dst), ".korbit-*.tmp")
+	tmp, err := os.CreateTemp(filepath.Dir(dst), tmpPattern)
 	if err != nil {
 		return err
 	}
@@ -296,7 +330,7 @@ func copyFileAtomic(dst, src string, mode os.FileMode) error {
 // writeBytesAtomic writes data to path with the given mode via temp file +
 // rename. path's directory must already exist.
 func writeBytesAtomic(path string, data []byte, mode os.FileMode) error {
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".korbit-*.tmp")
+	tmp, err := os.CreateTemp(filepath.Dir(path), tmpPattern)
 	if err != nil {
 		return err
 	}
@@ -368,14 +402,14 @@ func resolveExecutable() (string, error) {
 // resolveOrClean returns an absolute, symlink-resolved form of path for use as a
 // comparison key: two paths run through it are equal when they point at the same
 // real file even if a component is a symlink — e.g. $HOME is a symlink onto
-// another volume, so ~/.local/bin/korbit and its resolved /mnt/.../korbit form
+// another volume, so ~/.local/bin/dgx-cli and its resolved /mnt/.../dgx-cli form
 // are the same binary. os.Executable already resolves the running binary, so a
 // raw filepath.Clean of a layout path would spuriously differ from it.
 //
 // It absolutizes before resolving because filepath.EvalSymlinks preserves a
 // relative input as a relative result (and only makes it absolute if a component
 // is an absolute symlink); a relative-vs-absolute comparison would then never
-// match. Relative symlink *targets* within the tree (e.g. korbit -> ../lib/korbit)
+// match. Relative symlink *targets* within the tree (e.g. korbit -> dgx-cli)
 // are resolved correctly by EvalSymlinks regardless, once the input is absolute.
 //
 // The two fallbacks are best-effort and, in practice, unreachable for the callers
@@ -403,6 +437,23 @@ func resolveOrClean(path string) string {
 // match.
 func (l Layout) isInstalledBinary(path string) bool {
 	return resolveOrClean(path) == resolveOrClean(l.ExecutablePath())
+}
+
+// isLegacyBinary reports whether path is the install's alias name in the install
+// dir. On unix the alias is a symlink onto the primary binary, so a running
+// alias already satisfies isInstalledBinary; this additionally covers the layout
+// where the binary on PATH is a real file under the alias name and the primary
+// name is not there yet.
+func (l Layout) isLegacyBinary(path string) bool {
+	return resolveOrClean(path) == resolveOrClean(l.LegacyExecutablePath())
+}
+
+// isManagedBinary reports whether path is a binary this install owns — the
+// primary on PATH, or its alias name in the same directory. It is the gate
+// self update / uninstall use, so an install running under either name manages
+// itself while a copy dragged elsewhere still does not.
+func (l Layout) isManagedBinary(path string) bool {
+	return l.isInstalledBinary(path) || l.isLegacyBinary(path)
 }
 
 // defaultGOOS / defaultGOARCH fill a zero Config from the build's own platform.

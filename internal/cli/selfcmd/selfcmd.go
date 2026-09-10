@@ -91,7 +91,7 @@ func runInstall(cx *clienv.Cmd) error {
 			// State the why once, before the first prompt, so the user isn't confirming
 			// bare diffs.
 			if !explained {
-				cx.IO.Note(fmt.Sprintf("To run `korbit` from any shell, %s needs to be on your PATH — review each startup-file edit:", binDir))
+				cx.IO.Note(fmt.Sprintf("To run `%s` from any shell, %s needs to be on your PATH — review each startup-file edit:", progname.Name(), binDir))
 				explained = true
 			}
 			for _, ln := range renderAddition(col, add, oh) {
@@ -99,7 +99,7 @@ func runInstall(cx *clienv.Cmd) error {
 			}
 			q := "Add this to " + abbrev(add.Location, oh) + "?"
 			if isRegistryAddition(add) {
-				q = "Add korbit-cli to " + add.Location + "?"
+				q = "Add digitalx-cli to " + add.Location + "?"
 			}
 			return tty(q, true)
 		}
@@ -127,7 +127,7 @@ func runInstall(cx *clienv.Cmd) error {
 // splits into accepted vs left-unchanged.
 func reportInstallDryRun(cx *clienv.Cmd, cfg selfupdate.Config, confirm func(selfupdate.PathAddition) (bool, error), oh string) error {
 	l := cfg.Layout()
-	cx.IO.Note(fmt.Sprintf("Install korbit %s (dry run — nothing will be changed).", version.Version))
+	cx.IO.Note(fmt.Sprintf("Install %s %s (dry run — nothing will be changed).", progname.Name(), version.Version))
 
 	adds := cfg.PathAdditions()
 	sections := []string{"Would place:\n  " + abbrev(l.ExecutablePath(), oh)}
@@ -183,11 +183,11 @@ func renderAddition(col colorize, a selfupdate.PathAddition, oh string) []string
 	if isRegistryAddition(a) {
 		return []string{
 			"",
-			"add korbit-cli to " + a.Location + ":",
+			"add digitalx-cli to " + a.Location + ":",
 			"  " + col.green("+ "+a.Added[0].Text),
 		}
 	}
-	head := "add korbit-cli to PATH in " + abbrev(a.Location, oh)
+	head := "add digitalx-cli to PATH in " + abbrev(a.Location, oh)
 	if a.NewFile {
 		head += " (new file)"
 	}
@@ -287,15 +287,18 @@ func buildUninstallPlan(cx *clienv.Cmd, su selfupdate.Config, home string) unins
 		artifacts = append(artifacts, cacheDir)
 	}
 	return uninstallPlan{
-		binaryShow: existing(l.ExecutablePath(), l.ManifestPath()),
-		dataShow:   existing(clihome.Path(home), keys.RegistryPath(home), keystore.FilePath(home), journal.DefaultPath(home)),
+		binaryShow: existing(append(append([]string{l.ExecutablePath()}, su.AliasPaths()...), l.ManifestPath())...),
+		dataShow:   existing(append([]string{clihome.Path(home), keys.RegistryPath(home), keystore.FilePath(home), journal.DefaultPath(home)}, journal.LegacyPaths(home)...)...),
 		keyNames:   keyDisplayNames(cx, home),
 		cacheShow:  existingDirs(artifacts...),
 		edits:      su.PathEdits(),
 		// config + journal removed directly by Uninstall; the key registry + vault
 		// are removed by purgeKeys AFTER it clears each key's material, so
 		// keychain-backed keys are never orphaned by deleting keys.json first.
-		dataPaths: []string{clihome.Path(home), journal.DefaultPath(home), journal.DefaultPath(home) + "-wal", journal.DefaultPath(home) + "-shm"},
+		// A home that predates the rename may still hold the journal under its
+		// pre-rename name (it is adopted on the next open, but an uninstall may
+		// come first), so the legacy file and its sidecars are removed too.
+		dataPaths: append([]string{clihome.Path(home), journal.DefaultPath(home), journal.DefaultPath(home) + "-wal", journal.DefaultPath(home) + "-shm"}, journal.LegacyPaths(home)...),
 		keyFiles:  []string{keys.RegistryPath(home), keystore.FilePath(home)},
 		artifacts: artifacts,
 	}
@@ -333,15 +336,15 @@ func runUninstall(cx *clienv.Cmd, _ *cobra.Command) error {
 
 	col := detectColor(cx.Getenv)
 	if dry {
-		cx.IO.Note("Uninstall korbit-cli (dry run — nothing will be changed).")
+		cx.IO.Note("Uninstall digitalx-cli (dry run — nothing will be changed).")
 	} else {
-		cx.IO.Note("Uninstall korbit-cli. Nothing is changed until you confirm each item.")
+		cx.IO.Note("Uninstall digitalx-cli. Nothing is changed until you confirm each item.")
 	}
 
 	var removeBinary, removeData, removeCaches bool
 	var err error
 	if len(plan.binaryShow) > 0 {
-		showList(cx, "korbit binary and install manifest", abbrevAll(plan.binaryShow, oh))
+		showList(cx, progname.Name()+" binary and install manifest", abbrevAll(plan.binaryShow, oh))
 		if removeBinary, err = ask("Remove these?", true); err != nil {
 			return err
 		}
@@ -443,7 +446,7 @@ func reportDryRun(cx *clienv.Cmd, plan uninstallPlan, removeBinary, removeData, 
 		sections = append(sections, strings.Join(lines, "\n"))
 	}
 	if len(editAccepted) > 0 {
-		lines := []string{"Would edit (undo the korbit-cli PATH change):"}
+		lines := []string{"Would edit (undo the digitalx-cli PATH change):"}
 		for _, loc := range editAccepted {
 			lines = append(lines, "  "+abbrev(loc, oh))
 		}
@@ -545,11 +548,17 @@ func abbrevAll(paths []string, home string) []string {
 	return out
 }
 
-// existing returns the subset of paths that exist (file or dir).
+// existing returns the subset of paths that exist (file, dir, or symlink).
+//
+// It lstats rather than stats, so a name is listed when the NAME is there,
+// regardless of what it points at. An alias is a symlink onto the installed
+// binary on unix; if that binary is already gone the symlink is dangling, and a
+// stat-based check would hide it from the uninstall preview while uninstall
+// still removed it — showing the user less than it does.
 func existing(paths ...string) []string {
 	var out []string
 	for _, p := range paths {
-		if _, err := os.Stat(p); err == nil {
+		if _, err := os.Lstat(p); err == nil {
 			out = append(out, p)
 		}
 	}

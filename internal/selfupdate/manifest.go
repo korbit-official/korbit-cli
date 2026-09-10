@@ -27,6 +27,11 @@ type Manifest struct {
 	SHA256      string `json:"sha256"`
 	Repo        string `json:"repo"`
 	InstalledAt string `json:"installedAt"` // unix-ms as a string
+	// Aliases are the extra command names in the install dir that run the same
+	// binary (see Layout.LegacyBinName). Absent on an install that has none, so
+	// self doctor treats a listed-but-missing alias as a broken install and
+	// self uninstall knows exactly which extra names to remove.
+	Aliases []string `json:"aliases,omitempty"`
 }
 
 // loadManifest reads and parses the manifest at path. found is false (with a nil

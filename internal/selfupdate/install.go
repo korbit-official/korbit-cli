@@ -24,6 +24,9 @@ type InstallResult struct {
 	Repaired   []string   `json:"repaired"` // healed states (always present; [] when clean)
 	Path       PathResult `json:"path"`
 	Warnings   []string   `json:"warnings,omitempty"`
+	// Aliases are the extra command names now pointing at the installed binary
+	// (see alias.go). Absent on a fresh install, which creates none.
+	Aliases []string `json:"aliases,omitempty"`
 }
 
 // Install copies the running binary to the stable PATH location, wires PATH, and
@@ -72,15 +75,27 @@ func (c Config) Install() (*InstallResult, error) {
 	}
 	res.Repaired = append(res.Repaired, repaired...)
 
-	// 2. Wire PATH (idempotent; prompts on a TTY, else prints guidance).
+	// 2. Keep every alias command name pointing at the binary just placed. Only
+	// names this install OWNS are written (alias.go), so a fresh install gets the
+	// primary binary alone and a stranger's file at that name is left untouched.
+	// The manifest read here is the PRIOR one — step 4 rewrites it below — which
+	// is what records an alias an earlier run adopted.
+	prevManifest, _, _ := loadManifest(l.ManifestPath())
+	wanted, ownWarnings := c.aliasesToKeep(l, prevManifest, src)
+	aliases, aliasWarnings := c.syncAliases(l, wanted)
+	res.Aliases = aliases
+	res.Warnings = append(res.Warnings, ownWarnings...)
+	res.Warnings = append(res.Warnings, aliasWarnings...)
+
+	// 3. Wire PATH (idempotent; prompts on a TTY, else prints guidance).
 	pr, err := c.wirePath(l.ExecutableDir())
 	if err != nil {
 		return nil, err
 	}
 	res.Path = pr
 
-	// 3. Write/rebuild the manifest for this version.
-	repairedManifest, err := c.reconcileManifest(l, srcSum)
+	// 4. Write/rebuild the manifest for this version.
+	repairedManifest, err := c.reconcileManifest(l, srcSum, aliases)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +103,7 @@ func (c Config) Install() (*InstallResult, error) {
 		res.Repaired = append(res.Repaired, repairedManifest)
 	}
 
-	// 4. Sweep leftover temp / swap files from an interrupted run.
+	// 5. Sweep leftover temp / swap files from an interrupted run.
 	if swept := c.sweepLeftovers(l); swept {
 		res.Repaired = append(res.Repaired, "removed leftover temp files")
 	}
@@ -148,7 +163,7 @@ func (c Config) reconcileExecutable(l Layout, src, wantSum string) ([]string, er
 // reconcileManifest rebuilds the manifest for the version just installed, so a
 // missing or corrupt manifest is regenerated rather than blocking the install. It
 // returns the repair note when it had to rebuild a corrupt one.
-func (c Config) reconcileManifest(l Layout, sum string) (repaired string, err error) {
+func (c Config) reconcileManifest(l Layout, sum string, aliases []string) (repaired string, err error) {
 	_, found, perr := loadManifest(l.ManifestPath())
 	if found && perr != nil {
 		repaired = "rebuilt the corrupt manifest"
@@ -162,6 +177,7 @@ func (c Config) reconcileManifest(l Layout, sum string) (repaired string, err er
 		SHA256:      sum,
 		Repo:        c.repo(),
 		InstalledAt: strconv.FormatInt(c.now(), 10),
+		Aliases:     aliases,
 	}
 	if err := m.save(l.ManifestPath()); err != nil {
 		return "", err
@@ -170,10 +186,17 @@ func (c Config) reconcileManifest(l Layout, sum string) (repaired string, err er
 }
 
 // sweepLeftovers best-effort removes temp/swap files an interrupted install or
-// update left in the bin dir or home (our own .korbit-*.tmp scratch files, and
-// minio's .<bin>.new / .<bin>.old swap files). It never removes the installed
-// binary or the manifest.
+// update left in the bin dir or home: any hidden *.tmp scratch file (which
+// covers this package's own tmpPattern and any earlier one), and minio's
+// .<bin>.new / .<bin>.old swap files for the primary binary AND for each alias
+// name, since an alias is written through the same swap on windows. It never
+// removes the installed binary, an alias, or the manifest.
 func (c Config) sweepLeftovers(l Layout) bool {
+	swaps := map[string]bool{}
+	for _, bin := range []string{l.BinName(), l.LegacyBinName()} {
+		swaps["."+bin+".new"] = true
+		swaps["."+bin+".old"] = true
+	}
 	swept := false
 	dirs := []string{l.ExecutableDir(), l.Home()}
 	for _, d := range dirs {
@@ -184,8 +207,7 @@ func (c Config) sweepLeftovers(l Layout) bool {
 		for _, e := range entries {
 			name := e.Name()
 			isTmp := filepath.Ext(name) == ".tmp" && len(name) > 0 && name[0] == '.'
-			isSwap := name == "."+l.BinName()+".new" || name == "."+l.BinName()+".old"
-			if isTmp || isSwap {
+			if isTmp || swaps[name] {
 				if os.Remove(filepath.Join(d, name)) == nil {
 					swept = true
 				}

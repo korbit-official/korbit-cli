@@ -12,6 +12,36 @@ per-platform [`.mcpb` Desktop Extension](#desktop-extensions-mcpb). macOS
 **notarization** is a deliberate second step (`make notarize`) run only for a
 real, published release.
 
+## Two archive sets per release
+
+Every release publishes the **same program twice**, under two names:
+
+| Asset | Binary inside | Who downloads it |
+| --- | --- | --- |
+| `dgx-cli_<os>_<arch>.{tar.gz,zip}` | `dgx-cli` | the installers, and `dgx-cli self update` |
+| `korbit_<os>_<arch>.{tar.gz,zip}` | `korbit` | an installed `korbit` binary updating itself |
+
+The two are built from the same source with the same flags, ldflags, and target
+matrix — they differ only in the compiled binary's filename (`.goreleaser.yaml`
+carries a second `build` and a second `archives` entry for the legacy set).
+
+The legacy set exists because an already-installed `korbit` asks for a fixed
+asset name and then extracts the archive entry whose basename is exactly
+`korbit`. Both halves of that — the asset name and the name inside the archive —
+are a contract with binaries that are already on users' machines, so **neither
+may be renamed**: dropping the set, or renaming the binary inside it, strands
+every existing install with no way to update.
+
+That is also all the legacy set is for. Once a `korbit` install has updated
+through it, the new binary installs `dgx-cli` as the primary and keeps `korbit`
+as an alias beside it, and from then on it updates through the `dgx-cli` asset
+like any other install.
+
+One `checksums.txt` covers both sets plus the `.mcpb` bundles, so the single
+signature over it authenticates every download. The `.mcpb` Desktop Extensions
+are built from the `dgx-cli` binaries only — an extension is installed fresh
+rather than self-updated, so it needs no legacy name.
+
 ## Target matrix
 
 | OS      | Arch          |
@@ -145,14 +175,14 @@ skip/sign messages only show under `goreleaser ... --verbose`.
 
 Each build also produces a per-platform `.mcpb` — an [MCP
 Bundle](https://github.com/anthropics/mcpb) ("Desktop Extension"): a single file
-a user drags into Claude Desktop to install `korbit mcp serve` with no terminal
+a user drags into Claude Desktop to install `dgx-cli mcp serve` with no terminal
 step. It is the zero-terminal path that lets the Claude Desktop chat reach the
 local, key-holding binary; users comfortable with a shell can instead wire up
 the server with `claude mcp add …` (see the README).
 
 An `.mcpb` is just a ZIP with a `manifest.json` at the root plus the binary under
 `server/`. `scripts/build-mcpb.sh` is a per-target post-build hook (it runs right
-after `macos-sign.sh`) that writes `dist/korbit_<os>_<arch>.mcpb`. We ship **one
+after `macos-sign.sh`) that writes `dist/dgx-cli_<os>_<arch>.mcpb`. We ship **one
 bundle per platform/arch** — each carries a single binary — rather than one fat
 multi-platform bundle. No Node tooling is required to build them.
 
@@ -182,7 +212,9 @@ make notarize           # ./scripts/macos-notarize.sh dist
 ```
 
 It zips each signed macOS binary, submits it to Apple's notary service, and
-waits for the verdict. It does **not** staple: a stand-alone CLI binary can't
+waits for the verdict — **both** darwin builds, `dgx-cli` and `korbit`, since
+both ship to users (see [Two archive sets](#two-archive-sets-per-release)). It
+does **not** staple: a stand-alone CLI binary can't
 carry a stapled ticket, so Gatekeeper verifies the notarization online the first
 time a downloaded copy runs.
 

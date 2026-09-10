@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Pack one built binary into an MCP Bundle (.mcpb) — a Desktop Extension that
-# installs `korbit mcp serve` into Claude Desktop (and other MCPB hosts) with a
+# installs `dgx-cli mcp serve` into Claude Desktop (and other MCPB hosts) with a
 # drag-and-drop, no-terminal flow. Invoked by GoReleaser as a per-target
 # post-build hook (see .goreleaser.yaml), after the macOS signing hook, so the
 # binary we pack is the signed one. Notarization happens later (a separate step)
@@ -23,7 +23,7 @@
 #   GOOS  GOARCH       target platform/arch ({{ .Os }} / {{ .Arch }})
 #   VERSION            release version, semver ({{ .Version }})
 #
-# Output: dist/korbit_<goos>_<goarch>.mcpb (dist/ is inferred from the binary
+# Output: dist/dgx-cli_<goos>_<goarch>.mcpb (dist/ is inferred from the binary
 # path, matching how GoReleaser lays out its build directories).
 set -euo pipefail
 
@@ -49,17 +49,17 @@ fi
 # the project root, but resolve it from the script path so it is invariant.
 root="$(cd "$(dirname "$0")/.." && pwd)"
 
-# dist/ is two levels up from the binary (dist/korbit_<os>_<arch>.../korbit).
+# dist/ is two levels up from the binary (dist/dgx-cli_<os>_<arch>.../dgx-cli).
 dist="$(cd "$(dirname "$bin")/.." && pwd)"
-out="$dist/korbit_${goos}_${goarch}.mcpb"
+out="$dist/dgx-cli_${goos}_${goarch}.mcpb"
 
 # Map the Go target to the MCPB platform token and the on-disk binary name.
 # MCPB uses Node's process.platform values: win32 (not "windows").
-binname="korbit"
+binname="dgx-cli"
 platform="$goos"
 case "$goos" in
 windows)
-	binname="korbit.exe"
+	binname="dgx-cli.exe"
 	platform="win32"
 	;;
 darwin) platform="darwin" ;;
@@ -100,7 +100,7 @@ cat >"$stage/manifest.json" <<EOF
   "display_name": "Korbit",
   "version": "$version",
   "description": "Operate the Korbit cryptocurrency exchange over MCP — every REST endpoint as a tool, with the same validation, signing, journaling, and retries as the CLI.",
-  "long_description": "Exposes the Korbit Open API v2 as MCP tools backed by the korbit binary running locally on your machine, so your API keys never leave it. Read market data, manage orders, and check balances; the order-placement tool supports a dry-run that simulates the fill against the live order book before anything is sent. First-time users with no key yet can complete setup entirely in chat via the setup and doctor tools.",
+  "long_description": "Exposes the Korbit Open API v2 as MCP tools backed by the dgx-cli binary running locally on your machine, so your API keys never leave it. Read market data, manage orders, and check balances; the order-placement tool supports a dry-run that simulates the fill against the live order book before anything is sent. First-time users with no key yet can complete setup entirely in chat via the setup and doctor tools.",
   "author": { "name": "Digital X Co., Ltd.", "url": "https://www.korbit.co.kr" },
   "homepage": "https://developers.korbit.co.kr/",
   "documentation": "https://developers.korbit.co.kr/",

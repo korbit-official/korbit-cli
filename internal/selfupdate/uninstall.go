@@ -48,9 +48,10 @@ type UninstallResult struct {
 // user's choices, and passes them here; this layer does the filesystem work under
 // one lock and reports the outcome.
 type UninstallOptions struct {
-	// RemoveBinary removes the installed binary, the install manifest, and any
-	// leftover swap file. A binary that cannot delete itself (the locked running
-	// korbit.exe on Windows) is reported in Failed instead.
+	// RemoveBinary removes the installed binary, every alias command name the
+	// manifest records, the install manifest, and any leftover swap file. A binary
+	// that cannot delete itself (the locked running .exe on Windows) is reported in
+	// Failed instead.
 	RemoveBinary bool
 	// RemoveData removes the CLI-home data files in DataPaths (config.json, the
 	// journal) and, when the home is then empty, the home dir. Key material is
@@ -85,6 +86,15 @@ type UninstallOptions struct {
 // removal question or clearing keys, so a non-managed install is refused before
 // any destructive work — Uninstall re-checks it under the lock as a backstop.
 func (c Config) AssertManaged() error { return c.assertManaged(c.Layout()) }
+
+// AliasPaths returns the on-disk path of every extra command name this install
+// OWNS (alias.go) — exactly what Uninstall removes alongside the primary binary,
+// so the interactive front-end can show it before asking.
+func (c Config) AliasPaths() []string {
+	l := c.Layout()
+	m, _, _ := loadManifest(l.ManifestPath())
+	return c.aliasPaths(l, m)
+}
 
 // PathEdits returns the pending "undo the installer's PATH change" edits, one per
 // location that currently carries the installer's entry (each shell rc file with
@@ -136,7 +146,7 @@ func (c Config) Uninstall(opts UninstallOptions) (*UninstallResult, error) {
 	for _, loc := range opts.EditPaths {
 		c.editPath(loc, res)
 	}
-	// After clearing data, remove the CLI home if it is now empty (only korbit's
+	// After clearing data, remove the CLI home if it is now empty (only the CLI's
 	// own lock files may remain).
 	if opts.RemoveData {
 		c.pruneHome(l, res)
@@ -145,20 +155,23 @@ func (c Config) Uninstall(opts UninstallOptions) (*UninstallResult, error) {
 	return res, nil
 }
 
-// removeBinary deletes the installed binary, leftover swap files, and the
-// manifest. On Windows the running korbit.exe is locked and cannot delete itself;
-// that is recorded in Failed for manual deletion, not swallowed.
+// removeBinary deletes every command name this install put on PATH — each alias
+// it OWNS (aliasPaths), then the primary binary — plus leftover swap files and
+// the manifest. Aliases go first because a unix alias is a symlink onto the
+// primary: removing the primary first would leave a dangling name behind. A file
+// at the alias name that this install does not own is not its to delete and is
+// left alone. On Windows a running .exe is locked and cannot delete itself; that
+// is recorded in Failed for manual deletion, not swallowed.
 func (c Config) removeBinary(l Layout, res *UninstallResult) {
-	if fileExists(l.ExecutablePath()) {
-		if err := os.Remove(l.ExecutablePath()); err == nil {
-			res.Removed = append(res.Removed, l.ExecutablePath())
-		} else {
-			c.log().Debug("could not remove installed binary", "path", l.ExecutablePath(), "err", err.Error())
-			res.Failed = append(res.Failed, FailedRemoval{l.ExecutablePath(), "in use — delete it manually after this process exits"})
-		}
+	m, _, _ := loadManifest(l.ManifestPath())
+	for _, alias := range c.aliasPaths(l, m) {
+		c.removeInstalledFile(alias, res)
 	}
-	for _, swap := range []string{"." + l.BinName() + ".old", "." + l.BinName() + ".new"} {
-		_ = os.Remove(filepath.Join(l.ExecutableDir(), swap))
+	c.removeInstalledFile(l.ExecutablePath(), res)
+	for _, bin := range []string{l.BinName(), l.LegacyBinName()} {
+		for _, swap := range []string{"." + bin + ".old", "." + bin + ".new"} {
+			_ = os.Remove(filepath.Join(l.ExecutableDir(), swap))
+		}
 	}
 	if fileExists(l.ManifestPath()) {
 		if err := os.Remove(l.ManifestPath()); err == nil {
@@ -167,6 +180,50 @@ func (c Config) removeBinary(l Layout, res *UninstallResult) {
 			res.Failed = append(res.Failed, FailedRemoval{l.ManifestPath(), err.Error()})
 		}
 	}
+}
+
+// aliasPaths returns the on-disk path of every alias name this install OWNS —
+// every name the manifest records, plus the alias name this package manages when
+// ownsLegacyAlias proves that path is ours even though the manifest does not
+// list it (an install whose manifest was written before the field existed). It
+// uses the SAME ownership rule as adoption, so uninstall never deletes a file at
+// that name that install refused to overwrite: a user's own `korbit` wrapper is
+// left in place by both.
+func (c Config) aliasPaths(l Layout, m Manifest) []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(name string) {
+		if name == "" || name == l.BinName() || seen[name] {
+			return
+		}
+		seen[name] = true
+		out = append(out, l.AliasPath(name))
+	}
+	for _, name := range m.Aliases {
+		add(name)
+	}
+	exe, _ := c.runningExe()
+	if c.ownsLegacyAlias(l, m, exe) {
+		add(l.LegacyBinName())
+	}
+	return out
+}
+
+// removeInstalledFile deletes one installed command name, recording it in
+// Removed, or in Failed when it is locked (the running .exe on Windows). It uses
+// pathPresent, not fileExists, so a unix alias symlink whose target is already
+// gone is still cleaned up.
+func (c Config) removeInstalledFile(path string, res *UninstallResult) {
+	if !pathPresent(path) {
+		return
+	}
+	err := os.Remove(path)
+	if err == nil {
+		res.Removed = append(res.Removed, path)
+		return
+	}
+	c.log().Debug("could not remove installed binary", "path", path, "err", err.Error())
+	res.Failed = append(res.Failed, FailedRemoval{path, "in use — delete it manually after this process exits"})
 }
 
 // removePath removes one file/dir (a data file), recording success or the reason
@@ -213,22 +270,22 @@ func (c Config) editPath(loc string, res *UninstallResult) {
 	case errors.As(err, &skip):
 		res.Warnings = append(res.Warnings, skip.Error()+"; remove it by hand")
 	case err != nil:
-		res.Failed = append(res.Failed, FailedRemoval{loc, "could not undo the korbit-cli PATH change (" + err.Error() + ") — edit it manually"})
+		res.Failed = append(res.Failed, FailedRemoval{loc, "could not undo the digitalx-cli PATH change (" + err.Error() + ") — edit it manually"})
 	case changed:
 		res.Edited = append(res.Edited, loc)
 	default:
-		res.Warnings = append(res.Warnings, fmt.Sprintf("no korbit-cli block found in %s — nothing to undo", loc))
+		res.Warnings = append(res.Warnings, fmt.Sprintf("no digitalx-cli (or legacy korbit-cli) block found in %s — nothing to undo", loc))
 	}
 }
 
 // pruneHome removes the CLI home dir only when the sole things left in it are
-// korbit's own lock files — i.e. the user removed everything else. If any real
+// the CLI's own lock files — i.e. the user removed everything else. If any real
 // file remains (a kept manifest because the binary wasn't removed, a kept
 // sandbox/ because caches weren't removed, or a file whose own removal already
 // failed and was reported), the home is left in place silently: those are
 // deliberate keeps, not a failure the user must act on. A best-effort removal
 // that can't complete (a lock still held on Windows) is likewise left silent —
-// the leftover is just korbit's own lock file.
+// the leftover is just the CLI's own lock file.
 func (c Config) pruneHome(l Layout, res *UninstallResult) {
 	home := l.Home()
 	entries, err := os.ReadDir(home)
