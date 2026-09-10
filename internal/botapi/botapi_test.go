@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/ops"
 	"github.com/korbit-official/korbit-cli/internal/output"
 	"github.com/korbit-official/korbit-cli/internal/rawapi"
@@ -25,12 +25,12 @@ import (
 // Req is the recorded shape of one logical call the fake ops.Doer saw. It keeps
 // the field names the assertions read (Method/Path/Auth/Idempotent/Params) so
 // the behavior oracle is unchanged after the L2 ops layer landed: Idempotent is
-// the korbit.Policy.Idempotent ops derived (the spec retry gate), Auth is the
-// korbit.Call.Auth.
+// the apiclient.Policy.Idempotent ops derived (the spec retry gate), Auth is the
+// apiclient.Call.Auth.
 type Req struct {
 	Method     string
 	Path       string
-	Params     []korbit.KV
+	Params     []apiclient.KV
 	Auth       bool
 	Idempotent bool
 }
@@ -63,7 +63,7 @@ func (f *fakeTransport) on(method, path string, s ...step) {
 // idempotency back into the Req.Idempotent the assertions read) and returns the
 // scripted step. Attempts is always 1 (the fake does no retry of its own; the
 // ops protocols decide every resend).
-func (f *fakeTransport) Do(_ context.Context, call korbit.Call, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+func (f *fakeTransport) Do(_ context.Context, call apiclient.Call, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 	f.mu.Lock()
 	f.reqs = append(f.reqs, Req{
 		Method: call.Method, Path: call.Path, Params: call.Params,
@@ -73,7 +73,7 @@ func (f *fakeTransport) Do(_ context.Context, call korbit.Call, pol korbit.Polic
 	queue := f.steps[key]
 	if len(queue) == 0 {
 		f.mu.Unlock()
-		return nil, korbit.Meta{Attempts: 1}, fmt.Errorf("unexpected call %s", key)
+		return nil, apiclient.Meta{Attempts: 1}, fmt.Errorf("unexpected call %s", key)
 	}
 	s := queue[0]
 	if len(queue) > 1 {
@@ -84,7 +84,7 @@ func (f *fakeTransport) Do(_ context.Context, call korbit.Call, pol korbit.Polic
 	if gate != nil {
 		<-gate
 	}
-	return s.data, korbit.Meta{Attempts: 1}, s.err
+	return s.data, apiclient.Meta{Attempts: 1}, s.err
 }
 
 func (f *fakeTransport) calls(method, path string) []Req {
@@ -125,8 +125,8 @@ func (f fakeOpJournal) Begin(ops.OpStart) (ops.OpHandle, error) {
 
 type fakeOpHandle struct{ oj orderJournalFunc }
 
-func (h *fakeOpHandle) OperationID() int64             { return 0 }
-func (h *fakeOpHandle) ForCall(string) korbit.Recorder { return nil }
+func (h *fakeOpHandle) OperationID() int64                { return 0 }
+func (h *fakeOpHandle) ForCall(string) apiclient.Recorder { return nil }
 func (h *fakeOpHandle) StartOrder(in ops.OrderIntent) (ops.OrderFinishFunc, error) {
 	if h.oj == nil {
 		return func(string, string, string, int) {}, nil
@@ -505,7 +505,7 @@ func TestPlaceRegistersLocalHold(t *testing.T) {
 	}
 }
 
-func paramValue(kvs []korbit.KV, key string) string {
+func paramValue(kvs []apiclient.KV, key string) string {
 	for _, kv := range kvs {
 		if kv.Key == key {
 			return kv.Value

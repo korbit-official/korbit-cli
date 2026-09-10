@@ -12,12 +12,12 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
 	"github.com/korbit-official/korbit-cli/internal/cli/doctorcmd"
 	"github.com/korbit-official/korbit-cli/internal/cli/probe"
 	"github.com/korbit-official/korbit-cli/internal/i18n"
 	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/output"
 	"github.com/korbit-official/korbit-cli/internal/progname"
 )
@@ -489,9 +489,9 @@ func awaitingInteractive(ctx KeyContext, name, publicPEM, headline string, emitA
 			return nil, false, errors.New(i18n.T("enter the issued key id"))
 		case strings.HasPrefix(token, keys.SandboxAPIKeyPrefix):
 			return nil, false, errors.New(i18n.T("that looks like a sandbox key id — setup does not create sandbox keys"))
-		case korbit.LooksLikeEd25519PrivateKey(token):
+		case apiclient.LooksLikeEd25519PrivateKey(token):
 			return nil, false, errors.New(i18n.T("that's your private key — never paste private key material; paste the key id the portal issued instead"))
-		case korbit.LooksLikeEd25519PublicKey(token):
+		case apiclient.LooksLikeEd25519PublicKey(token):
 			return nil, false, errors.New(i18n.T("that looks like your public key, not the issued key id — paste the key id the portal gave you"))
 		}
 		// Validate the candidate id with a signed whoami BEFORE persisting it, so an

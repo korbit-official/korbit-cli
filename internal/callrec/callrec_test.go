@@ -11,9 +11,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
 	"github.com/korbit-official/korbit-cli/internal/journal"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/ops"
 	"github.com/korbit-official/korbit-cli/internal/output"
 )
@@ -55,7 +55,7 @@ func TestDefaultPolicyTable(t *testing.T) {
 	}
 	for _, c := range cases {
 		pol := DefaultPolicy(c.debug)
-		info := korbit.CallInfo{Origin: korbit.Origin{Surface: c.surface}, Auth: true}
+		info := apiclient.CallInfo{Origin: apiclient.Origin{Surface: c.surface}, Auth: true}
 		if c.write {
 			info.Safety = cmdmeta.SafetyNonIdempotent
 		} else {
@@ -75,8 +75,8 @@ func TestDefaultPolicyTable(t *testing.T) {
 
 // authInfo is an authenticated write call — recorded by default (POST classifies
 // it as a write for the ad-hoc path; operation tests carry Safety via OpStart).
-func authInfo(surface string) korbit.CallInfo {
-	return korbit.CallInfo{Origin: korbit.Origin{Surface: surface}, Method: "POST", Path: "/v2/orders", Auth: true}
+func authInfo(surface string) apiclient.CallInfo {
+	return apiclient.CallInfo{Origin: apiclient.Origin{Surface: surface}, Method: "POST", Path: "/v2/orders", Auth: true}
 }
 
 // TestLazyOpenPublicNoDebugLeavesNoDB: a call the policy declines to record must
@@ -89,11 +89,11 @@ func TestLazyOpenPublicNoDebugLeavesNoDB(t *testing.T) {
 	defer r.Close()
 
 	cr := r.ForCall("")
-	info := korbit.CallInfo{Origin: korbit.Origin{Surface: "cli"}, Method: "GET", Path: "/v2/tickers", Auth: false}
+	info := apiclient.CallInfo{Origin: apiclient.Origin{Surface: "cli"}, Method: "GET", Path: "/v2/tickers", Auth: false}
 	if err := cr.Ready(info); err != nil {
 		t.Fatalf("Ready: %v", err)
 	}
-	cr.Record(info, korbit.Outcome{HTTPStatus: 200})
+	cr.Record(info, apiclient.Outcome{HTTPStatus: 200})
 	if r.Opened() {
 		t.Fatal("recorder opened the journal for a non-recorded call")
 	}
@@ -115,7 +115,7 @@ func TestReadyFailsOnlyWhenRecording(t *testing.T) {
 	defer r.Close()
 
 	// A non-recorded public call: Ready opens nothing, so no error.
-	pub := korbit.CallInfo{Origin: korbit.Origin{Surface: "cli"}, Method: "GET", Path: "/v2/tickers", Auth: false}
+	pub := apiclient.CallInfo{Origin: apiclient.Origin{Surface: "cli"}, Method: "GET", Path: "/v2/tickers", Auth: false}
 	if err := r.ForCall("").Ready(pub); err != nil {
 		t.Fatalf("public Ready should not open or fail: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestNoJournalShortCircuits(t *testing.T) {
 	if err := cr.Ready(info); err != nil {
 		t.Fatalf("disabled Ready must not open or fail: %v", err)
 	}
-	if id := cr.Record(info, korbit.Outcome{Err: nil, HTTPStatus: 200}); id != 0 {
+	if id := cr.Record(info, apiclient.Outcome{Err: nil, HTTPStatus: 200}); id != 0 {
 		t.Fatalf("disabled Record = %d, want 0", id)
 	}
 	if r.Opened() {
@@ -175,13 +175,13 @@ func TestNoJournalShortCircuits(t *testing.T) {
 // warn-vs-fatal from the mode.)
 func TestPostFailureModes(t *testing.T) {
 	apiErr := &output.ApiError{HTTPStatus: 500, Code: "X"}
-	out := korbit.Outcome{Err: apiErr, HTTPStatus: 500, Code: "X", Message: "boom", Attempts: 1}
+	out := apiclient.Outcome{Err: apiErr, HTTPStatus: 500, Code: "X", Message: "boom", Attempts: 1}
 
 	for _, mode := range []FailMode{Fail, Warn} {
 		home := t.TempDir()
 		var gotModes []FailMode
 		var gotErrs []error
-		r := New(journal.DefaultPath(home), false, false, func(korbit.CallInfo) Decision {
+		r := New(journal.DefaultPath(home), false, false, func(apiclient.CallInfo) Decision {
 			return Decision{Record: true, PostFailure: mode}
 		}, nil, captureFailures(&gotModes, &gotErrs))
 		// Open the DB normally so Ready succeeds, then close the underlying handle
@@ -211,7 +211,7 @@ func TestRecordParityFields(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// out carries the client's (real-clock) times; they must NOT be stored —
 		// the row's timing comes from the recorder's injectable clock (see below).
-		row := recordOne(t, korbit.Outcome{Err: nil, HTTPStatus: 200, Attempts: 1, StartedAtMs: 999, FinishedAtMs: 999, DurationMs: 999})
+		row := recordOne(t, apiclient.Outcome{Err: nil, HTTPStatus: 200, Attempts: 1, StartedAtMs: 999, FinishedAtMs: 999, DurationMs: 999})
 		if !row.Success || row.HTTPStatus != nil {
 			t.Fatalf("success row: success=%v httpStatus=%v (want true, nil)", row.Success, row.HTTPStatus)
 		}
@@ -227,7 +227,7 @@ func TestRecordParityFields(t *testing.T) {
 	})
 	t.Run("apiError", func(t *testing.T) {
 		ae := &output.ApiError{HTTPStatus: 422, Code: "DUPLICATE", Message: "dup"}
-		row := recordOne(t, korbit.Outcome{Err: ae, HTTPStatus: 422, Code: "DUPLICATE", Message: "dup", Attempts: 2})
+		row := recordOne(t, apiclient.Outcome{Err: ae, HTTPStatus: 422, Code: "DUPLICATE", Message: "dup", Attempts: 2})
 		if row.Success || row.HTTPStatus == nil || *row.HTTPStatus != 422 {
 			t.Fatalf("apiError row: %+v", row)
 		}
@@ -236,7 +236,7 @@ func TestRecordParityFields(t *testing.T) {
 		}
 	})
 	t.Run("transport", func(t *testing.T) {
-		row := recordOne(t, korbit.Outcome{Err: errors.New("dial tcp: refused"), Message: "dial tcp: refused", Attempts: 1})
+		row := recordOne(t, apiclient.Outcome{Err: errors.New("dial tcp: refused"), Message: "dial tcp: refused", Attempts: 1})
 		if row.Success || row.HTTPStatus != nil {
 			t.Fatalf("transport row should have NULL http_status: %+v", row)
 		}
@@ -259,7 +259,7 @@ func TestForCallOverridesParamsJSON(t *testing.T) {
 	if err := cr.Ready(info); err != nil {
 		t.Fatal(err)
 	}
-	cr.Record(info, korbit.Outcome{HTTPStatus: 200, Attempts: 1})
+	cr.Record(info, apiclient.Outcome{HTTPStatus: 200, Attempts: 1})
 	rows, _ := r.jl.RecentCalls(1)
 	if len(rows) != 1 || string(rows[0].Params) != ordered {
 		t.Fatalf("params_json = %s, want %s", rows[0].Params, ordered)
@@ -288,7 +288,7 @@ func TestConcurrentSameCommandIsolated(t *testing.T) {
 				t.Errorf("Ready: %v", err)
 				return
 			}
-			cr.Record(info, korbit.Outcome{HTTPStatus: 200, Attempts: 1})
+			cr.Record(info, apiclient.Outcome{HTTPStatus: 200, Attempts: 1})
 		}(i)
 	}
 	wg.Wait()
@@ -340,7 +340,7 @@ func TestBeginGroupsCallsUnderOperation(t *testing.T) {
 		if err := cr.Ready(info); err != nil {
 			t.Fatalf("Ready %d: %v", i, err)
 		}
-		cr.Record(info, korbit.Outcome{HTTPStatus: 200, Attempts: 1})
+		cr.Record(info, apiclient.Outcome{HTTPStatus: 200, Attempts: 1})
 	}
 	if err := h.Finish("ok", ""); err != nil {
 		t.Fatalf("Finish: %v", err)
@@ -497,7 +497,7 @@ func steppedClock(start, step int64) func() int64 {
 	return func() int64 { n += step; return n }
 }
 
-func recordOne(t *testing.T, out korbit.Outcome) journal.CallRow {
+func recordOne(t *testing.T, out apiclient.Outcome) journal.CallRow {
 	t.Helper()
 	home := t.TempDir()
 	ticks := []int64{1000, 1100}
@@ -562,7 +562,7 @@ func TestRecorderCloseRaceWithLateCalls(t *testing.T) {
 			defer wg.Done()
 			cr := r.ForCall("")
 			_ = cr.Ready(info)
-			cr.Record(info, korbit.Outcome{HTTPStatus: 200})
+			cr.Record(info, apiclient.Outcome{HTTPStatus: 200})
 		}()
 		// Order intent + finish (pre-send hard-guarantee path, may fail cleanly).
 		go func() {
@@ -590,7 +590,7 @@ func TestRecorderCloseRaceWithLateCalls(t *testing.T) {
 				return
 			}
 			_ = cr.Ready(info)
-			cr.Record(info, korbit.Outcome{HTTPStatus: 200})
+			cr.Record(info, apiclient.Outcome{HTTPStatus: 200})
 		}()
 		// The shutdown close.
 		go func() {
@@ -617,7 +617,7 @@ func TestRecorderNoReopenAfterClose(t *testing.T) {
 	if err := cr.Ready(info); err != nil {
 		t.Fatalf("Ready: %v", err)
 	}
-	cr.Record(info, korbit.Outcome{HTTPStatus: 200})
+	cr.Record(info, apiclient.Outcome{HTTPStatus: 200})
 	if !r.Opened() {
 		t.Fatal("expected the journal open after a recorded call")
 	}
@@ -631,7 +631,7 @@ func TestRecorderNoReopenAfterClose(t *testing.T) {
 	// Post-send Record must no-op, not reopen.
 	late := r.ForCall("")
 	_ = late.Ready(info)
-	if id := late.Record(info, korbit.Outcome{HTTPStatus: 200}); id != 0 {
+	if id := late.Record(info, apiclient.Outcome{HTTPStatus: 200}); id != 0 {
 		t.Fatalf("late Record after Close should no-op, got id %d", id)
 	}
 	if r.Opened() {

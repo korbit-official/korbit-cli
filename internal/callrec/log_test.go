@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/journal"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/logging"
 )
 
@@ -24,7 +24,7 @@ func TestReadyLogsJournalingDecision(t *testing.T) {
 		r := New(journal.DefaultPath(t.TempDir()), false, false, DefaultPolicy(false), nil, nil)
 		r.Log = logging.New(&buf, slog.LevelDebug)
 		cr := r.ForCall("")
-		if err := cr.Ready(korbit.CallInfo{Origin: korbit.Origin{Surface: "cli"}, Auth: true, Method: "POST", Path: "/v2/orders"}); err != nil {
+		if err := cr.Ready(apiclient.CallInfo{Origin: apiclient.Origin{Surface: "cli"}, Auth: true, Method: "POST", Path: "/v2/orders"}); err != nil {
 			t.Fatalf("Ready: %v", err)
 		}
 		defer r.Close()
@@ -41,7 +41,7 @@ func TestReadyLogsJournalingDecision(t *testing.T) {
 		r := New(journal.DefaultPath(t.TempDir()), false, false, DefaultPolicy(false), nil, nil)
 		r.Log = logging.New(&buf, slog.LevelDebug)
 		cr := r.ForCall("")
-		if err := cr.Ready(korbit.CallInfo{Origin: korbit.Origin{Surface: "cli"}, Auth: false, Method: "GET", Path: "/v2/time"}); err != nil {
+		if err := cr.Ready(apiclient.CallInfo{Origin: apiclient.Origin{Surface: "cli"}, Auth: false, Method: "GET", Path: "/v2/time"}); err != nil {
 			t.Fatalf("Ready: %v", err)
 		}
 		out := buf.String()
@@ -62,7 +62,7 @@ func TestReadyLogsJournalingDecision(t *testing.T) {
 		r.Log = logging.New(&buf, slog.LevelDebug)
 		// A doctor write would record on any other surface, but doctor is exempt —
 		// the reason must name the exemption, not "read, not in debug".
-		if err := r.ForCall("").Ready(korbit.CallInfo{Origin: korbit.Origin{Surface: korbit.SurfaceDoctor}, Auth: true, Method: "POST", Path: "/v2/orders"}); err != nil {
+		if err := r.ForCall("").Ready(apiclient.CallInfo{Origin: apiclient.Origin{Surface: apiclient.SurfaceDoctor}, Auth: true, Method: "POST", Path: "/v2/orders"}); err != nil {
 			t.Fatalf("Ready: %v", err)
 		}
 		out := buf.String()

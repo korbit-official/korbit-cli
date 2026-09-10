@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package callrec is the single home of the CLI's journaling POLICY plus the
-// journal-backed korbit.Recorder that enacts it. The L1 client (internal/korbit)
+// journal-backed apiclient.Recorder that enacts it. The L1 client (internal/apiclient)
 // owns no journaling: it calls an injected Recorder's Ready before the first
 // send and Record once after, and a post-call failure is delivered through this
 // package's onPostFailure sink — never back through the client. This package is
@@ -40,7 +40,7 @@
 // so the error and its exit-4 classification are preserved.
 //
 // For order placement the order INTENT row is written before the placement send
-// too (StartOrder, an explicit pass-through the CLI calls before korbit.Do); its
+// too (StartOrder, an explicit pass-through the CLI calls before apiclient.Do); its
 // failure aborts with nothing sent, and FinishOrder folds in the result after.
 // Routing orders through this package — rather than a caller holding a raw
 // journal.Logger — keeps every journaled write behind one lazily-opened handle.
@@ -50,7 +50,7 @@
 //
 // # Per-call isolation (ForCall) — concurrency
 //
-// The korbit.Recorder interface (Ready then Record) carries no per-call token,
+// The apiclient.Recorder interface (Ready then Record) carries no per-call token,
 // so any state a call needs between its Ready and its Record — the start
 // timestamp captured pre-send, and the spec/insertion-ordered params_json that
 // overrides the client's map-sorted CallInfo.ParamsJSON — must NOT live on the
@@ -96,7 +96,7 @@
 // write to recover a diagnostic row in a shutdown-only window is not worth the
 // added lifecycle coupling.
 //
-// The injectable clock: korbit.Do brackets a call with the real, un-injectable
+// The injectable clock: apiclient.Do brackets a call with the real, un-injectable
 // wall clock (Outcome.StartedAtMs/FinishedAtMs), but the journal stamps ALL its
 // own time columns — every operations, orders, and api_calls row — from the
 // caller's single injectable clock (the system clock; ops supplies no timestamp).

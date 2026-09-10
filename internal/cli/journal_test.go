@@ -372,7 +372,7 @@ func TestOrderPlaceStartOrderBeforeSend(t *testing.T) {
 
 // TestJournalTimingUsesInjectableClock: the api_calls timing columns come from
 // the injected clock (runCLI pins it to 1700000000000), not the real wall clock
-// korbit.Do brackets a call with — the row is stamped with rt.deps.Now().
+// apiclient.Do brackets a call with — the row is stamped with rt.deps.Now().
 func TestJournalTimingUsesInjectableClock(t *testing.T) {
 	home := t.TempDir()
 	seedBoundKey(t, home)

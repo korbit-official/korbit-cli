@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 )
 
 // End-to-end tests against a live server (normally the Korbit API Sandbox,
@@ -132,11 +132,11 @@ func TestE2EPrivateStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	priv, err := korbit.ParsePrivatePEM(string(pemBytes))
+	priv, err := apiclient.ParsePrivatePEM(string(pemBytes))
 	if err != nil {
 		t.Fatal(err)
 	}
-	auth := &korbit.Credentials{APIKeyID: keyID, Signer: korbit.NewEd25519Signer(priv)}
+	auth := &apiclient.Credentials{APIKeyID: keyID, Signer: apiclient.NewEd25519Signer(priv)}
 
 	s, err := New(Config{
 		PrivateURL: ws + "/v2/private",
@@ -185,9 +185,9 @@ func TestE2EPrivateStream(t *testing.T) {
 	// Phase 2: place a real signed order over REST and expect it live on the
 	// myOrder channel.
 	clientOrderID := fmt.Sprintf("stream-e2e-%d", time.Now().UnixMilli())
-	_, err = korbit.Execute(korbit.Request{
+	_, err = apiclient.Execute(apiclient.Request{
 		Method: "POST", Path: "/v2/orders", Auth: true,
-		Params: []korbit.KV{
+		Params: []apiclient.KV{
 			{Key: "symbol", Value: "btc_krw"},
 			{Key: "side", Value: "buy"},
 			{Key: "price", Value: "10000000"},
@@ -195,9 +195,9 @@ func TestE2EPrivateStream(t *testing.T) {
 			{Key: "orderType", Value: "limit"},
 			{Key: "clientOrderId", Value: clientOrderID},
 		},
-	}, korbit.Options{
+	}, apiclient.Options{
 		BaseURL: rest,
-		Creds:   &korbit.Credentials{APIKeyID: keyID, Signer: korbit.NewEd25519Signer(priv)},
+		Creds:   &apiclient.Credentials{APIKeyID: keyID, Signer: apiclient.NewEd25519Signer(priv)},
 	})
 	if err != nil {
 		t.Fatalf("order place: %v", err)

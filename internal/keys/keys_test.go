@@ -17,9 +17,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/keystore"
 	"github.com/korbit-official/korbit-cli/internal/keystore/keystoretest"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/output"
 )
 
@@ -335,7 +335,7 @@ func TestBindRejectsPublicKey(t *testing.T) {
 
 	// The worse mistake: pasting a private key. Rejected with a secret-aware
 	// message that never echoes the pasted material.
-	kp, err := korbit.GenerateKeypair()
+	kp, err := apiclient.GenerateKeypair()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -427,7 +427,7 @@ func TestResolveSignerRoundTrip(t *testing.T) {
 // TestResolveCorruptPEMIsConfigError plants garbage where the private PEM should
 // be. After the signer seam, parsing happens inside Resolve, so a corrupt vault
 // entry must surface as a ConfigError (exit 4) naming the key and suggesting
-// recovery — NOT as korbit.ParsePrivatePEM's bare UsageError (exit 2), and never
+// recovery — NOT as apiclient.ParsePrivatePEM's bare UsageError (exit 2), and never
 // leaking the planted bytes.
 func TestResolveCorruptPEMIsConfigError(t *testing.T) {
 	env := newEnv(t, "file")
@@ -466,7 +466,7 @@ func TestResolveCorruptPEMIsConfigError(t *testing.T) {
 func TestResolvedFormatRedactsSigner(t *testing.T) {
 	env := newEnv(t, "file")
 	// Import a KNOWN keypair so the test holds the exact private bytes to scan for
-	// (the signer behind Resolved is opaque — korbit.Signer — and never hands
+	// (the signer behind Resolved is opaque — apiclient.Signer — and never hands
 	// them back).
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {

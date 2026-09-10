@@ -15,7 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/logging"
 	"github.com/korbit-official/korbit-cli/internal/rawapi"
 	"github.com/korbit-official/korbit-cli/internal/version"
@@ -47,7 +47,7 @@ type Config struct {
 	// which exempts the stream-backfill surface). The Client's BaseURL is required
 	// whenever any private channel is subscribed, or the trade channel is
 	// subscribed with backfill enabled.
-	Client *korbit.Client
+	Client *apiclient.Client
 	// DisableBackfill turns off all REST recovery. Private (re)connections then
 	// raise BACKFILL_DISABLED, and detected public trade gaps raise
 	// BACKFILL_DISABLED + DATA_GAP before the resubscribe snapshot is emitted.
@@ -147,9 +147,9 @@ type Config struct {
 type Session struct {
 	cfg  Config
 	tun  Tunables
-	lg   *slog.Logger // resolved once from cfg.Log (never nil); see log()
-	clk  korbit.Clock // the shared clock read view (cfg.Client.Clock); never nil
-	rest *restClient  // nil when the client has no BaseURL (no REST recovery)
+	lg   *slog.Logger    // resolved once from cfg.Log (never nil); see log()
+	clk  apiclient.Clock // the shared clock read view (cfg.Client.Clock); never nil
+	rest *restClient     // nil when the client has no BaseURL (no REST recovery)
 
 	events chan Event
 	stop   chan struct{} // closed when Run exits: unblocks emitters

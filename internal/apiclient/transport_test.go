@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package korbit
+package apiclient
 
 import (
 	"context"
@@ -48,7 +48,7 @@ func recFor(r Recorder) func(context.Context, Call) Recorder {
 	return func(context.Context, Call) Recorder { return r }
 }
 
-// fakeClock is a programmable korbit.Clock for the Do tests. now (when set) is
+// fakeClock is a programmable apiclient.Clock for the Do tests. now (when set) is
 // read fresh on each sign, so a test can mutate the signed timestamp from a
 // Resync hook.
 type fakeClock struct {

@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 )
 
 // CoinDeposit is one crypto deposit record.
@@ -62,7 +62,7 @@ type DepositAddressesRequest struct {
 	AccountSeq *int
 }
 
-func (c *Client) DepositAddresses(ctx context.Context, req DepositAddressesRequest, pol korbit.Policy) ([]DepositAddress, json.RawMessage, korbit.Meta, error) {
+func (c *Client) DepositAddresses(ctx context.Context, req DepositAddressesRequest, pol apiclient.Policy) ([]DepositAddress, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.intPtr("accountSeq", req.AccountSeq)
 	return call[[]DepositAddress](c, ctx, "GET", "/v2/coin/depositAddresses", true, p, pol)
@@ -77,7 +77,7 @@ type DepositAddressRequest struct {
 	AccountSeq *int
 }
 
-func (c *Client) DepositAddress(ctx context.Context, req DepositAddressRequest, pol korbit.Policy) (DepositAddress, json.RawMessage, korbit.Meta, error) {
+func (c *Client) DepositAddress(ctx context.Context, req DepositAddressRequest, pol apiclient.Policy) (DepositAddress, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.str("currency", string(req.Currency))
 	p.strPtr("network", req.Network)
@@ -94,7 +94,7 @@ type DepositGenerateRequest struct {
 	AccountSeq *int
 }
 
-func (c *Client) DepositGenerate(ctx context.Context, req DepositGenerateRequest, pol korbit.Policy) (DepositAddress, json.RawMessage, korbit.Meta, error) {
+func (c *Client) DepositGenerate(ctx context.Context, req DepositGenerateRequest, pol apiclient.Policy) (DepositAddress, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.str("currency", string(req.Currency))
 	p.strPtr("network", req.Network)
@@ -111,7 +111,7 @@ type DepositHistoryRequest struct {
 	AccountSeq *int
 }
 
-func (c *Client) DepositHistory(ctx context.Context, req DepositHistoryRequest, pol korbit.Policy) ([]CoinDeposit, json.RawMessage, korbit.Meta, error) {
+func (c *Client) DepositHistory(ctx context.Context, req DepositHistoryRequest, pol apiclient.Policy) ([]CoinDeposit, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.str("currency", string(req.Currency))
 	p.intPtr("limit", req.Limit)
@@ -128,7 +128,7 @@ type DepositStatusRequest struct {
 	AccountSeq    *int
 }
 
-func (c *Client) DepositStatus(ctx context.Context, req DepositStatusRequest, pol korbit.Policy) (CoinDeposit, json.RawMessage, korbit.Meta, error) {
+func (c *Client) DepositStatus(ctx context.Context, req DepositStatusRequest, pol apiclient.Policy) (CoinDeposit, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.str("currency", string(req.Currency))
 	p.intVal("coinDepositId", req.CoinDepositID)
@@ -152,7 +152,7 @@ type WithdrawableAddress struct {
 	SecondaryAddress string `json:"secondaryAddress,omitempty"`
 }
 
-func (c *Client) WithdrawAddresses(ctx context.Context, req WithdrawAddressesRequest, pol korbit.Policy) ([]WithdrawableAddress, json.RawMessage, korbit.Meta, error) {
+func (c *Client) WithdrawAddresses(ctx context.Context, req WithdrawAddressesRequest, pol apiclient.Policy) ([]WithdrawableAddress, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.intPtr("accountSeq", req.AccountSeq)
 	return call[[]WithdrawableAddress](c, ctx, "GET", "/v2/coin/withdrawableAddresses", true, p, pol)
@@ -174,7 +174,7 @@ type WithdrawableAmount struct {
 	WithdrawalInUseAmount string `json:"withdrawalInUseAmount"`
 }
 
-func (c *Client) WithdrawAmount(ctx context.Context, req WithdrawAmountRequest, pol korbit.Policy) ([]WithdrawableAmount, json.RawMessage, korbit.Meta, error) {
+func (c *Client) WithdrawAmount(ctx context.Context, req WithdrawAmountRequest, pol apiclient.Policy) ([]WithdrawableAmount, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.strPtr("currency", req.Currency)
 	p.intPtr("accountSeq", req.AccountSeq)
@@ -201,7 +201,7 @@ type WithdrawRequestResponse struct {
 	CoinWithdrawalID int64  `json:"coinWithdrawalId"`
 }
 
-func (c *Client) WithdrawRequest(ctx context.Context, req WithdrawRequestRequest, pol korbit.Policy) (WithdrawRequestResponse, json.RawMessage, korbit.Meta, error) {
+func (c *Client) WithdrawRequest(ctx context.Context, req WithdrawRequestRequest, pol apiclient.Policy) (WithdrawRequestResponse, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.str("currency", string(req.Currency))
 	p.str("amount", req.Amount)
@@ -225,7 +225,7 @@ type WithdrawCancelResponse struct {
 	Success bool `json:"success,omitempty"`
 }
 
-func (c *Client) WithdrawCancel(ctx context.Context, req WithdrawCancelRequest, pol korbit.Policy) (WithdrawCancelResponse, json.RawMessage, korbit.Meta, error) {
+func (c *Client) WithdrawCancel(ctx context.Context, req WithdrawCancelRequest, pol apiclient.Policy) (WithdrawCancelResponse, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.intVal("coinWithdrawalId", req.CoinWithdrawalID)
 	p.intPtr("accountSeq", req.AccountSeq)
@@ -241,7 +241,7 @@ type WithdrawHistoryRequest struct {
 	AccountSeq *int
 }
 
-func (c *Client) WithdrawHistory(ctx context.Context, req WithdrawHistoryRequest, pol korbit.Policy) ([]CoinWithdrawal, json.RawMessage, korbit.Meta, error) {
+func (c *Client) WithdrawHistory(ctx context.Context, req WithdrawHistoryRequest, pol apiclient.Policy) ([]CoinWithdrawal, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.str("currency", string(req.Currency))
 	p.intPtr("limit", req.Limit)
@@ -258,7 +258,7 @@ type WithdrawStatusRequest struct {
 	AccountSeq       *int
 }
 
-func (c *Client) WithdrawStatus(ctx context.Context, req WithdrawStatusRequest, pol korbit.Policy) (CoinWithdrawal, json.RawMessage, korbit.Meta, error) {
+func (c *Client) WithdrawStatus(ctx context.Context, req WithdrawStatusRequest, pol apiclient.Policy) (CoinWithdrawal, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.str("currency", string(req.Currency))
 	p.intVal("coinWithdrawalId", req.CoinWithdrawalID)
@@ -279,7 +279,7 @@ type KRWPushResponse struct {
 	Success bool `json:"success,omitempty"`
 }
 
-func (c *Client) KRWDeposit(ctx context.Context, req KRWDepositRequest, pol korbit.Policy) (KRWPushResponse, json.RawMessage, korbit.Meta, error) {
+func (c *Client) KRWDeposit(ctx context.Context, req KRWDepositRequest, pol apiclient.Policy) (KRWPushResponse, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.str("amount", req.Amount)
 	p.intPtr("accountSeq", req.AccountSeq)
@@ -294,7 +294,7 @@ type KRWWithdrawRequest struct {
 	AccountSeq *int
 }
 
-func (c *Client) KRWWithdraw(ctx context.Context, req KRWWithdrawRequest, pol korbit.Policy) (KRWPushResponse, json.RawMessage, korbit.Meta, error) {
+func (c *Client) KRWWithdraw(ctx context.Context, req KRWWithdrawRequest, pol apiclient.Policy) (KRWPushResponse, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.str("amount", req.Amount)
 	p.intPtr("accountSeq", req.AccountSeq)
@@ -317,7 +317,7 @@ type KRWDeposit struct {
 	CreatedAt int64  `json:"createdAt"`
 }
 
-func (c *Client) KRWDeposits(ctx context.Context, req KRWDepositsRequest, pol korbit.Policy) ([]KRWDeposit, json.RawMessage, korbit.Meta, error) {
+func (c *Client) KRWDeposits(ctx context.Context, req KRWDepositsRequest, pol apiclient.Policy) ([]KRWDeposit, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.intPtr("limit", req.Limit)
 	p.intPtr("accountSeq", req.AccountSeq)
@@ -341,7 +341,7 @@ type KRWWithdrawal struct {
 	CreatedAt int64  `json:"createdAt"`
 }
 
-func (c *Client) KRWWithdrawals(ctx context.Context, req KRWWithdrawalsRequest, pol korbit.Policy) ([]KRWWithdrawal, json.RawMessage, korbit.Meta, error) {
+func (c *Client) KRWWithdrawals(ctx context.Context, req KRWWithdrawalsRequest, pol apiclient.Policy) ([]KRWWithdrawal, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.intPtr("limit", req.Limit)
 	p.intPtr("accountSeq", req.AccountSeq)

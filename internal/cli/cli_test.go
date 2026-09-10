@@ -23,10 +23,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cli"
 	"github.com/korbit-official/korbit-cli/internal/journal"
 	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/version"
 )
 
@@ -89,7 +89,7 @@ func sharedTestHome() string {
 	return sharedTestHomeDir
 }
 
-func runCLI(args []string, env map[string]string, doer korbit.Doer) (string, string, int) {
+func runCLI(args []string, env map[string]string, doer apiclient.Doer) (string, string, int) {
 	// Always provide a temp KORBIT_CLI_HOME so journaling never touches the real
 	// user home; any explicit env entry from the caller still overrides it.
 	merged := map[string]string{"KORBIT_CLI_HOME": sharedTestHome()}
@@ -111,7 +111,7 @@ func runCLI(args []string, env map[string]string, doer korbit.Doer) (string, str
 // runCLIConfirm is runCLI with an injected `self uninstall` confirmer, so the
 // interactive uninstall flow is exercisable in-process (it forces the
 // interactive path on, bypassing the TTY gate, and never reads real stdin).
-func runCLIConfirm(args []string, env map[string]string, doer korbit.Doer, confirm func(string, bool) (bool, error)) (string, string, int) {
+func runCLIConfirm(args []string, env map[string]string, doer apiclient.Doer, confirm func(string, bool) (bool, error)) (string, string, int) {
 	merged := map[string]string{"KORBIT_CLI_HOME": sharedTestHome()}
 	for k, v := range env {
 		merged[k] = v
@@ -132,7 +132,7 @@ func runCLIConfirm(args []string, env map[string]string, doer korbit.Doer, confi
 // runCLIInstallConfirm is runCLI with an injected `self install` PATH-wiring
 // confirmer, so the install flow is exercisable in-process without reaching a
 // real /dev/tty (which, run interactively, would prompt the developer).
-func runCLIInstallConfirm(args []string, env map[string]string, doer korbit.Doer, confirm func(string, bool) (bool, error)) (string, string, int) {
+func runCLIInstallConfirm(args []string, env map[string]string, doer apiclient.Doer, confirm func(string, bool) (bool, error)) (string, string, int) {
 	merged := map[string]string{"KORBIT_CLI_HOME": sharedTestHome()}
 	for k, v := range env {
 		merged[k] = v

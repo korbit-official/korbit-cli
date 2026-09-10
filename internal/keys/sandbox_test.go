@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 )
 
 // genPEM returns a fresh ED25519 private PEM for import-path tests.
 func genPEM(t *testing.T) string {
 	t.Helper()
-	kp, err := korbit.GenerateKeypair()
+	kp, err := apiclient.GenerateKeypair()
 	if err != nil {
 		t.Fatal(err)
 	}

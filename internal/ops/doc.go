@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package ops is the L2 operations layer: the Korbit Open API v2 with THIS
-// CLI's guarantees layered on top of the L1 primitive client (internal/korbit).
+// CLI's guarantees layered on top of the L1 primitive client (internal/apiclient).
 //
 // # Where it sits
 //
@@ -11,9 +11,9 @@
 //	          │  resolve an Operation from the catalog (Find/Catalog) and call op.Run
 //	          ▼
 //	internal/ops  (THIS package)                     — owns ALL retry/idempotency POLICY
-//	          │  issues typed rawapi calls under a korbit.Policy it decides
+//	          │  issues typed rawapi calls under an apiclient.Policy it decides
 //	          ▼
-//	internal/rawapi + internal/korbit  (L1/L0)       — typed endpoints, contract-faithful executor
+//	internal/rawapi + internal/apiclient  (L1/L0)       — typed endpoints, contract-faithful executor
 //
 // The command surface is the catalog: each endpoint is one registered Operation
 // (Catalog/Find), carrying its presentation+validation metadata (OpMeta) and its
@@ -27,7 +27,7 @@
 //
 // # Dependency rule
 //
-// ops imports internal/rawapi + internal/korbit (the typed endpoints, the client
+// ops imports internal/rawapi + internal/apiclient (the typed endpoints, the client
 // + the exported retry taxonomy) and internal/cmdmeta (the shared metadata
 // vocabulary). It does NOT import internal/spec.
 // ops MUST NOT import internal/stream or internal/botapi: the allowed direction
@@ -50,7 +50,7 @@
 //     DUPLICATE instead of double-placing. This is the no-double-order guarantee.
 //   - HTTP 429 is pre-execution: the rate limiter rejects at the gate, before the
 //     order reaches matching. A budget-exhausted 429 is therefore a clean failure
-//     with no verification lookup (korbit.ClassRateLimited ∈ IsPreExecution).
+//     with no verification lookup (apiclient.ClassRateLimited ∈ IsPreExecution).
 //     EXCEED_TIME_WINDOW is pre-execution for the same reason (a clock-gate
 //     rejection).
 //   - The order read path is eventually consistent: a just-accepted order can be
@@ -75,7 +75,7 @@
 //     pre-send guarantee: a journal failure fails the placement with nothing on
 //     the wire).
 //   - The send is single-shot. ops then reconciles by the failure's class
-//     (internal/korbit's pre-execution vs ambiguous taxonomy):
+//     (internal/apiclient's pre-execution vs ambiguous taxonomy):
 //   - EXCEED_TIME_WINDOW — provably rejected at the server's clock gate
 //     BEFORE any side effect: resync the clock ONCE and resend the same id.
 //   - HTTP 429 — provably rate-limited before execution: honor Retry-After

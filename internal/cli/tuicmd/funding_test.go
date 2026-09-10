@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/ops"
 	"github.com/korbit-official/korbit-cli/internal/rawapi"
 	"github.com/korbit-official/korbit-cli/internal/tui"
@@ -21,17 +21,17 @@ import (
 // hit and with which wire parameters.
 type scriptedWire struct {
 	replies map[string]json.RawMessage
-	calls   []korbit.Call
+	calls   []apiclient.Call
 }
 
-func (s *scriptedWire) Do(_ context.Context, call korbit.Call, _ korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+func (s *scriptedWire) Do(_ context.Context, call apiclient.Call, _ apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 	s.calls = append(s.calls, call)
 	key := call.Method + " " + call.Path
 	data, ok := s.replies[key]
 	if !ok {
-		return nil, korbit.Meta{}, fmt.Errorf("unexpected call %s", key)
+		return nil, apiclient.Meta{}, fmt.Errorf("unexpected call %s", key)
 	}
-	return data, korbit.Meta{Attempts: 1}, nil
+	return data, apiclient.Meta{Attempts: 1}, nil
 }
 
 func (s *scriptedWire) param(i int, name string) string {

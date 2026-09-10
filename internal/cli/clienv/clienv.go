@@ -19,12 +19,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/callrec"
 	"github.com/korbit-official/korbit-cli/internal/clock"
 	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
 	"github.com/korbit-official/korbit-cli/internal/config"
 	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/logging"
 	"github.com/korbit-official/korbit-cli/internal/netbind"
 	"github.com/korbit-official/korbit-cli/internal/output"
@@ -39,7 +39,7 @@ type Env struct {
 	// Getenv reads the process environment (injectable so tests can stub it).
 	Getenv func(string) string
 	// Doer is the HTTP client public/signed calls run through.
-	Doer korbit.Doer
+	Doer apiclient.Doer
 	// Now is the local clock in unix-ms (injectable for tests).
 	Now func() int64
 	// Sleep delays for a duration (injectable for tests); the streaming commands
@@ -74,11 +74,11 @@ type Env struct {
 	// Key is the --key selection (empty = the default / env / inline rules).
 	Key string
 	// IPProbe fetches the public IP over a TCP family (doctor / setup).
-	IPProbe korbit.IPProber
+	IPProbe apiclient.IPProber
 	// FamilyDoer returns a Doer pinned to a TCP family ("tcp4"/"tcp6"); doctor
 	// uses it to replay a signed request per family to diagnose an IP-allowlist
 	// rejection.
-	FamilyDoer func(network string, timeoutMs int) korbit.Doer
+	FamilyDoer func(network string, timeoutMs int) apiclient.Doer
 	// Family is the effective outbound IP family (after any --bind narrowing). The
 	// ip/doctor probes cap to Family.Networks() so they never reach out a family
 	// --family excluded, and doctor warns when it is not dualstack (a single
@@ -183,20 +183,20 @@ func (e Env) NoticeLogger(level slog.Level) *slog.Logger {
 
 // ClientSpec is the per-surface input to Backend.BuildClient: the few things
 // that vary across the ways a command calls Korbit (endpoint, tui, monitor, mcp,
-// doctor, dry-run, stream). The Backend turns it into the one korbit.Client a
+// doctor, dry-run, stream). The Backend turns it into the one apiclient.Client a
 // surface uses, so "forgot the logger / recorder / Origin / User-Agent" is
 // structurally impossible — there is one construction site. When one signing
 // context mints several clients, write the shared fields once and derive each
 // with As, so only surface/detail/logger vary per client.
 type ClientSpec struct {
-	Surface, Detail string              // korbit.Origin + the useragent component/detail
-	BaseURL         string              //
-	Creds           *korbit.Credentials // nil = public-only
-	KeyName         string              // the named signing key (recorded into CallInfo; "" for public)
+	Surface, Detail string                 // apiclient.Origin + the useragent component/detail
+	BaseURL         string                 //
+	Creds           *apiclient.Credentials // nil = public-only
+	KeyName         string                 // the named signing key (recorded into CallInfo; "" for public)
 	// Clock is the shared server-clock estimate to sign against: a syncer's
 	// State for normal surfaces, a raw never-resynced clock for doctor (so skew
 	// surfaces), or nil for a pure-public read.
-	Clock korbit.Clock
+	Clock apiclient.Clock
 	// Resync is the ONE clock-resync primitive (a syncer's Sync) for
 	// auto-correcting EXCEED_TIME_WINDOW; nil = no auto-correct.
 	Resync    func() error
@@ -208,7 +208,7 @@ type ClientSpec struct {
 }
 
 // As returns a copy of the spec carrying a different call identity — the surface
-// and detail (which flow into korbit.Origin and the User-Agent) and the logger.
+// and detail (which flow into apiclient.Origin and the User-Agent) and the logger.
 // It is the per-client variation when one signing context mints several clients,
 // so the shared signing fields are written once in a base spec and each client
 // is base.As(surface, detail, log). The value receiver makes each call a fresh
@@ -232,15 +232,15 @@ type Backend interface {
 	// one step (the WS precedence guards against pairing a stale stored WS host
 	// with a higher REST override).
 	ResolveURLs(cmd *cobra.Command, cfg config.Config, keyBaseURL, keyWSBaseURL string) (rest, ws string, err error)
-	// BuildClient is the one korbit.Client construction site (logger, retry
+	// BuildClient is the one apiclient.Client construction site (logger, retry
 	// trace, journaling closure, Origin, User-Agent, shared clock, resync hook).
-	BuildClient(ClientSpec) *korbit.Client
+	BuildClient(ClientSpec) *apiclient.Client
 	// NewClockSyncer builds the process-wide clock Syncer for a surface over a
 	// shared State.
 	NewClockSyncer(state *clock.State, baseURL string, timeoutMs int, surface, detail string) *clock.Syncer
 	// MeasureOffset probes /v2/time and returns the measured server-clock offset
 	// (doctor's skew check signs against a raw clock, so it measures directly).
-	MeasureOffset(baseURL string, timeoutMs int) (korbit.ClockOffset, error)
+	MeasureOffset(baseURL string, timeoutMs int) (apiclient.ClockOffset, error)
 	// NewRecorder builds the journal-backed recorder with a caller-chosen
 	// post-write-failure sink.
 	NewRecorder(home string, log *slog.Logger, onFail func(callrec.FailMode, error)) *callrec.Recorder

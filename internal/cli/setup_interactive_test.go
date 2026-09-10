@@ -12,10 +12,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cli"
 	"github.com/korbit-official/korbit-cli/internal/cli/setupui"
 	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 )
 
 // skewThenOKDoer returns EXCEED_TIME_WINDOW on the first whoami and 200 after,
@@ -37,7 +37,7 @@ func (d skewThenOKDoer) Do(r *http.Request) (*http.Response, error) {
 // runWithSetupUI is runWithDeps plus a stubbed interactive setup runner.
 // Injecting a SetupUIRun forces the interactive path on (bypassing the TTY gate),
 // so the wiring runs in-process against buffers.
-func runWithSetupUI(args []string, env map[string]string, doer korbit.Doer,
+func runWithSetupUI(args []string, env map[string]string, doer apiclient.Doer,
 	probe func(context.Context, string, string, string, int) (string, error),
 	setupUI func(setupui.Config) error) (string, string, int) {
 	var out, errb bytes.Buffer
@@ -47,7 +47,7 @@ func runWithSetupUI(args []string, env map[string]string, doer korbit.Doer,
 		Stderr:     &errb,
 		Doer:       doer,
 		Now:        func() int64 { return 1700000000000 },
-		FamilyDoer: func(string, int) korbit.Doer { return doer },
+		FamilyDoer: func(string, int) apiclient.Doer { return doer },
 		IPProbe:    probe,
 		WSDial:     dialFrames(),
 		SetupUIRun: setupUI,

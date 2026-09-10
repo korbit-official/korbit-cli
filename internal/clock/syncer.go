@@ -24,7 +24,7 @@ const DefaultCoolDownMs = 2000
 // RTTmin/2) to install. It performs network I/O and is called by Sync WITHOUT
 // any Syncer lock held. Returning an error leaves the previous estimate
 // untouched. It is the seam that keeps this package free of any korbit import:
-// the caller wraps korbit.MeasureClockOffset and converts the result to plain
+// the caller wraps apiclient.MeasureClockOffset and converts the result to plain
 // int64s (offsetMs = off.OffsetMs, leanMs = off.UncertaintyMs()).
 type MeasureFunc func() (offsetMs, leanMs int64, err error)
 
@@ -66,7 +66,7 @@ type Syncer struct {
 	// share and cooldown reuse at Debug, a new estimate installed at Info, a
 	// measurement failure at Warn. nil = silent. The probe-level RTT/offset
 	// telemetry lives in the MeasureFunc (the caller threads a logger into
-	// korbit.MeasureClockOffset). It carries no secret.
+	// apiclient.MeasureClockOffset). It carries no secret.
 	Log *slog.Logger
 }
 

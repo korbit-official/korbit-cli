@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package korbit
+package apiclient
 
 import (
 	"bytes"
@@ -199,7 +199,7 @@ func NewHMACSHA256Signer(secret []byte) Signer { return hmacSHA256Signer{secret}
 
 // signerRedacted is what a Signer renders as under any fmt verb, so a stray
 // %v/%+v/%#v of a Credentials can never dump key material.
-const signerRedacted = "korbit.Signer(REDACTED)"
+const signerRedacted = "apiclient.Signer(REDACTED)"
 
 // SchemeOf reports the signing scheme of a Signer ("ed25519", "hmac-sha256", or
 // "unknown") for diagnostics. It reveals only the algorithm name, never any key

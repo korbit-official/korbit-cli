@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 )
 
 // ---- balance: GET /v2/balance (signed) ----
@@ -30,7 +30,7 @@ type Balance struct {
 	AvgPrice        string `json:"avgPrice"`
 }
 
-func (c *Client) Balance(ctx context.Context, req BalanceRequest, pol korbit.Policy) ([]Balance, json.RawMessage, korbit.Meta, error) {
+func (c *Client) Balance(ctx context.Context, req BalanceRequest, pol apiclient.Policy) ([]Balance, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.strPtr("currencies", req.Currencies)
 	p.intPtr("accountSeq", req.AccountSeq)
@@ -56,7 +56,7 @@ type Fee struct {
 	MakerFeeRate    string `json:"makerFeeRate"`
 }
 
-func (c *Client) Fees(ctx context.Context, req FeesRequest, pol korbit.Policy) ([]Fee, json.RawMessage, korbit.Meta, error) {
+func (c *Client) Fees(ctx context.Context, req FeesRequest, pol apiclient.Policy) ([]Fee, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.strPtr("symbol", req.Symbol)
 	p.intPtr("accountSeq", req.AccountSeq)
@@ -83,7 +83,7 @@ type KeyInfo struct {
 	CreatedAt          int64    `json:"createdAt"`
 }
 
-func (c *Client) Whoami(ctx context.Context, _ WhoamiRequest, pol korbit.Policy) (KeyInfo, json.RawMessage, korbit.Meta, error) {
+func (c *Client) Whoami(ctx context.Context, _ WhoamiRequest, pol apiclient.Policy) (KeyInfo, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	return call[KeyInfo](c, ctx, "GET", "/v2/currentKeyInfo", true, p, pol)
 }

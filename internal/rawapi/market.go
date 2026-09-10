@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 )
 
 // ---- ticker: GET /v2/tickers (public) ----
@@ -36,7 +36,7 @@ type Ticker struct {
 	LastTradedAt       int64  `json:"lastTradedAt"`
 }
 
-func (c *Client) Ticker(ctx context.Context, req TickerRequest, pol korbit.Policy) ([]Ticker, json.RawMessage, korbit.Meta, error) {
+func (c *Client) Ticker(ctx context.Context, req TickerRequest, pol apiclient.Policy) ([]Ticker, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.strPtr("symbol", req.Symbol)
 	return call[[]Ticker](c, ctx, "GET", "/v2/tickers", false, p, pol)
@@ -66,7 +66,7 @@ type Orderbook struct {
 	Asks      []OrderbookLevel `json:"asks"`
 }
 
-func (c *Client) Orderbook(ctx context.Context, req OrderbookRequest, pol korbit.Policy) (Orderbook, json.RawMessage, korbit.Meta, error) {
+func (c *Client) Orderbook(ctx context.Context, req OrderbookRequest, pol apiclient.Policy) (Orderbook, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.str("symbol", string(req.Symbol))
 	p.strPtr("level", req.Level)
@@ -90,7 +90,7 @@ type Trade struct {
 	TradeID      int64  `json:"tradeId"`
 }
 
-func (c *Client) Trades(ctx context.Context, req TradesRequest, pol korbit.Policy) ([]Trade, json.RawMessage, korbit.Meta, error) {
+func (c *Client) Trades(ctx context.Context, req TradesRequest, pol apiclient.Policy) ([]Trade, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.str("symbol", string(req.Symbol))
 	p.intPtr("limit", req.Limit)
@@ -122,7 +122,7 @@ type Candle struct {
 	Volume    string `json:"volume"`
 }
 
-func (c *Client) Candles(ctx context.Context, req CandlesRequest, pol korbit.Policy) ([]Candle, json.RawMessage, korbit.Meta, error) {
+func (c *Client) Candles(ctx context.Context, req CandlesRequest, pol apiclient.Policy) ([]Candle, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.str("symbol", string(req.Symbol))
 	p.str("interval", req.Interval)
@@ -156,7 +156,7 @@ type Pair struct {
 	MaxOrderValue string `json:"maxOrderValue,omitempty"`
 }
 
-func (c *Client) Pairs(ctx context.Context, _ PairsRequest, pol korbit.Policy) ([]Pair, json.RawMessage, korbit.Meta, error) {
+func (c *Client) Pairs(ctx context.Context, _ PairsRequest, pol apiclient.Policy) ([]Pair, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	return call[[]Pair](c, ctx, "GET", "/v2/currencyPairs", false, p, pol)
 }
@@ -184,7 +184,7 @@ type TickSizePolicy struct {
 // TickSize returns the queried symbol's tick-size policy. The endpoint's data
 // payload is an array (one element per symbol), so the typed value is a slice;
 // a single-symbol query yields a one-element slice.
-func (c *Client) TickSize(ctx context.Context, req TickSizeRequest, pol korbit.Policy) ([]TickSizePolicy, json.RawMessage, korbit.Meta, error) {
+func (c *Client) TickSize(ctx context.Context, req TickSizeRequest, pol apiclient.Policy) ([]TickSizePolicy, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.str("symbol", string(req.Symbol))
 	return call[[]TickSizePolicy](c, ctx, "GET", "/v2/tickSizePolicy", false, p, pol)
@@ -228,7 +228,7 @@ type CurrencyInfo struct {
 	NetworkList                   []CurrencyNetwork `json:"networkList"`
 }
 
-func (c *Client) Currencies(ctx context.Context, _ CurrenciesRequest, pol korbit.Policy) ([]CurrencyInfo, json.RawMessage, korbit.Meta, error) {
+func (c *Client) Currencies(ctx context.Context, _ CurrenciesRequest, pol apiclient.Policy) ([]CurrencyInfo, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	return call[[]CurrencyInfo](c, ctx, "GET", "/v2/currencies", false, p, pol)
 }
@@ -243,7 +243,7 @@ type ServerTime struct {
 	Time int64 `json:"time"`
 }
 
-func (c *Client) Time(ctx context.Context, _ TimeRequest, pol korbit.Policy) (ServerTime, json.RawMessage, korbit.Meta, error) {
+func (c *Client) Time(ctx context.Context, _ TimeRequest, pol apiclient.Policy) (ServerTime, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	return call[ServerTime](c, ctx, "GET", "/v2/time", false, p, pol)
 }

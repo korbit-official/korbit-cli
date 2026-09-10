@@ -7,8 +7,8 @@ package ops
 import (
 	"context"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 )
 
 // This file defines the journal seam ops sees: a set of interfaces a frontend
@@ -62,7 +62,7 @@ type OpHandle interface {
 	// params_json with the spec/insertion order ("" keeps the wire client's). It
 	// returns nil when the operation is not recorded; the wire client treats a nil
 	// Recorder as "do not record", so the send still proceeds.
-	ForCall(orderedParams string) korbit.Recorder
+	ForCall(orderedParams string) apiclient.Recorder
 	// StartOrder records the order's mint-time intent BEFORE the placement send
 	// (the hard pre-send guarantee) and returns the finish hook. An error aborts
 	// the placement with nothing on the wire.
@@ -104,8 +104,8 @@ func HandleFromContext(ctx context.Context) OpHandle {
 // proceed un-journaled.
 type noopHandle struct{}
 
-func (noopHandle) OperationID() int64             { return 0 }
-func (noopHandle) ForCall(string) korbit.Recorder { return nil }
+func (noopHandle) OperationID() int64                { return 0 }
+func (noopHandle) ForCall(string) apiclient.Recorder { return nil }
 func (noopHandle) StartOrder(OrderIntent) (OrderFinishFunc, error) {
 	return func(string, string, string, int) {}, nil
 }

@@ -267,9 +267,9 @@ type connManager struct {
 // accepted and then instantly dropped — can spin this loop without pausing
 // (that last case otherwise re-dials with no delay). The backoff ladder is the
 // rate bound that keeps an intentionally-unbounded reconnect loop safe; see the
-// "Loop-safety invariants" section of internal/korbit/doc.go.
+// "Loop-safety invariants" section of internal/apiclient/doc.go.
 //
-// This loop deliberately does NOT use korbit.RetryGovernor (which the budgeted
+// This loop deliberately does NOT use apiclient.RetryGovernor (which the budgeted
 // request-retry loops share): it is unbounded by design, has no sleep budget,
 // and classifies handshake rejections rather than Classify errors — a different
 // shape, where the right safety property is a rate bound, not a count.

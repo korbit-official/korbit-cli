@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package korbit
+package apiclient
 
 import "github.com/korbit-official/korbit-cli/internal/cmdmeta"
 
@@ -80,7 +80,7 @@ type Outcome struct {
 }
 
 // Recorder is the journal seam for the L1 client. It is an interface here on
-// purpose: package korbit must NOT import internal/journal (that would invert
+// purpose: package apiclient must NOT import internal/journal (that would invert
 // the layering and pull SQLite into the wire layer). A frontend supplies the
 // concrete Recorder.
 //

@@ -111,7 +111,7 @@ func TestTUISubscriptionsShape(t *testing.T) {
 
 // preflightVerdict is the start/don't-start gate the TUI runs against
 // /v2/currentKeyInfo before opening the alt-screen. A usable key/account returns
-// nil (start); a DEFINITIVE key/config problem (korbit.ClassFatal, or an unusable
+// nil (start); a DEFINITIVE key/config problem (apiclient.ClassFatal, or an unusable
 // payload) is a ConfigError (exit 4) so the diagnostic lands on the terminal; a
 // transient failure (network, 5xx, 429) and an unconverged clock resync
 // (EXCEED_TIME_WINDOW) are non-fatal — the session starts and the stream layer

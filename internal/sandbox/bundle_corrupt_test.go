@@ -17,8 +17,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 )
 
 func TestBundleCorruptFrom(t *testing.T) {
@@ -122,7 +122,7 @@ func corruptBundleManager(t *testing.T, logs *[]string, banner io.Writer) (*Mana
 	t.Helper()
 	home := t.TempDir()
 	cacheDir := t.TempDir()
-	kp, err := korbit.GenerateKeypair()
+	kp, err := apiclient.GenerateKeypair()
 	if err != nil {
 		t.Fatal(err)
 	}

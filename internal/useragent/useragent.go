@@ -20,7 +20,7 @@
 //	korbit-cli/1.2.3 (windows/10.0.22631; amd64) ctx:doctor
 //
 // It is applied ONLY to Korbit requests. This package deliberately lives ABOVE
-// the wire layer (internal/korbit): that package gathers no OS info and only
+// the wire layer (internal/apiclient): that package gathers no OS info and only
 // carries the UserAgent seam, so callers compose the rich value here and inject
 // it down. Nothing else (any future non-Korbit HTTP) should use this.
 package useragent
@@ -65,7 +65,7 @@ func current() env {
 // For returns the full User-Agent for a Korbit call attributed to the given
 // surface (the frontend identity, e.g. "cli", "monitor", "doctor") and optional
 // finer detail (e.g. the command key, or "botapi"). Both map straight onto the
-// korbit.Origin{Surface,Detail} the caller already sets on the request.
+// apiclient.Origin{Surface,Detail} the caller already sets on the request.
 func For(surface, detail string) string { return compose(current(), surface, detail) }
 
 // compose is the pure formatter: it never reads the environment, so it is fully

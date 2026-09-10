@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/output"
 	"github.com/korbit-official/korbit-cli/internal/stream"
 	"github.com/korbit-official/korbit-cli/internal/useragent"
@@ -206,8 +206,8 @@ func (r Report) EntryFor(label string) string {
 // probe to what --family permits — a family not listed is never contacted, so an
 // --family ipv6 run makes no IPv4 request and suggests no IPv4 allowlist entry. A
 // listed family that fails to connect is simply absent from the report.
-func IPs(prober korbit.IPProber, baseURL string, timeoutMs int, networks []string) Report {
-	ua := useragent.For(korbit.SurfaceCLI, "ip-probe")
+func IPs(prober apiclient.IPProber, baseURL string, timeoutMs int, networks []string) Report {
+	ua := useragent.For(apiclient.SurfaceCLI, "ip-probe")
 	addrs := make([]string, len(networks))
 	oks := make([]bool, len(networks))
 	var wg sync.WaitGroup
@@ -266,7 +266,7 @@ func FamiliesLabel(networks []string) string {
 // (rather than an error) when the family is unavailable or the response isn't a
 // well-formed address of the expected family — the caller reports only what it
 // could confirm.
-func probeFamily(prober korbit.IPProber, network, baseURL, userAgent string, timeoutMs int) (string, bool) {
+func probeFamily(prober apiclient.IPProber, network, baseURL, userAgent string, timeoutMs int) (string, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
 	defer cancel()
 	raw, err := prober(ctx, network, baseURL, userAgent, timeoutMs)
@@ -327,7 +327,7 @@ type EndpointVerification struct {
 // outcome is reported in the result, never returned as an error, and a nil doer
 // or dialer marks that half "not checked". Each probe gets its OWN timeout
 // budget so a slow REST host can't starve the WS probe into a false failure.
-func Endpoints(doer korbit.Doer, dial stream.Dialer, baseURL, wsBaseURL string, timeoutMs int) EndpointVerification {
+func Endpoints(doer apiclient.Doer, dial stream.Dialer, baseURL, wsBaseURL string, timeoutMs int) EndpointVerification {
 	d := time.Duration(timeoutMs) * time.Millisecond
 	restCtx, cancelREST := context.WithTimeout(context.Background(), d)
 	defer cancelREST()
@@ -340,7 +340,7 @@ func Endpoints(doer korbit.Doer, dial stream.Dialer, baseURL, wsBaseURL string, 
 }
 
 // REST probes one REST base URL with an unauthenticated GET /v2/time.
-func REST(ctx context.Context, doer korbit.Doer, baseURL string) EndpointCheck {
+func REST(ctx context.Context, doer apiclient.Doer, baseURL string) EndpointCheck {
 	c := EndpointCheck{URL: baseURL}
 	if doer == nil {
 		c.Reachable, c.Detail = true, "not checked"
@@ -352,7 +352,7 @@ func REST(ctx context.Context, doer korbit.Doer, baseURL string) EndpointCheck {
 		return c
 	}
 	req.Header.Set("accept", "application/json")
-	req.Header.Set("user-agent", useragent.For(korbit.SurfaceCLI, "probe"))
+	req.Header.Set("user-agent", useragent.For(apiclient.SurfaceCLI, "probe"))
 	resp, err := doer.Do(req)
 	if err != nil {
 		c.Detail, c.Err = "unreachable: "+err.Error(), err
@@ -379,7 +379,7 @@ func WS(ctx context.Context, dial stream.Dialer, wsBaseURL string) EndpointCheck
 	}
 	pub, _ := WSURLsFor(wsBaseURL)
 	hdr := http.Header{}
-	hdr.Set("User-Agent", useragent.For(korbit.SurfaceStreamWS, "probe"))
+	hdr.Set("User-Agent", useragent.For(apiclient.SurfaceStreamWS, "probe"))
 	conn, err := dial(ctx, pub, hdr)
 	if err != nil {
 		// A refused upgrade still means the host answered: the URL is reachable,

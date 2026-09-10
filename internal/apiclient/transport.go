@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package korbit
+package apiclient
 
 import (
 	"context"
@@ -16,11 +16,11 @@ import (
 )
 
 // errNoCreds is returned by Do for a signed call on a public-only client.
-var errNoCreds = errors.New("korbit: a signed call requires credentials, but this client is public-only")
+var errNoCreds = errors.New("apiclient: a signed call requires credentials, but this client is public-only")
 
 // Clock is the read view of the shared server-clock estimate a Client signs
 // against (and that the stream reads for delivery-delay detection). It is an
-// interface so package korbit does not import internal/clock — clock.State
+// interface so package apiclient does not import internal/clock — clock.State
 // satisfies it structurally, preserving the no-import-cycle invariant in both
 // packages' doc.go. Resync (the measurement that updates the estimate) is NOT on
 // this read-only view; it is Client.Resync, so a client can sign against a clock
@@ -392,7 +392,7 @@ func (c *Client) callInfo(call Call) CallInfo {
 	return info
 }
 
-// options assembles the per-call korbit.Options for the transport.
+// options assembles the per-call apiclient.Options for the transport.
 func (c *Client) options(call Call) Options {
 	opts := Options{
 		BaseURL:    c.BaseURL,

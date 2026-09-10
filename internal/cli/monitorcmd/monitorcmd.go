@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/korbit-official/korbit-cli/internal/accountseq"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/botapi"
 	"github.com/korbit-official/korbit-cli/internal/candles"
 	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
@@ -31,7 +32,6 @@ import (
 	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
 	"github.com/korbit-official/korbit-cli/internal/jqfilter"
 	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/logging"
 	"github.com/korbit-official/korbit-cli/internal/ops"
 	"github.com/korbit-official/korbit-cli/internal/output"
@@ -318,7 +318,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 	// channels a resolution failure is fatal (as always); for a public-only
 	// subscription it degrades — the monitor runs and authenticated korbit.*
 	// methods throw the resolution error.
-	var streamCreds *korbit.Credentials
+	var streamCreds *apiclient.Credentials
 	var keyName, apiKeyID, credsErr string
 	if private || jsActive {
 		resolved, kerr := km.ResolveSelection(sel, cx.Getenv)
@@ -335,7 +335,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 				}
 				credsErr = perr.Error()
 			} else {
-				streamCreds = &korbit.Credentials{APIKeyID: resolved.APIKeyID, Signer: signer}
+				streamCreds = &apiclient.Credentials{APIKeyID: resolved.APIKeyID, Signer: signer}
 				keyName, apiKeyID = resolved.Name, resolved.APIKeyID
 				// Always-shown safety disclosure (which key/account the bot signs
 				// with), not a level-gated log and not part of the stdout stream.
@@ -368,7 +368,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 	// (built below); the monitor's own JS-call client shares the same *clock.State.
 	localNow := cx.Now
 	clk := clock.New(localNow)
-	syncer := cx.NewClockSyncer(clk, baseURL, timeoutMs, korbit.SurfaceMonitor, "clock")
+	syncer := cx.NewClockSyncer(clk, baseURL, timeoutMs, apiclient.SurfaceMonitor, "clock")
 
 	mlog := cx.Log
 	// One journal-backed recorder (internal/callrec) for the whole monitor, built
@@ -409,7 +409,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 		TimeoutMs: timeoutMs,
 		Rec:       rec,
 	}
-	streamClient := cx.BuildClient(base.As(korbit.SurfaceStreamBackfill, "", streamLog))
+	streamClient := cx.BuildClient(base.As(apiclient.SurfaceStreamBackfill, "", streamLog))
 
 	// The candle synthesizer (--candles) derives the candle channel from the
 	// trade stream, seeded from REST via the candles operation (which auto-pages
@@ -418,7 +418,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 	// consulted by the journaling policy but never journaled.
 	var synth *candles.Synth
 	if cp.active() {
-		seedClient := cx.BuildClient(base.As(korbit.SurfaceStreamBackfill, "candles", streamLog))
+		seedClient := cx.BuildClient(base.As(apiclient.SurfaceStreamBackfill, "candles", streamLog))
 		api := ops.NewAPI(seedClient)
 		api.RetryBudgetMs = retryBudgetMs
 		api.Journal = rec
@@ -435,7 +435,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 			}
 			res, ferr := candlesOp.Run(fctx, api, ops.RunInput{
 				Values:   values,
-				Controls: ops.Controls{Surface: korbit.SurfaceStreamBackfill},
+				Controls: ops.Controls{Surface: apiclient.SurfaceStreamBackfill},
 			})
 			if ferr != nil {
 				return nil, ferr
@@ -464,7 +464,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 		DisableBackfill:   noBackfill,
 		NoReconnect:       noReconnect,
 		Dial:              cx.WSDial,
-		UserAgent:         useragent.For(korbit.SurfaceStreamWS, ""),
+		UserAgent:         useragent.For(apiclient.SurfaceStreamWS, ""),
 		Now:               cx.Now,
 		Sleep:             cx.Sleep,
 	})
@@ -483,7 +483,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 		// timeout as the WS/backfill side, signing through the SHARED clock so
 		// one resync fixes every surface. Creds are attached only when a key
 		// resolved (else authenticated methods degrade via CredsErr in botapi).
-		jsClient := cx.BuildClient(base.As(korbit.SurfaceMonitor, "botapi", mlog))
+		jsClient := cx.BuildClient(base.As(apiclient.SurfaceMonitor, "botapi", mlog))
 		api := ops.NewAPI(jsClient)
 		api.RetryBudgetMs = retryBudgetMs
 		api.Stderr = cx.IO.Err
@@ -493,7 +493,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 			On:             onSrc,
 			Init:           initSrc,
 			API:            api,
-			Surface:        korbit.SurfaceMonitor,
+			Surface:        apiclient.SurfaceMonitor,
 			KeyName:        keyName,
 			APIKeyID:       apiKeyID,
 			KeyManager:     km,

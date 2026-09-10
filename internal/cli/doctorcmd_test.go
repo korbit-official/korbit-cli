@@ -13,16 +13,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cli"
 	"github.com/korbit-official/korbit-cli/internal/keys"
 	"github.com/korbit-official/korbit-cli/internal/keystore"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/stream"
 )
 
 // runWithDeps runs the CLI with both a stub Doer and a stub IP prober — doctor
 // needs both (live whoami/time over the Doer, allowlist over the prober).
-func runWithDeps(args []string, env map[string]string, doer korbit.Doer,
+func runWithDeps(args []string, env map[string]string, doer apiclient.Doer,
 	probe func(context.Context, string, string, string, int) (string, error)) (string, string, int) {
 	var out, errb bytes.Buffer
 	code := cli.Execute(args, cli.Deps{
@@ -33,7 +33,7 @@ func runWithDeps(args []string, env map[string]string, doer korbit.Doer,
 		Now:    func() int64 { return 1700000000000 },
 		// The allowlist diagnosis replays the whoami over each family; reuse the
 		// injected doer so tests stay off the real network (same outcome per call).
-		FamilyDoer: func(string, int) korbit.Doer { return doer },
+		FamilyDoer: func(string, int) apiclient.Doer { return doer },
 		IPProbe:    probe,
 		// Doctor's WebSocket reachability check dials this; a stub keeps the suite
 		// hermetic (an unset WSDial would default to the real network dialer).
@@ -44,7 +44,7 @@ func runWithDeps(args []string, env map[string]string, doer korbit.Doer,
 
 // runWithClock is runWithDeps with an injectable clock, for tests that need
 // Now() to advance between calls (e.g. the clock-skew midpoint).
-func runWithClock(args []string, env map[string]string, doer korbit.Doer,
+func runWithClock(args []string, env map[string]string, doer apiclient.Doer,
 	probe func(context.Context, string, string, string, int) (string, error), now func() int64) (string, string, int) {
 	var out, errb bytes.Buffer
 	code := cli.Execute(args, cli.Deps{
@@ -53,7 +53,7 @@ func runWithClock(args []string, env map[string]string, doer korbit.Doer,
 		Stderr:     &errb,
 		Doer:       doer,
 		Now:        now,
-		FamilyDoer: func(string, int) korbit.Doer { return doer },
+		FamilyDoer: func(string, int) apiclient.Doer { return doer },
 		IPProbe:    probe,
 		WSDial:     dialFrames(), // hermetic WS dial for doctor's reachability check
 	})
@@ -106,8 +106,8 @@ func (d *capturingDoer) Do(r *http.Request) (*http.Response, error) {
 // diagnosis (in addition to the default-connection doer used for the first
 // whoami and /v2/time). family maps "tcp4"/"tcp6" to the Doer that family's
 // replay should see.
-func runWithFamilyDeps(args []string, env map[string]string, doer korbit.Doer,
-	family map[string]korbit.Doer, probe func(context.Context, string, string, string, int) (string, error)) (string, string, int) {
+func runWithFamilyDeps(args []string, env map[string]string, doer apiclient.Doer,
+	family map[string]apiclient.Doer, probe func(context.Context, string, string, string, int) (string, error)) (string, string, int) {
 	var out, errb bytes.Buffer
 	code := cli.Execute(args, cli.Deps{
 		Getenv:     func(k string) string { return env[k] },
@@ -115,7 +115,7 @@ func runWithFamilyDeps(args []string, env map[string]string, doer korbit.Doer,
 		Stderr:     &errb,
 		Doer:       doer,
 		Now:        func() int64 { return 1700000000000 },
-		FamilyDoer: func(network string, _ int) korbit.Doer { return family[network] },
+		FamilyDoer: func(network string, _ int) apiclient.Doer { return family[network] },
 		IPProbe:    probe,
 	})
 	return out.String(), errb.String(), code
@@ -256,7 +256,7 @@ func TestDoctorIPAllowlistOneFamilyAccepted(t *testing.T) {
 	}
 	out, _, code := runWithFamilyDeps([]string{"doctor", "--compact"},
 		map[string]string{"KORBIT_CLI_HOME": home}, defaultDoer,
-		map[string]korbit.Doer{"tcp4": v4OK, "tcp6": ipErr},
+		map[string]apiclient.Doer{"tcp4": v4OK, "tcp6": ipErr},
 		fakeProbe("203.0.113.7", "2001:db8::1"))
 	if code != 4 {
 		t.Fatalf("exit = %d, want 4 — %s", code, out)
@@ -293,7 +293,7 @@ func TestDoctorHonorsAndReportsFamily(t *testing.T) {
 	}
 	out, _, code := runWithFamilyDeps([]string{"doctor", "--family", "ipv6", "--compact"},
 		map[string]string{"KORBIT_CLI_HOME": home}, ok,
-		map[string]korbit.Doer{"tcp4": ok, "tcp6": ok}, probe)
+		map[string]apiclient.Doer{"tcp4": ok, "tcp6": ok}, probe)
 	if code != 0 {
 		t.Fatalf("exit=%d: %s", code, out)
 	}
@@ -324,7 +324,7 @@ func TestDoctorIPAllowlistNeitherFamilyAccepted(t *testing.T) {
 	defaultDoer.timeBody = okTime
 	out, _, code := runWithFamilyDeps([]string{"doctor", "--compact"},
 		map[string]string{"KORBIT_CLI_HOME": home}, defaultDoer,
-		map[string]korbit.Doer{"tcp4": ipErr, "tcp6": ipErr},
+		map[string]apiclient.Doer{"tcp4": ipErr, "tcp6": ipErr},
 		fakeProbe("203.0.113.7", "2001:db8::1"))
 	if code != 4 {
 		t.Fatalf("exit = %d, want 4 — %s", code, out)
@@ -355,7 +355,7 @@ func TestDoctorIPAllowlistBothFamiliesAccepted(t *testing.T) {
 	}
 	out, _, code := runWithFamilyDeps([]string{"doctor", "--compact"},
 		map[string]string{"KORBIT_CLI_HOME": home}, defaultDoer,
-		map[string]korbit.Doer{"tcp4": ok, "tcp6": ok},
+		map[string]apiclient.Doer{"tcp4": ok, "tcp6": ok},
 		fakeProbe("203.0.113.7", "2001:db8::1"))
 	if code != 4 {
 		t.Fatalf("exit = %d, want 4 — %s", code, out)
@@ -379,7 +379,7 @@ func TestDoctorIPAllowlistFamilyReplayNetworkError(t *testing.T) {
 	dead := routeDoer{whoamiErr: errors.New("dial tcp: no route to host")}
 	out, _, code := runWithFamilyDeps([]string{"doctor", "--compact"},
 		map[string]string{"KORBIT_CLI_HOME": home}, defaultDoer,
-		map[string]korbit.Doer{"tcp4": dead, "tcp6": dead},
+		map[string]apiclient.Doer{"tcp4": dead, "tcp6": dead},
 		fakeProbe("203.0.113.7", "2001:db8::1"))
 	if code != 4 {
 		t.Fatalf("exit = %d, want 4 — %s", code, out)
@@ -859,7 +859,7 @@ var healthyWhoami = routeDoer{
 }
 
 // runDoctorWS is a doctor run with a WebSocket dialer wired (runWithDeps omits it).
-func runDoctorWS(args []string, env map[string]string, doer korbit.Doer,
+func runDoctorWS(args []string, env map[string]string, doer apiclient.Doer,
 	probe func(context.Context, string, string, string, int) (string, error), dial stream.Dialer) (string, string, int) {
 	var out, errb bytes.Buffer
 	code := cli.Execute(args, cli.Deps{
@@ -868,7 +868,7 @@ func runDoctorWS(args []string, env map[string]string, doer korbit.Doer,
 		Stderr:     &errb,
 		Doer:       doer,
 		Now:        func() int64 { return 1700000000000 },
-		FamilyDoer: func(string, int) korbit.Doer { return doer },
+		FamilyDoer: func(string, int) apiclient.Doer { return doer },
 		IPProbe:    probe,
 		WSDial:     dial,
 	})

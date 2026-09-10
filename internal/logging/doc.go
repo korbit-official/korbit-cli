@@ -87,6 +87,6 @@
 // decisions the wire layer can't see (the place reconcile trail, paging
 // summaries) and leaves a single-call passthrough to the wire layer's own log.
 // Three seams stand outside this convention: the wire retry-decision seam
-// (korbit.Client.Observe func(string)), the callrec journal-write warn callback,
+// (apiclient.Client.Observe func(string)), the callrec journal-write warn callback,
 // and ops.API.Stderr (program output, not a log).
 package logging

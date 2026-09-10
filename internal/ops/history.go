@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 )
 
 // HistoryWindowMs is the documented /v2/allOrders + /v2/myTrades retention
@@ -53,15 +53,15 @@ const HistoryMaxRows = historyPageLimit * maxHistoryPages
 // document (a JSON array). endMs, when > 0, bounds the window's upper edge
 // (endTime exclusive); 0 means "now". This is the engine the stream layer's
 // reconnect backfill and the bot API's order.history/fills bindings both run.
-func WalkHistory(get func(params []korbit.KV) (json.RawMessage, error), base []korbit.KV, startMs, endMs int64, tsField string, emitPage func(rows []json.RawMessage)) (complete bool, err error) {
+func WalkHistory(get func(params []apiclient.KV) (json.RawMessage, error), base []apiclient.KV, startMs, endMs int64, tsField string, emitPage func(rows []json.RawMessage)) (complete bool, err error) {
 	curStart, curEnd := startMs, endMs
 	for page := 0; page < maxHistoryPages; page++ {
-		params := append(append([]korbit.KV{}, base...),
-			korbit.KV{Key: "limit", Value: fmt.Sprintf("%d", historyPageLimit)},
-			korbit.KV{Key: "startTime", Value: fmt.Sprintf("%d", curStart)},
+		params := append(append([]apiclient.KV{}, base...),
+			apiclient.KV{Key: "limit", Value: fmt.Sprintf("%d", historyPageLimit)},
+			apiclient.KV{Key: "startTime", Value: fmt.Sprintf("%d", curStart)},
 		)
 		if curEnd > 0 {
-			params = append(params, korbit.KV{Key: "endTime", Value: fmt.Sprintf("%d", curEnd)})
+			params = append(params, apiclient.KV{Key: "endTime", Value: fmt.Sprintf("%d", curEnd)})
 		}
 		data, err := get(params)
 		if err != nil {

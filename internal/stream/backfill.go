@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/ops"
 	"github.com/korbit-official/korbit-cli/internal/rawapi"
 )
@@ -51,7 +51,7 @@ const historyPageLimit = 1000
 const tradesPageLimit = 500
 
 // restClient runs the session's REST recovery calls (backfill + public-trade gap
-// patching) through the session's one korbit.Client (the typed rawapi layer over
+// patching) through the session's one apiclient.Client (the typed rawapi layer over
 // it). That Client signs with the shared clock, handles EXCEED_TIME_WINDOW
 // internally (its own Resync), and records each call through its own per-call
 // recorder — the journaling policy (callrec) exempts the stream-backfill surface,
@@ -76,8 +76,8 @@ func (s *Session) ctx() context.Context {
 // GETs, always safe to retry) within the session's backfill sleep budget, so
 // the bounded retry ladder (network/5xx backoff, 429 Retry-After,
 // EXCEED_TIME_WINDOW correction handled inside the Client) applies.
-func (r *restClient) pol() korbit.Policy {
-	return korbit.Policy{Idempotent: true, BudgetMs: r.budgetMs}
+func (r *restClient) pol() apiclient.Policy {
+	return apiclient.Policy{Idempotent: true, BudgetMs: r.budgetMs}
 }
 
 // privatePlan is one connect's private recovery window, captured at connect
@@ -209,7 +209,7 @@ func (s *Session) backfillPrivate(reconnect bool, downtimeMs int64, gen int64) (
 // backfillPass runs the per-connect private recovery pass over every
 // subscribed private channel, bracketed by its own BACKFILL_START/
 // BACKFILL_DONE pair, and returns the leaf calls that failed in a way worth
-// re-running (non-fatal per korbit.Classify) as retry units. Re-running a
+// re-running (non-fatal per apiclient.Classify) as retry units. Re-running a
 // leaf call is safe: snapshots re-baseline idempotently, and history rows are
 // deduped on both sides (myTradeSeen here, id dedupe in stream/state) — the
 // duplicates-over-loss rule.
@@ -367,7 +367,7 @@ func (s *Session) retryFailedBackfill(plan privatePlan, units []retryUnit) {
 // facts (path, param names) come from internal/rawapi rather than being
 // hand-built here.
 func (s *Session) fetchHistory(get func(req historyPageRequest) (json.RawMessage, error), symbol string, accountSeq *int, startMs int64, tsField string, emitPage func(rows []json.RawMessage)) (complete bool, err error) {
-	return ops.WalkHistory(func(params []korbit.KV) (json.RawMessage, error) {
+	return ops.WalkHistory(func(params []apiclient.KV) (json.RawMessage, error) {
 		return get(historyPageRequestFrom(symbol, accountSeq, params))
 	}, nil, startMs, 0, tsField, emitPage)
 }
@@ -385,7 +385,7 @@ type historyPageRequest struct {
 // historyPageRequestFrom parses the walk-supplied paging params (limit,
 // startTime, optional endTime) into a typed page request, carrying the per-call
 // symbol and accountSeq through.
-func historyPageRequestFrom(symbol string, accountSeq *int, params []korbit.KV) historyPageRequest {
+func historyPageRequestFrom(symbol string, accountSeq *int, params []apiclient.KV) historyPageRequest {
 	req := historyPageRequest{Symbol: rawapi.Symbol(symbol), AccountSeq: accountSeq}
 	for _, kv := range params {
 		n, err := strconv.Atoi(kv.Value)
@@ -842,7 +842,7 @@ func (s *Session) seedTradeHistory(symbol string, want, snapCount int, snapMinID
 
 // backfillFailed emits the BACKFILL_FAILED notice for one recovery call and
 // reports whether the failure is worth re-running (non-fatal per
-// korbit.Classify): network/5xx/429 may heal on a later attempt; a
+// apiclient.Classify): network/5xx/429 may heal on a later attempt; a
 // definitive 4xx rejection cannot.
 func (s *Session) backfillFailed(channel, symbol, source string, err error) bool {
 	details := map[string]any{"channel": channel, "source": source, "error": err.Error()}
@@ -851,7 +851,7 @@ func (s *Session) backfillFailed(channel, symbol, source string, err error) bool
 	}
 	s.noticef(BackfillFailed, LevelError, details,
 		"backfill %s for %s failed: %v — live data keeps flowing but the gap was not recovered", source, channel, err)
-	return korbit.Classify(err) != korbit.ClassFatal
+	return apiclient.Classify(err) != apiclient.ClassFatal
 }
 
 // failureOutcome maps one failed recovery call to its retry-unit outcome,

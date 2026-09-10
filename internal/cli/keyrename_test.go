@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 )
 
 // TestKeyRenamePreservesBindingAndDefault: renaming the default bound key keeps
@@ -70,7 +70,7 @@ func TestKeyRenameRejectsCollision(t *testing.T) {
 // one step — the result is bound, carries the id, and prints no registration link.
 func TestKeyAddWithAPIKeyBindsImmediately(t *testing.T) {
 	home := t.TempDir()
-	kp, err := korbit.GenerateKeypair()
+	kp, err := apiclient.GenerateKeypair()
 	if err != nil {
 		t.Fatal(err)
 	}

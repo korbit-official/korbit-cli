@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/rawapi"
 )
 
@@ -17,7 +17,7 @@ import (
 
 type fundingHistoryOp struct {
 	meta OpMeta
-	call func(ctx context.Context, raw *rawapi.Client, args fundingArgs, pol korbit.Policy) (json.RawMessage, error)
+	call func(ctx context.Context, raw *rawapi.Client, args fundingArgs, pol apiclient.Policy) (json.RawMessage, error)
 }
 
 func (op fundingHistoryOp) Meta() OpMeta { return op.meta }

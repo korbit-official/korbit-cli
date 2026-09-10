@@ -83,15 +83,15 @@
 // before re-probing), which together with the retry layer's per-call once-flag
 // keep an EXCEED_TIME_WINDOW condition from looping or storming /v2/time. See
 // syncer.go. The measurement primitive itself (MeasureClockOffset) stays in
-// internal/korbit; the Syncer takes a plain MeasureFunc the caller wires to it,
+// internal/apiclient; the Syncer takes a plain MeasureFunc the caller wires to it,
 // preserving the no-import-cycle rule below.
 //
-// # Dependency rule (no cycle with package korbit)
+// # Dependency rule (no cycle with package apiclient)
 //
-// This package MUST NOT import internal/korbit, and internal/korbit MUST NOT
+// This package MUST NOT import internal/apiclient, and internal/apiclient MUST NOT
 // import this package. The measurement primitive (MeasureClockOffset, the
-// ClockOffset type) stays in korbit; the L1 korbit.Client takes a plain
+// ClockOffset type) stays in apiclient; the L1 apiclient.Client takes a plain
 // `func() int64` (wired from State.SignNow) rather than a *State. Install
-// therefore takes plain int64s — the caller converts from korbit.ClockOffset
+// therefore takes plain int64s — the caller converts from apiclient.ClockOffset
 // (offsetMs = off.OffsetMs, leanMs = off.UncertaintyMs()) at the wiring seam.
 package clock

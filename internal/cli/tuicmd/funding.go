@@ -11,8 +11,8 @@ import (
 	"strconv"
 
 	"github.com/korbit-official/korbit-cli/internal/accountseq"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/ops"
 	"github.com/korbit-official/korbit-cli/internal/output"
 	"github.com/korbit-official/korbit-cli/internal/tui"
@@ -56,7 +56,7 @@ func (t *tuiFunding) run(values map[string]string, ids ...string) (json.RawMessa
 	}
 	res, err := op.Run(context.Background(), t.api, ops.RunInput{
 		Values:   params,
-		Controls: ops.Controls{Surface: korbit.SurfaceTUI},
+		Controls: ops.Controls{Surface: apiclient.SurfaceTUI},
 		KeyName:  t.keyName,
 		APIKeyID: t.apiKeyID,
 	})

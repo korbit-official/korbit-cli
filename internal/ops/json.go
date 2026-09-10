@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"encoding/json"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 )
 
 // joinRows reassembles verbatim row documents into a JSON array. It cannot
@@ -28,7 +28,7 @@ func joinRows(rows []json.RawMessage) json.RawMessage {
 
 // orderedJSON renders ordered params as a JSON object preserving order — the
 // pre-signing parameter record the order journal stores for an order's intent.
-func orderedJSON(kvs []korbit.KV) string {
+func orderedJSON(kvs []apiclient.KV) string {
 	var b bytes.Buffer
 	b.WriteByte('{')
 	for i, kv := range kvs {

@@ -16,16 +16,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cli"
 	"github.com/korbit-official/korbit-cli/internal/journal"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/output"
 	"github.com/korbit-official/korbit-cli/internal/stream"
 	"github.com/korbit-official/korbit-cli/internal/tui"
 )
 
 // runTUICLI is runCLI plus the WebSocket dial and TUI runner seams.
-func runTUICLI(args []string, env map[string]string, doer korbit.Doer, dial stream.Dialer, tuiRun func(tui.Config) error) (string, string, int) {
+func runTUICLI(args []string, env map[string]string, doer apiclient.Doer, dial stream.Dialer, tuiRun func(tui.Config) error) (string, string, int) {
 	merged := map[string]string{"KORBIT_CLI_HOME": sharedTestHome()}
 	for k, v := range env {
 		merged[k] = v
@@ -258,7 +258,7 @@ func TestTUIDefaultsToLaunchedPairs(t *testing.T) {
 // policy rather than a call-site decision: journaled in --debug (like every
 // other surface's public reads), and the DB never even opened in a normal run.
 func TestTUIPublicReadsJournaling(t *testing.T) {
-	publicDoer := func() korbit.Doer {
+	publicDoer := func() apiclient.Doer {
 		return doerFunc(func(r *http.Request) (*http.Response, error) {
 			switch {
 			case strings.Contains(r.URL.Path, "/v2/currencyPairs"):
@@ -368,7 +368,7 @@ func TestTUILaunchedPairsEdgeCases(t *testing.T) {
 
 // tradeDoer routes the REST calls a private TUI session makes: the startup key
 // pre-flight, clock probes, private backfill, and the trader's place/cancel.
-func tradeDoer(t *testing.T) (korbit.Doer, *struct {
+func tradeDoer(t *testing.T) (apiclient.Doer, *struct {
 	sync.Mutex
 	placeBody  string
 	cancelSeen string
@@ -409,7 +409,7 @@ func tradeDoer(t *testing.T) (korbit.Doer, *struct {
 // keyInfoDoer answers the startup /v2/currentKeyInfo pre-flight with the given
 // status/body (and a stock clock probe); every other path 500s, since a failed
 // pre-flight must return before the session dials anything.
-func keyInfoDoer(status int, body string) korbit.Doer {
+func keyInfoDoer(status int, body string) apiclient.Doer {
 	return doerFunc(func(r *http.Request) (*http.Response, error) {
 		switch r.URL.Path {
 		case "/v2/currentKeyInfo":
@@ -478,7 +478,7 @@ func TestTUIPreflightBlocksBeforeAltScreen(t *testing.T) {
 // multiAccountDoer answers the startup pre-flight with the given allowed
 // sub-account set (a JSON array) plus the stock session reads, so the seam
 // receives the resolved AccountSeq/AccountSeqs.
-func multiAccountDoer(allowedJSON string) korbit.Doer {
+func multiAccountDoer(allowedJSON string) apiclient.Doer {
 	return doerFunc(func(r *http.Request) (*http.Response, error) {
 		switch r.URL.Path {
 		case "/v2/currentKeyInfo":

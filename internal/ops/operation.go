@@ -8,8 +8,8 @@ import (
 	"context"
 	"strings"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 )
 
 // OpMeta is an operation's presentation + validation metadata; the catalog is
@@ -69,11 +69,11 @@ type Operation interface {
 // policyFor derives the L1 call policy from an operation's Safety: a read or
 // idempotent write opts into the bounded retry ladder within the API's budget; a
 // money-moving write is single-shot (the zero Policy).
-func policyFor(safety cmdmeta.Safety, a *API) korbit.Policy {
+func policyFor(safety cmdmeta.Safety, a *API) apiclient.Policy {
 	switch safety {
 	case cmdmeta.SafetyReadOnly, cmdmeta.SafetyIdempotent:
-		return korbit.Policy{Idempotent: true, BudgetMs: a.RetryBudgetMs}
+		return apiclient.Policy{Idempotent: true, BudgetMs: a.RetryBudgetMs}
 	default:
-		return korbit.Policy{}
+		return apiclient.Policy{}
 	}
 }

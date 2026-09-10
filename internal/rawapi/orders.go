@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 )
 
 // Order is the full order document returned by the order query endpoints.
@@ -56,7 +56,7 @@ type OrderPlaceResponse struct {
 	ClientOrderID string `json:"clientOrderId,omitempty"`
 }
 
-func (c *Client) OrderPlace(ctx context.Context, req OrderPlaceRequest, pol korbit.Policy) (OrderPlaceResponse, json.RawMessage, korbit.Meta, error) {
+func (c *Client) OrderPlace(ctx context.Context, req OrderPlaceRequest, pol apiclient.Policy) (OrderPlaceResponse, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.str("symbol", string(req.Symbol))
 	p.str("side", string(req.Side))
@@ -86,7 +86,7 @@ type OrderGetRequest struct {
 	AccountSeq    *int
 }
 
-func (c *Client) OrderGet(ctx context.Context, req OrderGetRequest, pol korbit.Policy) (Order, json.RawMessage, korbit.Meta, error) {
+func (c *Client) OrderGet(ctx context.Context, req OrderGetRequest, pol apiclient.Policy) (Order, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.str("symbol", string(req.Symbol))
 	p.intPtr("orderId", req.OrderID)
@@ -111,7 +111,7 @@ type OrderCancelResponse struct {
 	Success bool `json:"success,omitempty"`
 }
 
-func (c *Client) OrderCancel(ctx context.Context, req OrderCancelRequest, pol korbit.Policy) (OrderCancelResponse, json.RawMessage, korbit.Meta, error) {
+func (c *Client) OrderCancel(ctx context.Context, req OrderCancelRequest, pol apiclient.Policy) (OrderCancelResponse, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.str("symbol", string(req.Symbol))
 	p.intPtr("orderId", req.OrderID)
@@ -129,7 +129,7 @@ type OrderOpenRequest struct {
 	AccountSeq *int
 }
 
-func (c *Client) OrderOpen(ctx context.Context, req OrderOpenRequest, pol korbit.Policy) ([]Order, json.RawMessage, korbit.Meta, error) {
+func (c *Client) OrderOpen(ctx context.Context, req OrderOpenRequest, pol apiclient.Policy) ([]Order, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.str("symbol", string(req.Symbol))
 	p.intPtr("limit", req.Limit)
@@ -148,7 +148,7 @@ type OrderHistoryRequest struct {
 	AccountSeq *int
 }
 
-func (c *Client) OrderHistory(ctx context.Context, req OrderHistoryRequest, pol korbit.Policy) ([]Order, json.RawMessage, korbit.Meta, error) {
+func (c *Client) OrderHistory(ctx context.Context, req OrderHistoryRequest, pol apiclient.Policy) ([]Order, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.str("symbol", string(req.Symbol))
 	p.intPtr("limit", req.Limit)
@@ -184,7 +184,7 @@ type Fill struct {
 	FeeQty      string `json:"feeQty"`
 }
 
-func (c *Client) Fills(ctx context.Context, req FillsRequest, pol korbit.Policy) ([]Fill, json.RawMessage, korbit.Meta, error) {
+func (c *Client) Fills(ctx context.Context, req FillsRequest, pol apiclient.Policy) ([]Fill, json.RawMessage, apiclient.Meta, error) {
 	var p params
 	p.str("symbol", string(req.Symbol))
 	p.intPtr("limit", req.Limit)

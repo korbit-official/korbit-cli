@@ -93,18 +93,18 @@ internal/
                on across the layers                                    — see cmdmeta/doc.go
   spec/        the BUILTIN command surface + shared vocabulary types    — see the Registry var in spec/registry.go
   rawapi/      L1 typed endpoint layer over the wire client             — see rawapi/doc.go
-  korbit/      L0 wire layer (encode/sign/envelope/retry taxonomy) + the
-               L1 primitive client (Client.Do)                          — see korbit/doc.go
+  apiclient/   L0 wire layer (encode/sign/envelope/retry taxonomy) + the
+               L1 primitive client (Client.Do)                          — see apiclient/doc.go
   netbind/     outbound source/interface/IP-family binding (--bind/--family) — see netbind/doc.go
   useragent/   composes the User-Agent header sent on REST + WS requests — see the package doc in useragent/useragent.go
   accountseq/  the accountSeq selection policy shared by REST ops + private WS subscriptions — see the package doc in accountseq/accountseq.go
   ops/         L2 operations layer: owns the retry/idempotency policy for every
                endpoint operation the command surface dispatches (read-only probes
-               elsewhere declare korbit.Policy{Idempotent:true} inline; the ladder
-               mechanics stay in internal/korbit); the Operation catalog, place
+               elsewhere declare apiclient.Policy{Idempotent:true} inline; the ladder
+               mechanics stay in internal/apiclient); the Operation catalog, place
                reconcile, history/candles paging, cross-field validation — see ops/doc.go
   clock/       one shared server-clock estimate (State) + the one Syncer — see clock/doc.go
-  callrec/     the journal-backed korbit.Recorder + the single journaling policy — see callrec/doc.go
+  callrec/     the journal-backed apiclient.Recorder + the single journaling policy — see callrec/doc.go
   journal/     local SQLite action journal (api_calls + orders)         — see the package doc in journal/journal.go
   keys/        named-key registry (keys.json) + lifecycle commands      — see keys/doc.go
   keystore/    private-key vaults (file AES-256-GCM; native macOS keychain) — see keystore/doc.go
@@ -195,11 +195,12 @@ the experimental bot runtime.
 These are the load-bearing invariants. The mechanics live in code (pointers
 below); what's written out here is the *rule* and the *why*.
 
-### Wire format (`internal/korbit`)
+### Wire format (`internal/apiclient`)
 
 Signing, ordered param encoding, and envelope unwrap are documented in
-`korbit/doc.go`, with the primitives in `sign.go`, `encode.go`, and `client.go`.
-Two facts worth stating explicitly because no code comment asserts them:
+`apiclient/doc.go`, with the primitives in `sign.go`, `encode.go`, and
+`client.go`. Two facts worth stating explicitly because no code comment asserts
+them:
 
 - **The error envelope is the ONLY shape that exists:** `{"success": false,
   "error": {"code": <httpStatus>, "message": "SYMBOLIC_CODE", "description":
@@ -285,16 +286,16 @@ Extend all of them additively. Incomplete paged results say so in-band via the
 The mechanism — the asymmetric server window, `MeasureClockOffset`, the one
 shared `clock.State`/`Syncer` (single-flight + cooldown), `--time-sync`, and the
 `EXCEED_TIME_WINDOW` resync — is fully documented in `clock/doc.go`,
-`korbit/timesync.go`, and `korbit/retry.go`, and the loop-safety invariants are
-audited in `korbit/doc.go`. The retry ladder's master gate is each Operation's
-`OpMeta.Safety` (money-movers `nonIdempotent` = single-shot), pinned by
-`TestCatalogSafetyClassification` in `ops/catalog_test.go`.
+`apiclient/timesync.go`, and `apiclient/retry.go`, and the loop-safety
+invariants are audited in `apiclient/doc.go`. The retry ladder's master gate is
+each Operation's `OpMeta.Safety` (money-movers `nonIdempotent` = single-shot),
+pinned by `TestCatalogSafetyClassification` in `ops/catalog_test.go`.
 
 What is **not** captured in any single code comment, and is the easiest thing to
 get wrong, is **when to use the server clock at all**:
 
 > The server-clock estimate (`clock.SignNow`/`ServerNowMs`/`Offset`, and the
-> `korbit.Client`/`ops`/`botapi` seams over it) is a **scarce, special-purpose
+> `apiclient.Client`/`ops`/`botapi` seams over it) is a **scarce, special-purpose
 > correction — NOT a general time source.** It is a network-measured estimate
 > (±RTT/2 uncertainty, can jump on a mid-session resync, and is just the system
 > clock with offset 0 on a run that never measures). Use it ONLY for a value
@@ -350,7 +351,7 @@ with `synchronous=OFF`).
   never silently pick a different key (removing the default *unsets* it, never
   reassigns). Every private call prints `signing as key "<name>"` to stderr (a
   side-channel safety disclosure, not a log). Private key material lives only
-  in the keystore backends and `korbit/sign.go` and must never be printed,
+  in the keystore backends and `apiclient/sign.go` and must never be printed,
   logged, or put in an error. The per-key two-axis (`type` + `keystore`) model,
   tolerant-on-load/strict-at-use loading, `key remove --force`, atomic writes,
   and the `keystore.Migrate` copy→verify→commit→delete ordering are documented in

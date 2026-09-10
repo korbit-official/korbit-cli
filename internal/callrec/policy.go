@@ -7,8 +7,8 @@ package callrec
 import (
 	"net/http"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 )
 
 // FailMode is how a POST-call Record failure is handled — the second axis of a
@@ -46,7 +46,7 @@ type Decision struct {
 // policy wholesale without touching the recorder. The CallInfo it receives is
 // the pre-signing call description (origin/surface, read/write class, params) —
 // the only inputs a policy gets to reason over.
-type PolicyFunc func(info korbit.CallInfo) Decision
+type PolicyFunc func(info apiclient.CallInfo) Decision
 
 // DefaultPolicy returns the journaling policy, parameterized by whether debug
 // mode is on. It is THE policy table — the single place to change journaling
@@ -72,18 +72,18 @@ type PolicyFunc func(info korbit.CallInfo) Decision
 //	  - any other surface (notably "monitor") records the same calls cli does but
 //	    Warns on a post-failure, so a long-running session isn't killed by it.
 func DefaultPolicy(debug bool) PolicyFunc {
-	return func(info korbit.CallInfo) Decision {
+	return func(info apiclient.CallInfo) Decision {
 		switch info.Origin.Surface {
-		case korbit.SurfaceDoctor:
+		case apiclient.SurfaceDoctor:
 			// Signed diagnostic calls are never journaled. Explicit so flipping
 			// doctor on to record is a one-line change here.
 			return Decision{Record: false, Reason: "surface never journaled"}
-		case korbit.SurfaceStreamBackfill:
+		case apiclient.SurfaceStreamBackfill:
 			// Stream REST recovery reads (snapshots re-fetched on every reconnect
 			// and focus change) are recovery machinery, not user actions — never
 			// journaled, so reconnect storms don't bury the real actions.
 			return Decision{Record: false, Reason: "surface never journaled"}
-		case korbit.SurfaceCLI:
+		case apiclient.SurfaceCLI:
 			rec, reason := recordDecision(info, debug)
 			return Decision{Record: rec, PostFailure: Fail, Reason: reason}
 		default:
@@ -96,7 +96,7 @@ func DefaultPolicy(debug bool) PolicyFunc {
 // recordDecision applies the write/read rule shared by cli and the other
 // surfaces — writes always record, reads only under debug — with the matching
 // diagnostic reason.
-func recordDecision(info korbit.CallInfo, debug bool) (record bool, reason string) {
+func recordDecision(info apiclient.CallInfo, debug bool) (record bool, reason string) {
 	switch {
 	case isWrite(info):
 		return true, "write"
@@ -110,7 +110,7 @@ func recordDecision(info korbit.CallInfo, debug bool) (record bool, reason strin
 // isWrite reports whether a call mutates state. An operation supplies its class
 // via CallInfo.Safety (anything but readOnly writes); an ad-hoc call has no
 // Safety, so its HTTP method classifies it (anything but GET writes).
-func isWrite(info korbit.CallInfo) bool {
+func isWrite(info apiclient.CallInfo) bool {
 	if info.Safety != "" {
 		return info.Safety != cmdmeta.SafetyReadOnly
 	}

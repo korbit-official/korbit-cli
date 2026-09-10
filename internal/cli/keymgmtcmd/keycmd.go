@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
 	"github.com/korbit-official/korbit-cli/internal/cli/doctorcmd"
 	"github.com/korbit-official/korbit-cli/internal/cli/probe"
@@ -21,7 +22,6 @@ import (
 	"github.com/korbit-official/korbit-cli/internal/config"
 	"github.com/korbit-official/korbit-cli/internal/i18n"
 	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/output"
 	"github.com/korbit-official/korbit-cli/internal/progname"
 	"github.com/korbit-official/korbit-cli/internal/spec"
@@ -59,7 +59,7 @@ func registrationLabel(name string) string {
 // review and one MFA confirm. It returns "" when the public key can't be encoded
 // (the caller then falls back to manual PEM registration).
 func registrationLink(portalURL, publicPEM, label string, allowlist []string, perms int) string {
-	b64, err := korbit.PublicSPKIBase64URL(publicPEM)
+	b64, err := apiclient.PublicSPKIBase64URL(publicPEM)
 	if err != nil {
 		return ""
 	}

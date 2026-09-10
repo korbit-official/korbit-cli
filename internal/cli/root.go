@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cli/agentskillcmd"
 	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
 	"github.com/korbit-official/korbit-cli/internal/cli/doctorcmd"
@@ -37,7 +38,6 @@ import (
 	"github.com/korbit-official/korbit-cli/internal/config"
 	"github.com/korbit-official/korbit-cli/internal/i18n"
 	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/logging"
 	"github.com/korbit-official/korbit-cli/internal/netbind"
 	"github.com/korbit-official/korbit-cli/internal/output"
@@ -57,18 +57,18 @@ type Deps struct {
 	Getenv func(string) string
 	Stdout io.Writer
 	Stderr io.Writer
-	Doer   korbit.Doer
+	Doer   apiclient.Doer
 	Now    func() int64
 	// Sleep delays between auto-retries; defaults to time.Sleep. Tests inject a
 	// no-op so the retry layer runs instantly.
 	Sleep func(time.Duration)
 	// IPProbe fetches the public IP over a given network family for the `ip`
 	// command and `setup`. Defaults to a netbind family-pinned probe; tests stub it.
-	IPProbe korbit.IPProber
+	IPProbe apiclient.IPProber
 	// FamilyDoer returns a Doer pinned to a TCP family ("tcp4"/"tcp6"); doctor
 	// uses it to replay a signed request over each family to diagnose an
 	// IP-allowlist rejection. Defaults to a netbind family-pinned doer; tests stub it.
-	FamilyDoer func(network string, timeoutMs int) korbit.Doer
+	FamilyDoer func(network string, timeoutMs int) apiclient.Doer
 	// WSDial opens the monitor/tui commands' WebSocket connections. Defaults
 	// to stream.DefaultDialer; tests inject a fake.
 	WSDial stream.Dialer
@@ -343,7 +343,7 @@ func (rt *runtime) logger() *slog.Logger {
 // (The tui frontend in tuicmd makes the same decision via its own
 // tuiLogging over clienv.Env.LogToFile.)
 func (rt *runtime) surfaceLogger(surface string) *slog.Logger {
-	if surface == korbit.SurfaceTUI && !rt.logToFile {
+	if surface == apiclient.SurfaceTUI && !rt.logToFile {
 		return nil // silent on stderr unless --log-file is set
 	}
 	return rt.logger()
@@ -1009,12 +1009,12 @@ func (rt *runtime) verifyKeyUsable(ctx context.Context, cmd *cobra.Command, km *
 	}
 	baseURL := rt.ResolveBaseURL(cmd, cfg, km.MetaBaseURL(name))
 	clk := clock.New(rt.localNow())
-	syncer := rt.NewClockSyncer(clk, baseURL, setupVerifyTimeoutMs, korbit.SurfaceDoctor, "setup-verify")
+	syncer := rt.NewClockSyncer(clk, baseURL, setupVerifyTimeoutMs, apiclient.SurfaceDoctor, "setup-verify")
 	client := rt.BuildClient(clienv.ClientSpec{
-		Surface:   korbit.SurfaceDoctor,
+		Surface:   apiclient.SurfaceDoctor,
 		Detail:    "setup-verify",
 		BaseURL:   baseURL,
-		Creds:     &korbit.Credentials{APIKeyID: apiKeyID, Signer: signer},
+		Creds:     &apiclient.Credentials{APIKeyID: apiKeyID, Signer: signer},
 		KeyName:   name,
 		Clock:     clk,
 		Resync:    syncer.Sync,
@@ -1022,16 +1022,16 @@ func (rt *runtime) verifyKeyUsable(ctx context.Context, cmd *cobra.Command, km *
 		Rec:       rt.LogRecorder(home, rt.log),
 		Log:       rt.log,
 	})
-	call := korbit.Call{Method: "GET", Path: "/v2/currentKeyInfo", Auth: true}
+	call := apiclient.Call{Method: "GET", Path: "/v2/currentKeyInfo", Auth: true}
 	if !wait {
-		_, _, err = client.Do(ctx, call, korbit.Policy{RetryPreExec: true})
+		_, _, err = client.Do(ctx, call, apiclient.Policy{RetryPreExec: true})
 		return err
 	}
 	// Tolerant: ride out the just-registered KEY_NOT_FOUND window within the budget.
 	wctx, cancel := context.WithTimeout(ctx, setupKeyActiveBudget)
 	defer cancel()
 	for {
-		_, _, err = client.Do(wctx, call, korbit.Policy{RetryPreExec: true})
+		_, _, err = client.Do(wctx, call, apiclient.Policy{RetryPreExec: true})
 		if err == nil {
 			return nil
 		}
@@ -1085,20 +1085,20 @@ func (rt *runtime) pollKeyClaim(ctx context.Context, cmd *cobra.Command, km *key
 	if err != nil {
 		return "", "", err
 	}
-	pubB64, err := korbit.PublicSPKIBase64URL(s.PublicKey)
+	pubB64, err := apiclient.PublicSPKIBase64URL(s.PublicKey)
 	if err != nil {
 		return "", "", err
 	}
 	baseURL := rt.ResolveBaseURL(cmd, cfg, km.MetaBaseURL(name))
 	clk := clock.New(rt.localNow())
-	syncer := rt.NewClockSyncer(clk, baseURL, setupVerifyTimeoutMs, korbit.SurfaceDoctor, "setup-claim")
+	syncer := rt.NewClockSyncer(clk, baseURL, setupVerifyTimeoutMs, apiclient.SurfaceDoctor, "setup-claim")
 	client := rt.BuildClient(clienv.ClientSpec{
-		Surface: korbit.SurfaceDoctor,
+		Surface: apiclient.SurfaceDoctor,
 		Detail:  "setup-claim",
 		BaseURL: baseURL,
 		// No APIKeyID: a keyless signed GET (the Build path omits X-KAPI-KEY when
 		// the id is empty), authenticated purely by the request signature.
-		Creds:     &korbit.Credentials{Signer: signer},
+		Creds:     &apiclient.Credentials{Signer: signer},
 		KeyName:   name,
 		Clock:     clk,
 		Resync:    syncer.Sync,
@@ -1106,10 +1106,10 @@ func (rt *runtime) pollKeyClaim(ctx context.Context, cmd *cobra.Command, km *key
 		Rec:       rt.LogRecorder(home, rt.log),
 		Log:       rt.log,
 	})
-	call := korbit.Call{
+	call := apiclient.Call{
 		Method: "GET",
 		Path:   "/v2/keys/claim",
-		Params: []korbit.KV{{Key: "publicKey", Value: pubB64}, {Key: "type", Value: keys.TypeEd25519}},
+		Params: []apiclient.KV{{Key: "publicKey", Value: pubB64}, {Key: "type", Value: keys.TypeEd25519}},
 		Auth:   true,
 	}
 	// Log the resolved endpoint up front: an auto-claim that hits the wrong host
@@ -1117,7 +1117,7 @@ func (rt *runtime) pollKeyClaim(ctx context.Context, cmd *cobra.Command, km *key
 	// otherwise hard to spot — the only symptom is a 404 stop.
 	rt.log.Debug("auto-claim polling", "keyName", name, "baseURL", baseURL)
 	for {
-		data, _, derr := client.Do(ctx, call, korbit.Policy{RetryPreExec: true})
+		data, _, derr := client.Do(ctx, call, apiclient.Policy{RetryPreExec: true})
 		if derr == nil {
 			var resp struct {
 				APIKey string `json:"apiKey"`
@@ -1297,9 +1297,9 @@ type depsResolved struct {
 	Getenv     func(string) string
 	Now        func() int64
 	Sleep      func(time.Duration)
-	Doer       korbit.Doer
-	IPProbe    korbit.IPProber
-	FamilyDoer func(network string, timeoutMs int) korbit.Doer
+	Doer       apiclient.Doer
+	IPProbe    apiclient.IPProber
+	FamilyDoer func(network string, timeoutMs int) apiclient.Doer
 	WSDial     stream.Dialer
 	TUIRun     func(tui.Config) error     // nil = the real tui.Run (needs a TTY)
 	SetupUIRun func(setupui.Config) error // nil = the real setupui.Run (needs a TTY)
@@ -1372,17 +1372,17 @@ func (rt *runtime) applyNetBinding() error {
 
 // familyDoerFor builds the family-pinned Doer factory the diagnostics use, bound
 // to b's source (b == nil = unbound). The family pin + binding live in netbind.
-func familyDoerFor(b *netbind.Binder) func(network string, timeoutMs int) korbit.Doer {
-	return func(network string, timeoutMs int) korbit.Doer {
+func familyDoerFor(b *netbind.Binder) func(network string, timeoutMs int) apiclient.Doer {
+	return func(network string, timeoutMs int) apiclient.Doer {
 		return netbind.FamilyDoer(b, network, timeoutMs)
 	}
 }
 
 // ipProberFor builds the /v2/ip prober: a netbind family-pinned (and b-bound)
-// client handed to korbit.ProbeIP, so the prober carries no family/binding logic.
-func ipProberFor(b *netbind.Binder) korbit.IPProber {
+// client handed to apiclient.ProbeIP, so the prober carries no family/binding logic.
+func ipProberFor(b *netbind.Binder) apiclient.IPProber {
 	return func(ctx context.Context, network, baseURL, userAgent string, timeoutMs int) (string, error) {
-		return korbit.ProbeIP(ctx, netbind.FamilyDoer(b, network, timeoutMs), baseURL, userAgent)
+		return apiclient.ProbeIP(ctx, netbind.FamilyDoer(b, network, timeoutMs), baseURL, userAgent)
 	}
 }
 
@@ -1421,7 +1421,7 @@ func resolveDeps(d Deps) depsResolved {
 	}
 	doer := d.Doer
 	if doer == nil {
-		// Same default korbit.Client applies to a nil Doer, hoisted here so direct
+		// Same default apiclient.Client applies to a nil Doer, hoisted here so direct
 		// callers (the set-base-url endpoint smoke test) get a working client too.
 		doer = http.DefaultClient
 	}

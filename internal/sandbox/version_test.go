@@ -17,8 +17,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 )
 
 func TestParseSandboxVersion(t *testing.T) {
@@ -129,7 +129,7 @@ func versionGateManager(t *testing.T, skip bool, logs *[]string) *Manager {
 	t.Helper()
 	home := t.TempDir()
 	cacheDir := t.TempDir()
-	kp, err := korbit.GenerateKeypair()
+	kp, err := apiclient.GenerateKeypair()
 	if err != nil {
 		t.Fatal(err)
 	}

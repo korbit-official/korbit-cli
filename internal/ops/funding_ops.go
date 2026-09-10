@@ -8,8 +8,8 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/rawapi"
 )
 
@@ -31,7 +31,7 @@ func init() {
 			Auth:     signedAuth("readDeposits"),
 			Safety:   cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			seq := reqAccountSeq(in.Values)
 			_, b, meta, err := raw.DepositAddresses(ctx, rawapi.DepositAddressesRequest{AccountSeq: &seq}, pol)
 			return b, meta, err
@@ -55,7 +55,7 @@ func init() {
 			Auth:     signedAuth("readDeposits"),
 			Safety:   cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			seq := reqAccountSeq(in.Values)
 			_, b, meta, err := raw.DepositAddress(ctx, rawapi.DepositAddressRequest{
 				Currency:   rawapi.Currency(reqStr(in.Values, "currency")),
@@ -86,7 +86,7 @@ func init() {
 			Auth:     signedAuth("writeDeposits"),
 			Safety:   cmdmeta.SafetyIdempotent,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			seq := reqAccountSeq(in.Values)
 			_, b, meta, err := raw.DepositGenerate(ctx, rawapi.DepositGenerateRequest{
 				Currency:   rawapi.Currency(reqStr(in.Values, "currency")),
@@ -111,7 +111,7 @@ func init() {
 			Auth:     signedAuth("readDeposits"),
 			Safety:   cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			seq := reqAccountSeq(in.Values)
 			_, b, meta, err := raw.DepositStatus(ctx, rawapi.DepositStatusRequest{
 				Currency:      rawapi.Currency(reqStr(in.Values, "currency")),
@@ -133,7 +133,7 @@ func init() {
 			Auth:        signedAuth("readDeposits"),
 			Safety:      cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, args fundingArgs, pol korbit.Policy) (json.RawMessage, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, args fundingArgs, pol apiclient.Policy) (json.RawMessage, error) {
 			_, b, _, err := raw.DepositHistory(ctx, rawapi.DepositHistoryRequest{
 				Currency:   rawapi.Currency(args.currency),
 				Limit:      &args.limit,
@@ -161,7 +161,7 @@ func init() {
 			Auth:     signedAuth("readWithdrawals"),
 			Safety:   cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			seq := reqAccountSeq(in.Values)
 			_, b, meta, err := raw.WithdrawAddresses(ctx, rawapi.WithdrawAddressesRequest{AccountSeq: &seq}, pol)
 			return b, meta, err
@@ -183,7 +183,7 @@ func init() {
 			Auth:     signedAuth("readWithdrawals"),
 			Safety:   cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			seq := reqAccountSeq(in.Values)
 			_, b, meta, err := raw.WithdrawAmount(ctx, rawapi.WithdrawAmountRequest{
 				Currency:   optStr(in.Values, "currency"),
@@ -221,7 +221,7 @@ func init() {
 			Safety:      cmdmeta.SafetyNonIdempotent,
 			Destructive: true,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			seq := reqAccountSeq(in.Values)
 			_, b, meta, err := raw.WithdrawRequest(ctx, rawapi.WithdrawRequestRequest{
 				Currency:         rawapi.Currency(reqStr(in.Values, "currency")),
@@ -252,7 +252,7 @@ func init() {
 			Safety:      cmdmeta.SafetyIdempotent,
 			Destructive: true,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			seq := reqAccountSeq(in.Values)
 			_, b, meta, err := raw.WithdrawCancel(ctx, rawapi.WithdrawCancelRequest{
 				CoinWithdrawalID: reqInt(in.Values, "coinWithdrawalId"),
@@ -276,7 +276,7 @@ func init() {
 			Auth:     signedAuth("readWithdrawals"),
 			Safety:   cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			seq := reqAccountSeq(in.Values)
 			_, b, meta, err := raw.WithdrawStatus(ctx, rawapi.WithdrawStatusRequest{
 				Currency:         rawapi.Currency(reqStr(in.Values, "currency")),
@@ -298,7 +298,7 @@ func init() {
 			Auth:        signedAuth("readWithdrawals"),
 			Safety:      cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, args fundingArgs, pol korbit.Policy) (json.RawMessage, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, args fundingArgs, pol apiclient.Policy) (json.RawMessage, error) {
 			_, b, _, err := raw.WithdrawHistory(ctx, rawapi.WithdrawHistoryRequest{
 				Currency:   rawapi.Currency(args.currency),
 				Limit:      &args.limit,
@@ -326,7 +326,7 @@ func init() {
 			Safety:      cmdmeta.SafetyNonIdempotent,
 			Destructive: true,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			seq := reqAccountSeq(in.Values)
 			_, b, meta, err := raw.KRWDeposit(ctx, rawapi.KRWDepositRequest{
 				Amount:     reqStr(in.Values, "amount"),
@@ -352,7 +352,7 @@ func init() {
 			Safety:      cmdmeta.SafetyNonIdempotent,
 			Destructive: true,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			seq := reqAccountSeq(in.Values)
 			_, b, meta, err := raw.KRWWithdraw(ctx, rawapi.KRWWithdrawRequest{
 				Amount:     reqStr(in.Values, "amount"),
@@ -377,7 +377,7 @@ func init() {
 			Auth:     signedAuth("readDeposits"),
 			Safety:   cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, args fundingArgs, pol korbit.Policy) (json.RawMessage, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, args fundingArgs, pol apiclient.Policy) (json.RawMessage, error) {
 			_, b, _, err := raw.KRWDeposits(ctx, rawapi.KRWDepositsRequest{Limit: &args.limit, AccountSeq: &args.accountSeq}, pol)
 			return b, err
 		},
@@ -399,7 +399,7 @@ func init() {
 			Auth:     signedAuth("readWithdrawals"),
 			Safety:   cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, args fundingArgs, pol korbit.Policy) (json.RawMessage, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, args fundingArgs, pol apiclient.Policy) (json.RawMessage, error) {
 			_, b, _, err := raw.KRWWithdrawals(ctx, rawapi.KRWWithdrawalsRequest{Limit: &args.limit, AccountSeq: &args.accountSeq}, pol)
 			return b, err
 		},

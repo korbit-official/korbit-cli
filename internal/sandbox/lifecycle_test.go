@@ -15,8 +15,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/sandbox/deno"
 )
 
@@ -147,7 +147,7 @@ func TestStartStopWithFakeRuntime(t *testing.T) {
 	cacheDir := t.TempDir()
 
 	// Seed a real ED25519 PEM as the sandbox's "secret".
-	kp, err := korbit.GenerateKeypair()
+	kp, err := apiclient.GenerateKeypair()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +232,7 @@ func TestStartStopWithFakeRuntime(t *testing.T) {
 func TestStartReusesRunningInstance(t *testing.T) {
 	home := t.TempDir()
 	cacheDir := t.TempDir()
-	kp, err := korbit.GenerateKeypair()
+	kp, err := apiclient.GenerateKeypair()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,7 +277,7 @@ func TestStartReusesRunningInstance(t *testing.T) {
 func TestStartRefusesClobberingRealKey(t *testing.T) {
 	home := t.TempDir()
 	cacheDir := t.TempDir()
-	kp, _ := korbit.GenerateKeypair()
+	kp, _ := apiclient.GenerateKeypair()
 	km := keys.NewManager(home, "file", func() int64 { return 1700000000000 }, nil)
 	// Pre-create a REAL key named "sandbox".
 	if _, err := km.Add("sandbox", kp.PrivatePEM, "file"); err != nil {

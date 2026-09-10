@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/journal"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/ops"
 	"github.com/korbit-official/korbit-cli/internal/output"
 	"github.com/korbit-official/korbit-cli/internal/version"
@@ -34,8 +34,8 @@ import (
 // open failure is fatal regardless of surface (see the package doc); the
 // per-call FailMode governs only post-send write failures.
 func (r *Recorder) Begin(o ops.OpStart) (ops.OpHandle, error) {
-	info := korbit.CallInfo{
-		Origin:   korbit.Origin{Surface: o.Surface},
+	info := apiclient.CallInfo{
+		Origin:   apiclient.Origin{Surface: o.Surface},
 		Auth:     o.Auth,
 		Safety:   o.Safety,
 		KeyName:  o.KeyName,
@@ -107,7 +107,7 @@ func (h *OpHandle) OperationID() int64 {
 // unjournaled path uses), so the send proceeds un-journaled. The journal is
 // already open from Begin, so a recording recorder's Ready only captures the
 // start timestamp — the hard open gate already fired in Begin.
-func (h *OpHandle) ForCall(orderedParams string) korbit.Recorder {
+func (h *OpHandle) ForCall(orderedParams string) apiclient.Recorder {
 	if h == nil || !h.recording {
 		return nil
 	}
@@ -221,7 +221,7 @@ type opCallRecorder struct {
 
 // Ready captures the start timestamp on the injectable clock; the journal is
 // already open from Begin, so there is no open gate here (it fired in Begin).
-func (c *opCallRecorder) Ready(korbit.CallInfo) error {
+func (c *opCallRecorder) Ready(apiclient.CallInfo) error {
 	c.startedMs = c.parent.clock()
 	c.started = true
 	return nil
@@ -230,7 +230,7 @@ func (c *opCallRecorder) Ready(korbit.CallInfo) error {
 // Record writes the api_calls row under the operation, delivering a write failure
 // to the onPostFailure sink with the handle's FailMode (Warn logs/toasts; Fail
 // captures for the cli to surface fatally) — never returned.
-func (c *opCallRecorder) Record(info korbit.CallInfo, out korbit.Outcome) int64 {
+func (c *opCallRecorder) Record(info apiclient.CallInfo, out apiclient.Outcome) int64 {
 	rec := callRecordFrom(info, out)
 	rec.OperationID = c.operationID
 	rec.Seq = c.seq

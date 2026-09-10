@@ -22,6 +22,7 @@ import (
 	"github.com/charmbracelet/x/term"
 
 	"github.com/korbit-official/korbit-cli/internal/accountseq"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/callrec"
 	"github.com/korbit-official/korbit-cli/internal/candles"
 	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
@@ -33,7 +34,6 @@ import (
 	"github.com/korbit-official/korbit-cli/internal/i18n"
 	"github.com/korbit-official/korbit-cli/internal/journal"
 	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/ops"
 	"github.com/korbit-official/korbit-cli/internal/output"
 	"github.com/korbit-official/korbit-cli/internal/progname"
@@ -225,7 +225,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string, tuiRun func(tui.Conf
 	// at once. The stream session shares it via its Config.Client (built below).
 	localNow := cx.Now
 	clk := clock.New(localNow)
-	syncer := cx.NewClockSyncer(clk, baseURL, timeoutMs, korbit.SurfaceTUI, "clock")
+	syncer := cx.NewClockSyncer(clk, baseURL, timeoutMs, apiclient.SurfaceTUI, "clock")
 
 	// Stream-layer loggers, tagged for filtering (see internal/stream/doc.go
 	// "Logging"): component=stream for the connection mechanics, component=stream/
@@ -249,7 +249,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string, tuiRun func(tui.Conf
 	// backfill reads consult the trader's recorder (the stream-backfill surface is
 	// policy-exempt, so they are consulted but never journaled). A public-only
 	// session leaves both nil.
-	var streamCreds *korbit.Credentials
+	var streamCreds *apiclient.Credentials
 	var rec *callrec.Recorder
 	// One signing context shared by the TUI's two clients — the order client and
 	// the stream-backfill client — each minted via base.as for its own surface,
@@ -274,7 +274,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string, tuiRun func(tui.Conf
 		}
 		keyName = resolved.Name
 		apiKeyID := resolved.APIKeyID
-		streamCreds = &korbit.Credentials{APIKeyID: apiKeyID, Signer: signer}
+		streamCreds = &apiclient.Credentials{APIKeyID: apiKeyID, Signer: signer}
 		base.Creds, base.KeyName = streamCreds, keyName
 		cx.IO.Notef("korbit-cli: signing as key %q", resolved.Name)
 
@@ -337,7 +337,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string, tuiRun func(tui.Conf
 		// balances, fills) consult this SAME recorder via the stream client below —
 		// the policy exempts the stream-backfill surface, so they are consulted but
 		// never journaled.
-		client := cx.BuildClient(base.As(korbit.SurfaceTUI, "orders", tuiLog))
+		client := cx.BuildClient(base.As(apiclient.SurfaceTUI, "orders", tuiLog))
 		t.api = ops.NewAPI(client)
 		t.api.RetryBudgetMs = 5000
 		t.api.Stderr = tuiLogSink // --log-file when set, else io.Discard (the UI surfaces results itself)
@@ -348,7 +348,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string, tuiRun func(tui.Conf
 		// (its own log detail tag), sharing the recorder — so a funding write is
 		// journaled exactly like `withdraw request` on the command line, and the
 		// money movers inherit their single-shot policy from the ops catalog.
-		fclient := cx.BuildClient(base.As(korbit.SurfaceTUI, "funding", tuiLog))
+		fclient := cx.BuildClient(base.As(apiclient.SurfaceTUI, "funding", tuiLog))
 		fapi := ops.NewAPI(fclient)
 		fapi.RetryBudgetMs = 5000
 		fapi.Stderr = tuiLogSink
@@ -366,7 +366,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string, tuiRun func(tui.Conf
 	// (set for a private session) sign the upgrade; its recorder consults the
 	// journaling policy, which exempts the stream-backfill surface (recovery reads,
 	// not actions, so consulted but never journaled). A public session is creds-less.
-	streamClient := cx.BuildClient(base.As(korbit.SurfaceStreamBackfill, "", streamLog))
+	streamClient := cx.BuildClient(base.As(apiclient.SurfaceStreamBackfill, "", streamLog))
 
 	// The private channels now carry the finalized sub-account set (every
 	// subscribed account); public channels ignore it.
@@ -378,7 +378,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string, tuiRun func(tui.Conf
 		Client:            streamClient,
 		ProactiveTimeSync: cx.Modes.TimeSync.Proactive(),
 		Dial:              cx.WSDial,
-		UserAgent:         useragent.For(korbit.SurfaceStreamWS, ""),
+		UserAgent:         useragent.For(apiclient.SurfaceStreamWS, ""),
 		Now:               cx.Now,
 		Sleep:             cx.Sleep,
 		Log:               streamLog,
@@ -500,7 +500,7 @@ func tuiCandles(cx *clienv.Cmd, baseURL string, timeoutMs int, rec *callrec.Reco
 	// Public read (candles need no signing or clock) — built through the single
 	// client site for a uniform logger/UA/Origin and the one journaling closure.
 	client := cx.BuildClient(clienv.ClientSpec{
-		Surface:   korbit.SurfaceTUI,
+		Surface:   apiclient.SurfaceTUI,
 		Detail:    "candles",
 		BaseURL:   baseURL,
 		TimeoutMs: timeoutMs,
@@ -538,7 +538,7 @@ func tuiCandles(cx *clienv.Cmd, baseURL string, timeoutMs int, rec *callrec.Reco
 		params["symbol"] = sym
 		res, err := op.Run(context.Background(), api, ops.RunInput{
 			Values:   params,
-			Controls: ops.Controls{Surface: korbit.SurfaceTUI},
+			Controls: ops.Controls{Surface: apiclient.SurfaceTUI},
 		})
 		if err != nil {
 			return nil, err
@@ -560,7 +560,7 @@ func tuiCandles(cx *clienv.Cmd, baseURL string, timeoutMs int, rec *callrec.Reco
 func tuiTickSizePolicy(cx *clienv.Cmd, baseURL string, timeoutMs int, rec *callrec.Recorder) func(symbol string) (tui.TickPolicy, error) {
 	tuiLog, _ := tuiLogging(cx)
 	client := cx.BuildClient(clienv.ClientSpec{
-		Surface:   korbit.SurfaceTUI,
+		Surface:   apiclient.SurfaceTUI,
 		Detail:    "ticksize",
 		BaseURL:   baseURL,
 		TimeoutMs: timeoutMs,
@@ -569,7 +569,7 @@ func tuiTickSizePolicy(cx *clienv.Cmd, baseURL string, timeoutMs int, rec *callr
 	})
 	raw := rawapi.New(client, tuiLog)
 	return func(symbol string) (tui.TickPolicy, error) {
-		pols, _, _, err := raw.TickSize(context.Background(), rawapi.TickSizeRequest{Symbol: rawapi.Symbol(symbol)}, korbit.Policy{Idempotent: true})
+		pols, _, _, err := raw.TickSize(context.Background(), rawapi.TickSizeRequest{Symbol: rawapi.Symbol(symbol)}, apiclient.Policy{Idempotent: true})
 		if err != nil {
 			return tui.TickPolicy{}, err
 		}
@@ -597,7 +597,7 @@ func tuiTickSizePolicy(cx *clienv.Cmd, baseURL string, timeoutMs int, rec *callr
 func tuiOrderValueBounds(cx *clienv.Cmd, baseURL string, timeoutMs int, rec *callrec.Recorder) func(symbol string) (ops.OrderValueBounds, error) {
 	tuiLog, _ := tuiLogging(cx)
 	client := cx.BuildClient(clienv.ClientSpec{
-		Surface:   korbit.SurfaceTUI,
+		Surface:   apiclient.SurfaceTUI,
 		Detail:    "pairs",
 		BaseURL:   baseURL,
 		TimeoutMs: timeoutMs,
@@ -606,7 +606,7 @@ func tuiOrderValueBounds(cx *clienv.Cmd, baseURL string, timeoutMs int, rec *cal
 	})
 	raw := rawapi.New(client, tuiLog)
 	return func(symbol string) (ops.OrderValueBounds, error) {
-		pairs, _, _, err := raw.Pairs(context.Background(), rawapi.PairsRequest{}, korbit.Policy{Idempotent: true})
+		pairs, _, _, err := raw.Pairs(context.Background(), rawapi.PairsRequest{}, apiclient.Policy{Idempotent: true})
 		return resolveTUIBounds(pairs, err, symbol)
 	}
 }
@@ -634,10 +634,10 @@ func resolveTUIBounds(pairs []rawapi.Pair, err error, symbol string) (ops.OrderV
 // clears the TUI's fetch guard so the next trigger retries — until a policy
 // lands, arming an order stays gated (see tui.Config.Fees).
 func tuiFees(cx *clienv.Cmd, base clienv.ClientSpec, tuiLog *slog.Logger) func(symbol string, accountSeq int) (tui.FeeRates, error) {
-	client := cx.BuildClient(base.As(korbit.SurfaceTUI, "fees", tuiLog))
+	client := cx.BuildClient(base.As(apiclient.SurfaceTUI, "fees", tuiLog))
 	raw := rawapi.New(client, tuiLog)
 	return func(symbol string, accountSeq int) (tui.FeeRates, error) {
-		rows, _, _, err := raw.Fees(context.Background(), rawapi.FeesRequest{Symbol: &symbol, AccountSeq: &accountSeq}, korbit.Policy{Idempotent: true})
+		rows, _, _, err := raw.Fees(context.Background(), rawapi.FeesRequest{Symbol: &symbol, AccountSeq: &accountSeq}, apiclient.Policy{Idempotent: true})
 		if err != nil {
 			return tui.FeeRates{}, err
 		}
@@ -661,14 +661,14 @@ func tuiFees(cx *clienv.Cmd, base clienv.ClientSpec, tuiLog *slog.Logger) func(s
 func launchedPairs(cx *clienv.Cmd, ctx context.Context, baseURL string, timeoutMs int, rec *callrec.Recorder) ([]string, error) {
 	tuiLog, _ := tuiLogging(cx)
 	client := cx.BuildClient(clienv.ClientSpec{
-		Surface:   korbit.SurfaceTUI,
+		Surface:   apiclient.SurfaceTUI,
 		Detail:    "pairs",
 		BaseURL:   baseURL,
 		TimeoutMs: timeoutMs,
 		Rec:       rec,
 		Log:       tuiLog,
 	})
-	pairs, _, _, err := rawapi.New(client, tuiLog).Pairs(ctx, rawapi.PairsRequest{}, korbit.Policy{})
+	pairs, _, _, err := rawapi.New(client, tuiLog).Pairs(ctx, rawapi.PairsRequest{}, apiclient.Policy{})
 	if err != nil {
 		return nil, err
 	}
@@ -695,10 +695,10 @@ const keyStatusActivated = "activated"
 // will sign with. The read is a diagnostic, journaled only under --debug like the
 // TUI's other reads (it shares the public-read recorder).
 func tuiKeyInfo(cx *clienv.Cmd, base clienv.ClientSpec, rec *callrec.Recorder, log *slog.Logger) (json.RawMessage, error) {
-	spec := base.As(korbit.SurfaceTUI, "preflight", log)
+	spec := base.As(apiclient.SurfaceTUI, "preflight", log)
 	spec.Rec = rec
 	client := cx.BuildClient(spec)
-	_, data, _, err := rawapi.New(client, log).Whoami(context.Background(), rawapi.WhoamiRequest{}, korbit.Policy{RetryPreExec: true})
+	_, data, _, err := rawapi.New(client, log).Whoami(context.Background(), rawapi.WhoamiRequest{}, apiclient.Policy{RetryPreExec: true})
 	return data, err
 }
 
@@ -747,7 +747,7 @@ func resolveTUIAccounts(explicit []int, keyDefault string, allowed []int, keyInf
 	if len(allowed) == 0 {
 		// The allowed set is unknown: the key-info read failed, or the server
 		// didn't report the field (older server), or it reported an empty list.
-		if keyInfoErr != nil && korbit.Classify(keyInfoErr) != korbit.ClassFatal {
+		if keyInfoErr != nil && apiclient.Classify(keyInfoErr) != apiclient.ClassFatal {
 			// Omitted --account-seq means "subscribe every account this key can
 			// access", but the read that lists them failed transiently, so the set
 			// is unknown. Silently narrowing to the single active account would hide
@@ -809,7 +809,7 @@ func containsInt(xs []int, v int) bool {
 
 // preflightVerdict decides whether the private TUI session can start from a
 // /v2/currentKeyInfo result (the raw unwrapped data plus the call error). Only a
-// DEFINITIVE rejection blocks the start: korbit.ClassFatal (a 4xx carrying a
+// DEFINITIVE rejection blocks the start: apiclient.ClassFatal (a 4xx carrying a
 // Korbit envelope code — auth/permission/config — the same class the WS upgrade
 // treats as fatal), or an unusable key/account in the returned payload. Both are
 // a ConfigError (exit 4) carrying the fix. A transient failure (network, HTTP
@@ -821,7 +821,7 @@ func containsInt(xs []int, v int) bool {
 // irrelevant.
 func preflightVerdict(data json.RawMessage, err error, accountSeqs []int, nowMs int64, log *slog.Logger) error {
 	if err != nil {
-		if korbit.Classify(err) != korbit.ClassFatal {
+		if apiclient.Classify(err) != apiclient.ClassFatal {
 			// Transient (network / 5xx / 429) or a clock resync that didn't
 			// converge (EXCEED_TIME_WINDOW): not a definitive key/config problem.
 			// Start anyway; the stream layer recovers or resyncs itself.
@@ -1057,7 +1057,7 @@ func (t *tuiTrader) Place(form tui.OrderForm) (tui.PlaceResult, error) {
 	t.recErr = nil
 	res, err := op.Run(context.Background(), t.api, ops.RunInput{
 		Values:   params,
-		Controls: ops.Controls{Surface: korbit.SurfaceTUI},
+		Controls: ops.Controls{Surface: apiclient.SurfaceTUI},
 		KeyName:  t.keyName,
 		APIKeyID: t.apiKeyID,
 	})
@@ -1098,7 +1098,7 @@ func (t *tuiTrader) Cancel(symbol string, orderID int64, accountSeq int) (string
 	t.recErr = nil
 	res, err := op.Run(context.Background(), t.api, ops.RunInput{
 		Values:   params,
-		Controls: ops.Controls{Surface: korbit.SurfaceTUI},
+		Controls: ops.Controls{Surface: apiclient.SurfaceTUI},
 		KeyName:  t.keyName,
 		APIKeyID: t.apiKeyID,
 	})

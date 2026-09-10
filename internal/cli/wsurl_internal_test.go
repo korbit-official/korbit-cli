@@ -70,7 +70,7 @@ func TestProbeEndpoints(t *testing.T) {
 
 // TestResolveDepsDefaultsDoer guards the smoke test: production wires only
 // Stdout/Stderr, so a nil Doer must default to a working client (mirroring
-// korbit.Client) or the REST probe would silently no-op as "not checked".
+// apiclient.Client) or the REST probe would silently no-op as "not checked".
 func TestResolveDepsDefaultsDoer(t *testing.T) {
 	if resolveDeps(Deps{}).Doer == nil {
 		t.Fatal("resolveDeps must default a nil Doer so the REST smoke test can run")

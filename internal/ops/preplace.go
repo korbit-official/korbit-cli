@@ -13,7 +13,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/rawapi"
 )
 
@@ -225,7 +225,7 @@ type BookLevel struct {
 func PrePlaceCheck(ctx context.Context, raw *rawapi.Client, values map[string]string) (PlaceSimulation, []PlaceWarning, error) {
 	req := placeRequest(values)
 
-	book, _, _, err := raw.Orderbook(ctx, rawapi.OrderbookRequest{Symbol: req.Symbol}, korbit.Policy{Idempotent: true})
+	book, _, _, err := raw.Orderbook(ctx, rawapi.OrderbookRequest{Symbol: req.Symbol}, apiclient.Policy{Idempotent: true})
 	if err != nil {
 		return PlaceSimulation{}, nil, err
 	}
@@ -1100,7 +1100,7 @@ func bestQty(req rawapi.OrderPlaceRequest, side string, peg decimal.Decimal) (de
 // fetchTickBands fetches the symbol's tick-size policy bands; nil if the
 // policy can't be fetched — the alignment check is best-effort and secondary.
 func fetchTickBands(ctx context.Context, raw *rawapi.Client, symbol rawapi.Symbol) []TickBand {
-	pols, _, _, err := raw.TickSize(ctx, rawapi.TickSizeRequest{Symbol: symbol}, korbit.Policy{Idempotent: true})
+	pols, _, _, err := raw.TickSize(ctx, rawapi.TickSizeRequest{Symbol: symbol}, apiclient.Policy{Idempotent: true})
 	if err != nil || len(pols) == 0 {
 		return nil
 	}
@@ -1117,7 +1117,7 @@ func fetchTickBands(ctx context.Context, raw *rawapi.Client, symbol rawapi.Symbo
 // documented KRW figures in place (ResolveBoundsForSymbol) and elsewhere skips
 // the bound checks — never a substituted figure from another pair.
 func fetchOrderValueBounds(ctx context.Context, raw *rawapi.Client, symbol rawapi.Symbol) OrderValueBounds {
-	pairs, _, _, err := raw.Pairs(ctx, rawapi.PairsRequest{}, korbit.Policy{Idempotent: true})
+	pairs, _, _, err := raw.Pairs(ctx, rawapi.PairsRequest{}, apiclient.Policy{Idempotent: true})
 	if err != nil {
 		pairs = nil
 	}

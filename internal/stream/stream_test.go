@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/clock"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/logging"
 )
 
@@ -372,38 +372,38 @@ func parseSubscribeItems(t *testing.T, raw []byte) []map[string]any {
 	return items
 }
 
-func testAuth(t *testing.T) (*korbit.Credentials, ed25519.PublicKey) {
+func testAuth(t *testing.T) (*apiclient.Credentials, ed25519.PublicKey) {
 	t.Helper()
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &korbit.Credentials{APIKeyID: "test-key-id", Signer: korbit.NewEd25519Signer(priv)}, pub
+	return &apiclient.Credentials{APIKeyID: "test-key-id", Signer: apiclient.NewEd25519Signer(priv)}, pub
 }
 
 // testClient builds the stream's single Korbit API handle for tests: a
-// korbit.Client over the given REST doer with a real shared clock + Syncer
+// apiclient.Client over the given REST doer with a real shared clock + Syncer
 // (measuring /v2/time through the doer, so the proactive-measure and
 // EXCEED_TIME_WINDOW-resync paths run the real machinery), optional creds for
 // the signed upgrade, and the stream-backfill Origin.
-func testClient(baseURL string, doer korbit.Doer, creds *korbit.Credentials) *korbit.Client {
+func testClient(baseURL string, doer apiclient.Doer, creds *apiclient.Credentials) *apiclient.Client {
 	now := func() int64 { return time.Now().UnixMilli() }
 	clk := clock.New(now)
 	measure := func() (int64, int64, error) {
-		off, err := korbit.MeasureClockOffset(korbit.Options{BaseURL: baseURL, Doer: doer, Now: now}, 0, nil)
+		off, err := apiclient.MeasureClockOffset(apiclient.Options{BaseURL: baseURL, Doer: doer, Now: now}, 0, nil)
 		if err != nil {
 			return 0, 0, err
 		}
 		return off.OffsetMs, off.UncertaintyMs(), nil
 	}
 	syncer := clock.NewSyncer(clk, measure, now, clock.DefaultCoolDownMs)
-	c := &korbit.Client{
+	c := &apiclient.Client{
 		BaseURL: baseURL,
 		Doer:    doer,
 		Creds:   creds,
 		Clock:   clk,
 		Resync:  syncer.Sync,
-		Origin:  korbit.Origin{Surface: "stream-backfill"},
+		Origin:  apiclient.Origin{Surface: "stream-backfill"},
 	}
 	if creds != nil {
 		c.APIKeyID = creds.APIKeyID // recorder metadata (CallInfo); the upgrade header reads Creds.APIKeyID
@@ -435,8 +435,8 @@ func TestNewValidation(t *testing.T) {
 		{"private without creds", Config{Subscriptions: []Subscription{{Channel: ChannelMyAsset}}, Client: testClient("http://x", nil, nil)}, "require a Client with credentials"},
 		// Creds present but malformed: a nil Signer would panic at sign time and an
 		// empty APIKeyID would send an empty X-KAPI-KEY — both rejected up front.
-		{"private creds nil signer", Config{Subscriptions: []Subscription{{Channel: ChannelMyAsset}}, Client: testClient("http://x", nil, &korbit.Credentials{APIKeyID: "k"})}, "require a Client with credentials"},
-		{"private creds empty apiKeyID", Config{Subscriptions: []Subscription{{Channel: ChannelMyAsset}}, Client: testClient("http://x", nil, &korbit.Credentials{Signer: auth.Signer})}, "require a Client with credentials"},
+		{"private creds nil signer", Config{Subscriptions: []Subscription{{Channel: ChannelMyAsset}}, Client: testClient("http://x", nil, &apiclient.Credentials{APIKeyID: "k"})}, "require a Client with credentials"},
+		{"private creds empty apiKeyID", Config{Subscriptions: []Subscription{{Channel: ChannelMyAsset}}, Client: testClient("http://x", nil, &apiclient.Credentials{Signer: auth.Signer})}, "require a Client with credentials"},
 		// A credentialed client with no BaseURL cannot back the private state.
 		{"private without baseURL", Config{Subscriptions: []Subscription{{Channel: ChannelMyAsset}}, Client: testClient("", nil, auth)}, "the Client's BaseURL"},
 		// A trade channel with backfill on needs the client's BaseURL.
@@ -922,11 +922,11 @@ func TestPrivateUpgradeIncludesRecvWindowWhenNeeded(t *testing.T) {
 	// A high-RTT measurement: lean = RTTMin/2 = 2000ms -> recvWindow 12000. Install
 	// it on the client's clock BEFORE Run so the first signed upgrade carries it.
 	clk := clock.New(func() int64 { return time.Now().UnixMilli() })
-	off := korbit.ClockOffset{OffsetMs: 0, RTTMinMs: 4000, Samples: 1}
+	off := apiclient.ClockOffset{OffsetMs: 0, RTTMinMs: 4000, Samples: 1}
 	clk.Install(off.OffsetMs, off.UncertaintyMs())
-	client := &korbit.Client{
+	client := &apiclient.Client{
 		BaseURL: "http://example.test", Doer: doer, Creds: auth, Clock: clk,
-		Origin: korbit.Origin{Surface: "stream-backfill"},
+		Origin: apiclient.Origin{Surface: "stream-backfill"},
 	}
 	s, err := New(Config{
 		Subscriptions: []Subscription{{Channel: ChannelMyAsset}},

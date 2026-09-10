@@ -17,7 +17,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 )
 
 // captureDoer records the last outgoing request and replies with a fixed
@@ -58,24 +58,24 @@ func (d *captureDoer) sentParams(method string) string {
 // keypair at a fixed timestamp and no recvWindow, against the capture doer.
 func newSignedClient(t *testing.T, d *captureDoer) (*Client, ed25519.PublicKey) {
 	t.Helper()
-	kp, err := korbit.GenerateKeypair()
+	kp, err := apiclient.GenerateKeypair()
 	if err != nil {
 		t.Fatalf("keypair: %v", err)
 	}
-	priv, err := korbit.ParsePrivatePEM(kp.PrivatePEM)
+	priv, err := apiclient.ParsePrivatePEM(kp.PrivatePEM)
 	if err != nil {
 		t.Fatalf("parse priv: %v", err)
 	}
-	wire := &korbit.Client{
+	wire := &apiclient.Client{
 		BaseURL: "https://api.example",
 		Doer:    d,
-		Creds:   &korbit.Credentials{APIKeyID: "KID", Signer: korbit.NewEd25519Signer(priv)},
+		Creds:   &apiclient.Credentials{APIKeyID: "KID", Signer: apiclient.NewEd25519Signer(priv)},
 		Clock:   fixedClock(1700000000000),
 	}
 	return New(wire, nil), publicKeyFromPEM(t, kp.PublicPEM)
 }
 
-// fixedClock is a deterministic korbit.Clock for signing tests (no widening,
+// fixedClock is a deterministic apiclient.Clock for signing tests (no widening,
 // zero offset).
 type fixedClock int64
 
@@ -136,7 +136,7 @@ func TestSigningWireBytes(t *testing.T) {
 		_, _, _, err := c.OrderPlace(ctx, OrderPlaceRequest{
 			Symbol: "btc_krw", Side: SideBuy, OrderType: OrderTypeLimit,
 			Price: &price, Qty: &qty,
-		}, korbit.Policy{})
+		}, apiclient.Policy{})
 		if err != nil {
 			t.Fatalf("place: %v", err)
 		}
@@ -158,7 +158,7 @@ func TestSigningWireBytes(t *testing.T) {
 		d := &captureDoer{data: `{"orderId":42}`}
 		c, pub := newSignedClient(t, d)
 		oid := 123456
-		_, _, _, err := c.OrderGet(ctx, OrderGetRequest{Symbol: "btc_krw", OrderID: &oid}, korbit.Policy{})
+		_, _, _, err := c.OrderGet(ctx, OrderGetRequest{Symbol: "btc_krw", OrderID: &oid}, apiclient.Policy{})
 		if err != nil {
 			t.Fatalf("get: %v", err)
 		}
@@ -177,7 +177,7 @@ func TestSigningWireBytes(t *testing.T) {
 		d := &captureDoer{data: `null`}
 		c, pub := newSignedClient(t, d)
 		oid := 123456
-		_, _, _, err := c.OrderCancel(ctx, OrderCancelRequest{Symbol: "btc_krw", OrderID: &oid}, korbit.Policy{})
+		_, _, _, err := c.OrderCancel(ctx, OrderCancelRequest{Symbol: "btc_krw", OrderID: &oid}, apiclient.Policy{})
 		if err != nil {
 			t.Fatalf("cancel: %v", err)
 		}
@@ -210,7 +210,7 @@ func TestOrderedParamsDeclarationOrder(t *testing.T) {
 		// Price omitted (absent optional) — must not appear.
 		Qty: &qty, TimeInForce: &tif, BestNth: &bestNth,
 		ClientOrderID: &coid, PP: &pp, PPPercent: &ppPct, AccountSeq: &seq,
-	}, korbit.Policy{})
+	}, apiclient.Policy{})
 	if err != nil {
 		t.Fatalf("place: %v", err)
 	}
@@ -235,8 +235,8 @@ func TestOrderedParamsDeclarationOrder(t *testing.T) {
 func TestDecodeMarket(t *testing.T) {
 	const data = `[{"symbol":"btc_krw","open":"1","high":"2","low":"0.5","close":"1.5","prevClose":"1","priceChange":"0.5","priceChangePercent":"50","volume":"10","quoteVolume":"15","bestBidPrice":"1.4","bestAskPrice":"1.6","lastTradedAt":1700000000000}]`
 	d := &captureDoer{data: data}
-	c := New(&korbit.Client{BaseURL: "https://api.example", Doer: d}, nil)
-	got, raw, _, err := c.Ticker(context.Background(), TickerRequest{}, korbit.Policy{})
+	c := New(&apiclient.Client{BaseURL: "https://api.example", Doer: d}, nil)
+	got, raw, _, err := c.Ticker(context.Background(), TickerRequest{}, apiclient.Policy{})
 	if err != nil {
 		t.Fatalf("ticker: %v", err)
 	}
@@ -254,11 +254,11 @@ func TestDecodeMarket(t *testing.T) {
 // page, silently capping auto-paging and scroll-back backfill at one page.
 func TestCandlesTimeBoundParamNames(t *testing.T) {
 	d := &captureDoer{data: `[]`}
-	c := New(&korbit.Client{BaseURL: "https://api.example", Doer: d}, nil)
+	c := New(&apiclient.Client{BaseURL: "https://api.example", Doer: d}, nil)
 	start, end := 1_600_000_000_000, 1_700_000_000_000
 	if _, _, _, err := c.Candles(context.Background(),
 		CandlesRequest{Symbol: "btc_krw", Interval: "60", Limit: 200, StartTime: &start, EndTime: &end},
-		korbit.Policy{}); err != nil {
+		apiclient.Policy{}); err != nil {
 		t.Fatalf("candles: %v", err)
 	}
 	q := d.sentParams("GET")
@@ -282,8 +282,8 @@ func TestCandlesTimeBoundParamNames(t *testing.T) {
 func TestDecodeTickSize(t *testing.T) {
 	const data = `[{"symbol":"xrp_krw","tickSizePolicy":[{"priceGte":"0","tickSize":"0.0001"},{"priceGte":"1","tickSize":"0.001"}],"orderbookLevels":["0.1","1","10"]}]`
 	d := &captureDoer{data: data}
-	c := New(&korbit.Client{BaseURL: "https://api.example", Doer: d}, nil)
-	got, raw, _, err := c.TickSize(context.Background(), TickSizeRequest{Symbol: "xrp_krw"}, korbit.Policy{})
+	c := New(&apiclient.Client{BaseURL: "https://api.example", Doer: d}, nil)
+	got, raw, _, err := c.TickSize(context.Background(), TickSizeRequest{Symbol: "xrp_krw"}, apiclient.Policy{})
 	if err != nil {
 		t.Fatalf("ticksize: %v", err)
 	}
@@ -305,7 +305,7 @@ func TestDecodeOrders(t *testing.T) {
 	d := &captureDoer{data: data}
 	c, _ := newSignedClient(t, d)
 	oid := 42
-	got, raw, _, err := c.OrderGet(context.Background(), OrderGetRequest{Symbol: "btc_krw", OrderID: &oid}, korbit.Policy{})
+	got, raw, _, err := c.OrderGet(context.Background(), OrderGetRequest{Symbol: "btc_krw", OrderID: &oid}, apiclient.Policy{})
 	if err != nil {
 		t.Fatalf("order get: %v", err)
 	}
@@ -322,7 +322,7 @@ func TestDecodeAccount(t *testing.T) {
 	const data = `[{"currency":"krw","balance":"1000","available":"800","tradeInUse":"200","withdrawalInUse":"0","avgPrice":"0"}]`
 	d := &captureDoer{data: data}
 	c, _ := newSignedClient(t, d)
-	got, raw, _, err := c.Balance(context.Background(), BalanceRequest{}, korbit.Policy{})
+	got, raw, _, err := c.Balance(context.Background(), BalanceRequest{}, apiclient.Policy{})
 	if err != nil {
 		t.Fatalf("balance: %v", err)
 	}
@@ -340,7 +340,7 @@ func TestDecodeFunding(t *testing.T) {
 	const data = `[{"currency":"btc","withdrawableAmount":"1.5","withdrawalInUseAmount":"0.2"}]`
 	d := &captureDoer{data: data}
 	c, _ := newSignedClient(t, d)
-	got, raw, _, err := c.WithdrawAmount(context.Background(), WithdrawAmountRequest{}, korbit.Policy{})
+	got, raw, _, err := c.WithdrawAmount(context.Background(), WithdrawAmountRequest{}, apiclient.Policy{})
 	if err != nil {
 		t.Fatalf("withdraw amount: %v", err)
 	}
@@ -357,8 +357,8 @@ func TestDecodeFunding(t *testing.T) {
 func TestCurrenciesNetworkListVerbatim(t *testing.T) {
 	const data = `[{"name":"usdt","fullName":"Tether","withdrawalMaxAmountPerRequest":"100","withdrawalMinAmount":"1","defaultNetwork":"ETH","networkList":[{"name":"ETH","withdrawalStatus":"open","depositStatus":"open","confirmCount":12}]}]`
 	d := &captureDoer{data: data}
-	c := New(&korbit.Client{BaseURL: "https://api.example", Doer: d}, nil)
-	got, _, _, err := c.Currencies(context.Background(), CurrenciesRequest{}, korbit.Policy{})
+	c := New(&apiclient.Client{BaseURL: "https://api.example", Doer: d}, nil)
+	got, _, _, err := c.Currencies(context.Background(), CurrenciesRequest{}, apiclient.Policy{})
 	if err != nil {
 		t.Fatalf("currencies: %v", err)
 	}

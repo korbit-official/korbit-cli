@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/korbit-official/korbit-cli/internal/agentskill"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/callrec"
 	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
 	"github.com/korbit-official/korbit-cli/internal/cli/doctorcmd"
@@ -32,7 +33,6 @@ import (
 	"github.com/korbit-official/korbit-cli/internal/clock"
 	"github.com/korbit-official/korbit-cli/internal/config"
 	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/ops"
 	"github.com/korbit-official/korbit-cli/internal/output"
 	"github.com/korbit-official/korbit-cli/internal/progname"
@@ -161,7 +161,7 @@ func (rt *runtime) runMCP(cmd *cobra.Command, args []string) error {
 	// One process clock Syncer, measured against the public base URL. The offset
 	// is server-wide (key-independent), so a --multi-key key on a different host
 	// shares this estimate and self-corrects via its own reactive resync.
-	syncer := rt.NewClockSyncer(clk, publicBaseURL, timeoutMs, korbit.SurfaceMCP, "clock")
+	syncer := rt.NewClockSyncer(clk, publicBaseURL, timeoutMs, apiclient.SurfaceMCP, "clock")
 
 	// --time-sync on: measure once up front so the first signed call already signs
 	// in the server's window instead of paying an EXCEED_TIME_WINDOW round-trip.
@@ -282,7 +282,7 @@ func (s *mcpServer) apiForKey(name string) *keyAPI {
 // construction sites (per-key, public, dry-run preflight).
 func (s *mcpServer) clientBase() clienv.ClientSpec {
 	return clienv.ClientSpec{
-		Surface:   korbit.SurfaceMCP,
+		Surface:   apiclient.SurfaceMCP,
 		Clock:     s.clk,
 		TimeoutMs: s.timeoutMs,
 		Rec:       s.rec,
@@ -326,7 +326,7 @@ func (s *mcpServer) buildKeyAPI(name string) *keyAPI {
 	}
 	spec := s.clientBase()
 	spec.BaseURL = baseURL
-	spec.Creds = &korbit.Credentials{APIKeyID: resolved.APIKeyID, Signer: signer}
+	spec.Creds = &apiclient.Credentials{APIKeyID: resolved.APIKeyID, Signer: signer}
 	spec.KeyName = resolved.Name
 	// --time-sync off opts out of the reactive EXCEED_TIME_WINDOW resync too.
 	if rt.timeSyncMode().Reactive() {
@@ -579,7 +579,7 @@ func (s *mcpServer) makeToolHandler(c surfaceCmd, multiKey bool) mcp.ToolHandler
 		// false): --no-reconcile is a CLI concept, not an MCP one.
 		res, callErr := c.op.Run(ctx, api, ops.RunInput{
 			Values:   params,
-			Controls: ops.Controls{Surface: korbit.SurfaceMCP},
+			Controls: ops.Controls{Surface: apiclient.SurfaceMCP},
 			KeyName:  keyName,
 			APIKeyID: apiKeyID,
 		})

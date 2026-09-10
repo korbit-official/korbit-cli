@@ -8,8 +8,8 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/rawapi"
 )
 
@@ -43,7 +43,7 @@ func init() {
 			Examples: []string{"{prog} ticker btc_krw", "{prog} ticker btc_krw eth_krw", "{prog} ticker"},
 			Safety:   cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			_, b, meta, err := raw.Ticker(ctx, rawapi.TickerRequest{
 				Symbol: optStr(in.Values, "symbol"),
 			}, pol)
@@ -67,7 +67,7 @@ func init() {
 			Examples: []string{"{prog} orderbook btc_krw", "{prog} orderbook btc_krw --level 4"},
 			Safety:   cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			_, b, meta, err := raw.Orderbook(ctx, rawapi.OrderbookRequest{
 				Symbol: rawapi.Symbol(reqStr(in.Values, "symbol")),
 				Level:  optStr(in.Values, "level"),
@@ -94,7 +94,7 @@ func init() {
 			Examples: []string{"{prog} trades btc_krw --limit 50"},
 			Safety:   cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			_, b, meta, err := raw.Trades(ctx, rawapi.TradesRequest{
 				Symbol: rawapi.Symbol(reqStr(in.Values, "symbol")),
 				Limit:  optInt(in.Values, "limit"),
@@ -121,7 +121,7 @@ func init() {
 			Examples: []string{"{prog} pairs"},
 			Safety:   cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			_, b, meta, err := raw.Pairs(ctx, rawapi.PairsRequest{}, pol)
 			return b, meta, err
 		},
@@ -143,7 +143,7 @@ func init() {
 			Examples: []string{"{prog} ticksize btc_krw"},
 			Safety:   cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			_, b, meta, err := raw.TickSize(ctx, rawapi.TickSizeRequest{
 				Symbol: rawapi.Symbol(reqStr(in.Values, "symbol")),
 			}, pol)
@@ -166,7 +166,7 @@ func init() {
 			Examples: []string{"{prog} currencies"},
 			Safety:   cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			_, b, meta, err := raw.Currencies(ctx, rawapi.CurrenciesRequest{}, pol)
 			return b, meta, err
 		},
@@ -182,7 +182,7 @@ func init() {
 			Examples: []string{"{prog} time"},
 			Safety:   cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			_, b, meta, err := raw.Time(ctx, rawapi.TimeRequest{}, pol)
 			if err != nil {
 				return b, meta, err
@@ -234,7 +234,7 @@ func init() {
 // make the offset meaningless, so the server time is returned without skew
 // fields. Both frontends (cli and mcp serve) dispatch through this op, so both
 // surface the skew.
-func withTimeSkew(body json.RawMessage, meta korbit.Meta) json.RawMessage {
+func withTimeSkew(body json.RawMessage, meta apiclient.Meta) json.RawMessage {
 	if meta.Attempts > 1 || meta.StartedAtMs == 0 || meta.FinishedAtMs == 0 || meta.FinishedAtMs < meta.StartedAtMs {
 		return body
 	}

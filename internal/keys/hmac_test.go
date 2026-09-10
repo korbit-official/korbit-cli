@@ -63,7 +63,7 @@ func TestResolveHMACBuildsHexSigner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Same vector as the korbit package's signer test, proving the seam wires the
+	// Same vector as the apiclient package's signer test, proving the seam wires the
 	// secret bytes through unchanged.
 	if got := signer.Sign("The quick brown fox jumps over the lazy dog"); got != "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8" {
 		t.Fatalf("hmac signer wire form wrong: %q", got)

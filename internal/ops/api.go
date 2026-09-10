@@ -11,18 +11,18 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/logging"
 	"github.com/korbit-official/korbit-cli/internal/rawapi"
 )
 
 // API is the L2 operations layer over the typed L1 endpoints. It owns ALL retry
-// and idempotency policy: every operation decides the korbit.Policy the wire
+// and idempotency policy: every operation decides the apiclient.Policy the wire
 // client will execute and the reconcile protocol around it. A frontend builds
 // one API and asks an Operation to Run; it never decides call policy itself.
 //
 // Build one with NewAPI, which seeds the clock/time/scheduling seams (Resync,
-// ServerNow, Sleep, Log) from the *korbit.Client the Operations call through, so
+// ServerNow, Sleep, Log) from the *apiclient.Client the Operations call through, so
 // they cannot drift from the client that actually signs and sends. A frontend
 // then sets only the ops-level policy (RetryBudgetMs, Journal, Stderr). The zero
 // RetryBudgetMs is treated as "no budgeted (sleeping) retries", same as a single
@@ -36,18 +36,18 @@ type API struct {
 	// protocol's clock-resync hook (the ONLY user of this field, since that
 	// protocol drives single-shot sends through its own reconcile loop rather than
 	// the L1 client's retry, which corrects EXCEED_TIME_WINDOW itself). NewAPI
-	// seeds it from korbit.Client.Resync — the SAME resync primitive — so the two
+	// seeds it from apiclient.Client.Resync — the SAME resync primitive — so the two
 	// never diverge. nil disables that one corrective resync.
 	Resync func() error
 	// ServerNow is the server-clock estimate in unix ms, used to default the
 	// history walk's lookback window (a server-relative time filter sent on the
-	// wire). NewAPI seeds it from korbit.Client.ServerNowMs — the same clock the
+	// wire). NewAPI seeds it from apiclient.Client.ServerNowMs — the same clock the
 	// client signs against. nil falls back to the local wall clock. (The journal's
 	// row times do NOT use this — they are stamped by the frontend's own system
 	// clock in internal/callrec.)
 	ServerNow func() int64
 	// Sleep is the inter-retry delay primitive for the place protocol's budgeted
-	// waits; NewAPI seeds it from korbit.Client.Sleep. nil = time.Sleep.
+	// waits; NewAPI seeds it from apiclient.Client.Sleep. nil = time.Sleep.
 	Sleep func(time.Duration)
 	// RetryBudgetMs bounds the place protocol's total reconcile sleep and the
 	// default per-call retry budget handed to idempotent passthrough calls.
@@ -84,7 +84,7 @@ type API struct {
 // NewAPI builds the L2 operations layer over a wire client. It is the single
 // production construction site: the typed endpoint layer (Raw) and the
 // clock/time/scheduling seams (Resync, ServerNow, Sleep) and the operational
-// logger (Log) are all derived from the one *korbit.Client the Operations call
+// logger (Log) are all derived from the one *apiclient.Client the Operations call
 // through, so they cannot drift from the client that actually signs and sends —
 // the same resync primitive, the same clock estimate, the same sleep and logger.
 // The caller then sets only the ops-level policy that the client does not own:
@@ -93,7 +93,7 @@ type API struct {
 //
 // Tests build *API directly to inject scripted seams over a rawapi.Doer fake;
 // NewAPI is the production path that ties the seams to a real client.
-func NewAPI(client *korbit.Client) *API {
+func NewAPI(client *apiclient.Client) *API {
 	return &API{
 		Raw:       rawapi.New(client, client.Log),
 		Resync:    client.Resync,

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/rawapi"
 )
 
@@ -27,22 +27,22 @@ type fakeMarketDoer struct {
 	err   error
 }
 
-func (d fakeMarketDoer) Do(_ context.Context, call korbit.Call, _ korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+func (d fakeMarketDoer) Do(_ context.Context, call apiclient.Call, _ apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 	if d.err != nil {
-		return nil, korbit.Meta{}, d.err
+		return nil, apiclient.Meta{}, d.err
 	}
 	switch call.Path {
 	case "/v2/orderbook":
-		return json.RawMessage(d.orderbook), korbit.Meta{}, nil
+		return json.RawMessage(d.orderbook), apiclient.Meta{}, nil
 	case "/v2/tickSizePolicy":
-		return json.RawMessage(d.tickSize), korbit.Meta{}, nil
+		return json.RawMessage(d.tickSize), apiclient.Meta{}, nil
 	case "/v2/currencyPairs":
 		if d.pairs == "" {
-			return json.RawMessage(`[]`), korbit.Meta{}, nil
+			return json.RawMessage(`[]`), apiclient.Meta{}, nil
 		}
-		return json.RawMessage(d.pairs), korbit.Meta{}, nil
+		return json.RawMessage(d.pairs), apiclient.Meta{}, nil
 	}
-	return json.RawMessage(`{}`), korbit.Meta{}, nil
+	return json.RawMessage(`{}`), apiclient.Meta{}, nil
 }
 
 // a liquid book around a ~10,000,000 mid, tick 1000.

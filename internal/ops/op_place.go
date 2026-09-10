@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/ids"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/progname"
 	"github.com/korbit-official/korbit-cli/internal/rawapi"
 )
@@ -183,8 +183,8 @@ func (op placeOp) runReconcile(ctx context.Context, a *API, h OpHandle, args pla
 		return Result{}, jerr
 	}
 
-	send := func() (json.RawMessage, korbit.Meta, error) {
-		_, b, meta, err := a.Raw.OrderPlace(ctx, req, korbit.Policy{})
+	send := func() (json.RawMessage, apiclient.Meta, error) {
+		_, b, meta, err := a.Raw.OrderPlace(ctx, req, apiclient.Policy{})
 		return b, meta, err
 	}
 
@@ -196,7 +196,7 @@ func (op placeOp) runReconcile(ctx context.Context, a *API, h OpHandle, args pla
 	)
 	budget := int64(a.RetryBudgetMs)
 
-	gov := korbit.NewRetryGovernor(true, true, a.Resync != nil, budget)
+	gov := apiclient.NewRetryGovernor(true, true, a.Resync != nil, budget)
 	var lastErr error
 	for gov.Attempt() {
 		data, _, err := send()
@@ -207,7 +207,7 @@ func (op placeOp) runReconcile(ctx context.Context, a *API, h OpHandle, args pla
 			break
 		}
 		lastErr = err
-		class := korbit.Classify(err)
+		class := apiclient.Classify(err)
 		ae := apiErrOf(err)
 		trace(log, "order place: send failed",
 			"clientOrderId", clientOrderID, "attempt", sends,
@@ -222,7 +222,7 @@ func (op placeOp) runReconcile(ctx context.Context, a *API, h OpHandle, args pla
 			break
 		}
 
-		dec := gov.Next(class, korbit.RetryAfterMs(err))
+		dec := gov.Next(class, apiclient.RetryAfterMs(err))
 		// The retry-governor decision is the ops-owned reasoning the wire layer
 		// can't see (it logs each HTTP attempt; this logs why ops resends or stops).
 		log.Debug("order place: retry decision",
@@ -230,7 +230,7 @@ func (op placeOp) runReconcile(ctx context.Context, a *API, h OpHandle, args pla
 			"class", class.String(), "action", dec.Action.String(),
 			"waitMs", dec.Wait.Milliseconds(), "reason", dec.Reason)
 		switch dec.Action {
-		case korbit.RetryResync:
+		case apiclient.RetryResync:
 			if rerr := a.Resync(); rerr != nil {
 				log.Debug("order place: clock resync failed — giving up",
 					"clientOrderId", clientOrderID, "err", rerr.Error())
@@ -239,9 +239,9 @@ func (op placeOp) runReconcile(ctx context.Context, a *API, h OpHandle, args pla
 				return Result{Attempts: sends, JournalErr: ferr}, err
 			}
 
-		case korbit.RetryWait:
+		case apiclient.RetryWait:
 			if serr := a.sleep(ctx, dec.Wait); serr != nil {
-				if class == korbit.ClassTransient {
+				if class == apiclient.ClassTransient {
 					return a.reconcileUnknownTyped(ctx, h, symbol, clientOrderID, accountSeq, err, finish, sends)
 				}
 				finish("failed", "", codeOf(ae), sends)
@@ -249,8 +249,8 @@ func (op placeOp) runReconcile(ctx context.Context, a *API, h OpHandle, args pla
 				return Result{Attempts: sends, JournalErr: ferr}, err
 			}
 
-		case korbit.RetryGiveUp:
-			if class == korbit.ClassTransient {
+		case apiclient.RetryGiveUp:
+			if class == apiclient.ClassTransient {
 				return a.reconcileUnknownTyped(ctx, h, symbol, clientOrderID, accountSeq, err, finish, sends)
 			}
 			finish("failed", "", codeOf(ae), sends)
@@ -337,7 +337,7 @@ func (op placeOp) runAck(ctx context.Context, a *API, h OpHandle, args placeArgs
 		return Result{}, jerr
 	}
 
-	_, data, meta, err := a.Raw.OrderPlace(ctx, req, korbit.Policy{})
+	_, data, meta, err := a.Raw.OrderPlace(ctx, req, apiclient.Policy{})
 	res := Result{Attempts: meta.Attempts}
 	if err == nil {
 		orderID := jsonNumberField(data, "orderId")
@@ -348,7 +348,7 @@ func (op placeOp) runAck(ctx context.Context, a *API, h OpHandle, args placeArgs
 		return res, nil
 	}
 	ae := apiErrOf(err)
-	if korbit.Classify(err) == korbit.ClassTransient {
+	if apiclient.Classify(err) == apiclient.ClassTransient {
 		log.Debug("order place: state UNKNOWN (no-reconcile, ambiguous single-shot failure, not verified)",
 			"clientOrderId", clientOrderID, "code", codeOf(ae))
 		finish("unknown", "", codeOf(ae), meta.Attempts)
@@ -412,7 +412,7 @@ func (a *API) lookupOrderTyped(ctx context.Context, symbol, clientOrderID string
 				return nil, false, serr
 			}
 		}
-		_, data, _, err := a.Raw.OrderGet(ctx, req, korbit.Policy{Idempotent: true, BudgetMs: a.RetryBudgetMs})
+		_, data, _, err := a.Raw.OrderGet(ctx, req, apiclient.Policy{Idempotent: true, BudgetMs: a.RetryBudgetMs})
 		if err != nil {
 			if isOrderNotFound(err) {
 				trace(log, "order place: lookup not-found (read may be lagging, retrying)",
@@ -491,23 +491,23 @@ func placeParamsJSON(req rawapi.OrderPlaceRequest) string {
 
 // paramsCapture mirrors the wire layer's ordered-param builder so the order
 // journal records the same pre-signing parameter object the placement sends.
-type paramsCapture struct{ kv []korbit.KV }
+type paramsCapture struct{ kv []apiclient.KV }
 
 func (p *paramsCapture) str(key, value string) {
-	p.kv = append(p.kv, korbit.KV{Key: key, Value: value})
+	p.kv = append(p.kv, apiclient.KV{Key: key, Value: value})
 }
 func (p *paramsCapture) strPtr(key string, value *string) {
 	if value != nil {
-		p.kv = append(p.kv, korbit.KV{Key: key, Value: *value})
+		p.kv = append(p.kv, apiclient.KV{Key: key, Value: *value})
 	}
 }
 func (p *paramsCapture) intPtr(key string, value *int) {
 	if value != nil {
-		p.kv = append(p.kv, korbit.KV{Key: key, Value: strconv.Itoa(*value)})
+		p.kv = append(p.kv, apiclient.KV{Key: key, Value: strconv.Itoa(*value)})
 	}
 }
 func (p *paramsCapture) boolFlag(key string, value *bool) {
 	if value != nil {
-		p.kv = append(p.kv, korbit.KV{Key: key, Value: strconv.FormatBool(*value)})
+		p.kv = append(p.kv, apiclient.KV{Key: key, Value: strconv.FormatBool(*value)})
 	}
 }

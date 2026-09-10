@@ -125,4 +125,4 @@
 // plain Resync func() error hook, rather than holding a *clock.State. The clock
 // measurement primitive (MeasureClockOffset) lives here; the shared estimate
 // holder lives in internal/clock.
-package korbit
+package apiclient

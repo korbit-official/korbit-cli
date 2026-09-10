@@ -63,8 +63,8 @@ const MethodManagedScript = "managed-script"
 const devVersion = "dev"
 
 // Doer performs an HTTP request. *http.Client satisfies it, as does the CLI's
-// shared korbit.Doer; tests inject a stub. Declared locally so the package does
-// not depend on internal/korbit.
+// shared apiclient.Doer; tests inject a stub. Declared locally so the package does
+// not depend on internal/apiclient.
 type Doer interface {
 	Do(*http.Request) (*http.Response, error)
 }

@@ -13,13 +13,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cli/probe"
 	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 )
 
 func TestRegistrationLink(t *testing.T) {
-	kp, err := korbit.GenerateKeypair()
+	kp, err := apiclient.GenerateKeypair()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestRegistrationLink(t *testing.T) {
 // registration deep link: "korbit-cli: <key name>", so a CLI-issued key is
 // recognizable in the developers portal.
 func TestNewKeyGuidanceLabelsLink(t *testing.T) {
-	kp, err := korbit.GenerateKeypair()
+	kp, err := apiclient.GenerateKeypair()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestNewKeyGuidanceLabelsLink(t *testing.T) {
 }
 
 func TestRegistrationLinkOmitsEmptyWhitelist(t *testing.T) {
-	kp, _ := korbit.GenerateKeypair()
+	kp, _ := apiclient.GenerateKeypair()
 	u, err := url.Parse(registrationLink(probe.PortalURL, kp.PublicPEM, "bot", nil, permTrading))
 	if err != nil {
 		t.Fatal(err)

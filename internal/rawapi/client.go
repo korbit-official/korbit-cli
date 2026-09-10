@@ -10,20 +10,20 @@ import (
 	"log/slog"
 	"strconv"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/logging"
 )
 
 // Doer is the minimal wire surface the typed layer drives: one logical call
-// executed under a policy. *korbit.Client satisfies it; an interface here keeps
+// executed under a policy. *apiclient.Client satisfies it; an interface here keeps
 // the typed layer testable with a scripted fake and documents that it needs
 // nothing more than Do.
 type Doer interface {
-	Do(ctx context.Context, call korbit.Call, pol korbit.Policy) (json.RawMessage, korbit.Meta, error)
+	Do(ctx context.Context, call apiclient.Call, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error)
 }
 
 // Client is the typed endpoint layer over a wire client. It is configured once
-// (with a Doer, a *korbit.Client in production) and reused; safety for
+// (with a Doer, an *apiclient.Client in production) and reused; safety for
 // concurrent use matches the wrapped client.
 type Client struct {
 	wire Doer
@@ -47,30 +47,30 @@ func New(wire Doer, log *slog.Logger) *Client {
 // it sends, so positionals are appended before the remaining parameters and an
 // absent optional parameter is skipped.
 type params struct {
-	kv []korbit.KV
+	kv []apiclient.KV
 }
 
 // str appends a required string-valued parameter.
 func (p *params) str(key, value string) {
-	p.kv = append(p.kv, korbit.KV{Key: key, Value: value})
+	p.kv = append(p.kv, apiclient.KV{Key: key, Value: value})
 }
 
 // strPtr appends an optional string-valued parameter only when set.
 func (p *params) strPtr(key string, value *string) {
 	if value != nil {
-		p.kv = append(p.kv, korbit.KV{Key: key, Value: *value})
+		p.kv = append(p.kv, apiclient.KV{Key: key, Value: *value})
 	}
 }
 
 // intVal appends a required int-valued parameter, formatted as a string.
 func (p *params) intVal(key string, value int) {
-	p.kv = append(p.kv, korbit.KV{Key: key, Value: strconv.Itoa(value)})
+	p.kv = append(p.kv, apiclient.KV{Key: key, Value: strconv.Itoa(value)})
 }
 
 // intPtr appends an optional int-valued parameter only when set.
 func (p *params) intPtr(key string, value *int) {
 	if value != nil {
-		p.kv = append(p.kv, korbit.KV{Key: key, Value: strconv.Itoa(*value)})
+		p.kv = append(p.kv, apiclient.KV{Key: key, Value: strconv.Itoa(*value)})
 	}
 }
 
@@ -78,7 +78,7 @@ func (p *params) intPtr(key string, value *int) {
 // "true"/"false".
 func (p *params) boolFlag(key string, value *bool) {
 	if value != nil {
-		p.kv = append(p.kv, korbit.KV{Key: key, Value: strconv.FormatBool(*value)})
+		p.kv = append(p.kv, apiclient.KV{Key: key, Value: strconv.FormatBool(*value)})
 	}
 }
 
@@ -95,9 +95,9 @@ func (p *params) boolFlag(key string, value *bool) {
 // response shape. A caller that needs the typed view checks it against the
 // bytes; one that only forwards the bytes is unaffected by a shape it never
 // reads.
-func call[T any](c *Client, ctx context.Context, method, path string, auth bool, p params, pol korbit.Policy) (T, json.RawMessage, korbit.Meta, error) {
+func call[T any](c *Client, ctx context.Context, method, path string, auth bool, p params, pol apiclient.Policy) (T, json.RawMessage, apiclient.Meta, error) {
 	var typed T
-	wireCall := korbit.Call{Method: method, Path: path, Params: p.kv, Auth: auth}
+	wireCall := apiclient.Call{Method: method, Path: path, Params: p.kv, Auth: auth}
 	raw, meta, err := c.wire.Do(ctx, wireCall, pol)
 	if err != nil {
 		return typed, raw, meta, err

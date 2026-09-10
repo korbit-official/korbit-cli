@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cli/probe"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 )
 
 func TestSpliceField(t *testing.T) {
@@ -44,7 +44,7 @@ func TestOrderedObject(t *testing.T) {
 	if got := string(orderedObject(nil)); got != `{}` {
 		t.Fatalf("empty -> %s", got)
 	}
-	got := string(orderedObject([]korbit.KV{{Key: "b", Value: "2"}, {Key: "a", Value: "1"}}))
+	got := string(orderedObject([]apiclient.KV{{Key: "b", Value: "2"}, {Key: "a", Value: "1"}}))
 	if got != `{"b":"2","a":"1"}` { // insertion order preserved, not sorted
 		t.Fatalf("order not preserved: %s", got)
 	}

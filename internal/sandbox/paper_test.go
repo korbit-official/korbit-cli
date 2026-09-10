@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 )
 
 func TestInitDBArgsPaper(t *testing.T) {
@@ -87,7 +87,7 @@ func paperHarness(t *testing.T, pairs ...statusPair) (*Manager, string) {
 func paperHarnessMarkets(t *testing.T, markets statusMarkets) (*Manager, string) {
 	t.Helper()
 	home := t.TempDir()
-	kp, err := korbit.GenerateKeypair()
+	kp, err := apiclient.GenerateKeypair()
 	if err != nil {
 		t.Fatal(err)
 	}

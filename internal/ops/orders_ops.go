@@ -8,8 +8,8 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/rawapi"
 )
 
@@ -86,7 +86,7 @@ func init() {
 			Safety:        cmdmeta.SafetyReadOnly,
 			CrossValidate: crossValidateIDXor,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			seq := reqAccountSeq(in.Values)
 			_, b, meta, err := raw.OrderGet(ctx, rawapi.OrderGetRequest{
 				Symbol:        rawapi.Symbol(reqStr(in.Values, "symbol")),
@@ -113,7 +113,7 @@ func init() {
 			Destructive:   true,
 			CrossValidate: crossValidateIDXor,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			seq := reqAccountSeq(in.Values)
 			_, b, meta, err := raw.OrderCancel(ctx, rawapi.OrderCancelRequest{
 				Symbol:        rawapi.Symbol(reqStr(in.Values, "symbol")),
@@ -141,7 +141,7 @@ func init() {
 			Auth:     signedAuth("readOrders"),
 			Safety:   cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			seq := reqAccountSeq(in.Values)
 			_, b, meta, err := raw.OrderOpen(ctx, rawapi.OrderOpenRequest{
 				Symbol:     rawapi.Symbol(reqStr(in.Values, "symbol")),
@@ -173,7 +173,7 @@ func init() {
 			CrossValidate: crossValidateTimeWindow,
 		},
 		tsField: "createdAt", idField: "orderId",
-		page: func(ctx context.Context, raw *rawapi.Client, args historyArgs, p pageParams, pol korbit.Policy) (json.RawMessage, error) {
+		page: func(ctx context.Context, raw *rawapi.Client, args historyArgs, p pageParams, pol apiclient.Policy) (json.RawMessage, error) {
 			_, b, _, err := raw.OrderHistory(ctx, rawapi.OrderHistoryRequest{
 				Symbol:     rawapi.Symbol(args.symbol),
 				Limit:      &p.limit,
@@ -213,7 +213,7 @@ func init() {
 			CrossValidate: crossValidateTimeWindow,
 		},
 		tsField: "tradedAt", idField: "tradeId",
-		page: func(ctx context.Context, raw *rawapi.Client, args historyArgs, p pageParams, pol korbit.Policy) (json.RawMessage, error) {
+		page: func(ctx context.Context, raw *rawapi.Client, args historyArgs, p pageParams, pol apiclient.Policy) (json.RawMessage, error) {
 			_, b, _, err := raw.Fills(ctx, rawapi.FillsRequest{
 				Symbol:     rawapi.Symbol(args.symbol),
 				Limit:      &p.limit,

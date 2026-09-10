@@ -43,7 +43,7 @@ func New(now func() int64) *State { return &State{now: now} }
 // (serverClock - localClock); leanMs is the measurement uncertainty that
 // SignNow leans the signed timestamp into the past by (so it can never cross
 // the server's fixed +1s future bound). Callers convert these from a
-// korbit.ClockOffset (offsetMs = off.OffsetMs, leanMs = off.UncertaintyMs());
+// apiclient.ClockOffset (offsetMs = off.OffsetMs, leanMs = off.UncertaintyMs());
 // the conversion lives at the call site so this package stays free of any
 // korbit import (no dependency cycle — see doc.go).
 func (s *State) Install(offsetMs, leanMs int64) {

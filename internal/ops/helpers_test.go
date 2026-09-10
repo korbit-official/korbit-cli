@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/output"
 	"github.com/korbit-official/korbit-cli/internal/rawapi"
 )
@@ -27,8 +27,8 @@ type fakeClient struct {
 }
 
 type recorded struct {
-	call korbit.Call
-	pol  korbit.Policy
+	call apiclient.Call
+	pol  apiclient.Policy
 }
 
 type step struct {
@@ -42,20 +42,20 @@ func (f *fakeClient) on(method, path string, s ...step) {
 	f.steps[method+" "+path] = s
 }
 
-func (f *fakeClient) Do(_ context.Context, call korbit.Call, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+func (f *fakeClient) Do(_ context.Context, call apiclient.Call, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, recorded{call, pol})
 	key := call.Method + " " + call.Path
 	queue := f.steps[key]
 	if len(queue) == 0 {
-		return nil, korbit.Meta{Attempts: 1}, fmt.Errorf("unexpected call %s", key)
+		return nil, apiclient.Meta{Attempts: 1}, fmt.Errorf("unexpected call %s", key)
 	}
 	s := queue[0]
 	if len(queue) > 1 {
 		f.steps[key] = queue[1:]
 	}
-	return s.data, korbit.Meta{Attempts: 1, RecordID: 0}, s.err
+	return s.data, apiclient.Meta{Attempts: 1, RecordID: 0}, s.err
 }
 
 func (f *fakeClient) countOf(method, path string) int {
@@ -116,8 +116,8 @@ func (f fakeOpJournal) Begin(OpStart) (OpHandle, error) { return &fakeOpHandle{o
 
 type fakeOpHandle struct{ oj orderJournalFunc }
 
-func (h *fakeOpHandle) OperationID() int64             { return 0 }
-func (h *fakeOpHandle) ForCall(string) korbit.Recorder { return nil }
+func (h *fakeOpHandle) OperationID() int64                { return 0 }
+func (h *fakeOpHandle) ForCall(string) apiclient.Recorder { return nil }
 func (h *fakeOpHandle) StartOrder(in OrderIntent) (OrderFinishFunc, error) {
 	if h.oj == nil {
 		return func(string, string, string, int) {}, nil
@@ -147,9 +147,9 @@ func m(pairs ...string) map[string]string {
 	return out
 }
 
-func cidOf(params []korbit.KV) string { return cidByKey(params, "clientOrderId") }
+func cidOf(params []apiclient.KV) string { return cidByKey(params, "clientOrderId") }
 
-func cidByKey(params []korbit.KV, key string) string {
+func cidByKey(params []apiclient.KV, key string) string {
 	for _, kv := range params {
 		if kv.Key == key {
 			return kv.Value

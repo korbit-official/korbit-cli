@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/korbit-official/korbit-cli/internal/accountseq"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/callrec"
 	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
 	"github.com/korbit-official/korbit-cli/internal/cli/probe"
@@ -22,7 +23,6 @@ import (
 	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
 	"github.com/korbit-official/korbit-cli/internal/config"
 	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/ops"
 	"github.com/korbit-official/korbit-cli/internal/output"
 	"github.com/korbit-official/korbit-cli/internal/progname"
@@ -39,12 +39,12 @@ const cmdPlace = "order place"
 // and sending, in declaration order) plus a map (for cross-field validation and
 // lookups). The two stay in lock-step. Values are normalized via the cmdmeta
 // validation engine, the single home of the per-value rules.
-func collectParams(sc surfaceCmd, cmd *cobra.Command, args []string) ([]korbit.KV, map[string]string, error) {
+func collectParams(sc surfaceCmd, cmd *cobra.Command, args []string) ([]apiclient.KV, map[string]string, error) {
 	prog := progname.Name()
-	var ordered []korbit.KV
+	var ordered []apiclient.KV
 	m := map[string]string{}
 	add := func(api, val string) {
-		ordered = append(ordered, korbit.KV{Key: api, Value: val})
+		ordered = append(ordered, apiclient.KV{Key: api, Value: val})
 		m[api] = val
 	}
 
@@ -129,7 +129,7 @@ func (rt *runtime) runEndpoint(sc surfaceCmd, cmd *cobra.Command, args []string)
 	if isPlace && !rt.dryRun {
 		if _, ok := params["clientOrderId"]; !ok {
 			id := ops.MintClientOrderID()
-			ordered = append(ordered, korbit.KV{Key: "clientOrderId", Value: id})
+			ordered = append(ordered, apiclient.KV{Key: "clientOrderId", Value: id})
 			params["clientOrderId"] = id
 		}
 	}
@@ -161,7 +161,7 @@ func (rt *runtime) runEndpoint(sc surfaceCmd, cmd *cobra.Command, args []string)
 		return err
 	}
 	if appliedAccountSeq && !hadAccountSeq {
-		ordered = append(ordered, korbit.KV{Key: accountseq.APIName, Value: params[accountseq.APIName]})
+		ordered = append(ordered, apiclient.KV{Key: accountseq.APIName, Value: params[accountseq.APIName]})
 	}
 
 	// Cross-field validation runs once, after accountSeq is resolved into params,
@@ -256,9 +256,9 @@ func (rt *runtime) runEndpoint(sc surfaceCmd, cmd *cobra.Command, args []string)
 	// place protocol via ops.Resync — both wired to this one Syncer).
 	localNow := rt.localNow()
 	clk := clock.New(localNow)
-	syncer := rt.NewClockSyncer(clk, baseURL, timeoutMs, korbit.SurfaceCLI, "clock")
+	syncer := rt.NewClockSyncer(clk, baseURL, timeoutMs, apiclient.SurfaceCLI, "clock")
 
-	var creds *korbit.Credentials
+	var creds *apiclient.Credentials
 	var keyName, apiKeyID string
 	if needsAuth {
 		resolved, err := km.ResolveSelection(sel, rt.deps.Getenv)
@@ -270,7 +270,7 @@ func (rt *runtime) runEndpoint(sc surfaceCmd, cmd *cobra.Command, args []string)
 			return err
 		}
 		keyName, apiKeyID = resolved.Name, resolved.APIKeyID
-		creds = &korbit.Credentials{APIKeyID: resolved.APIKeyID, Signer: signer}
+		creds = &apiclient.Credentials{APIKeyID: resolved.APIKeyID, Signer: signer}
 		// Always-shown safety disclosure (which key/account is acting), not a
 		// level-gated log and not part of the stdout result.
 		rt.io.Notef("korbit-cli: signing as key %q", resolved.Name)
@@ -311,7 +311,7 @@ func (rt *runtime) runEndpoint(sc surfaceCmd, cmd *cobra.Command, args []string)
 		resync = syncer.Sync
 	}
 
-	// The single korbit.Client construction site (rt.BuildClient): it records each
+	// The single apiclient.Client construction site (rt.BuildClient): it records each
 	// call itself via the uniform per-call closure (during an ops Operation the
 	// call lands under the operation with its sequence; off-operation it records
 	// standalone), so there is no recorder wrapper here. The cli's Fail policy is
@@ -319,7 +319,7 @@ func (rt *runtime) runEndpoint(sc surfaceCmd, cmd *cobra.Command, args []string)
 	// surfaced fatally AFTER the result; the operations-ledger finish error rides
 	// Result.JournalErr — both joined below.
 	client := rt.BuildClient(clienv.ClientSpec{
-		Surface:   korbit.SurfaceCLI,
+		Surface:   apiclient.SurfaceCLI,
 		Detail:    commandKey,
 		BaseURL:   baseURL,
 		Creds:     creds,
@@ -355,7 +355,7 @@ func (rt *runtime) runEndpoint(sc surfaceCmd, cmd *cobra.Command, args []string)
 	// an ambiguous failure as UNKNOWN); every other operation ignores it.
 	res, callErr := sc.op.Run(context.Background(), api, ops.RunInput{
 		Values:   params,
-		Controls: ops.Controls{SkipReconcile: rt.noReconcile, Surface: korbit.SurfaceCLI},
+		Controls: ops.Controls{SkipReconcile: rt.noReconcile, Surface: apiclient.SurfaceCLI},
 		KeyName:  keyName,
 		APIKeyID: apiKeyID,
 	})
@@ -572,7 +572,7 @@ func (rt *runtime) preplaceCheck(home, baseURL string, params map[string]string,
 	// client's per-call closure records each read as a standalone (adhoc) row under
 	// the same policy (journaled only in --debug). No clock/resync — public reads.
 	client := rt.BuildClient(clienv.ClientSpec{
-		Surface:   korbit.SurfaceCLI,
+		Surface:   apiclient.SurfaceCLI,
 		Detail:    cmdPlace,
 		BaseURL:   baseURL,
 		TimeoutMs: timeoutMs,
@@ -607,14 +607,14 @@ func wrapTruncated(data json.RawMessage, note string) json.RawMessage {
 // returning the full measurement (offset + min RTT) for callers that need the
 // direction/magnitude, such as doctor's clock-skew diagnosis. The signing path
 // goes through the Syncer (newClockSyncer) instead.
-func (rt *runtime) MeasureOffset(baseURL string, timeoutMs int) (korbit.ClockOffset, error) {
-	mopts := korbit.Options{BaseURL: baseURL, TimeoutMs: timeoutMs, Doer: rt.deps.Doer, Now: rt.deps.Now, UserAgent: useragent.For(korbit.SurfaceCLI, "clock")}
-	return korbit.MeasureClockOffset(mopts, 0, rt.logger()) // 0 => the library default probe count
+func (rt *runtime) MeasureOffset(baseURL string, timeoutMs int) (apiclient.ClockOffset, error) {
+	mopts := apiclient.Options{BaseURL: baseURL, TimeoutMs: timeoutMs, Doer: rt.deps.Doer, Now: rt.deps.Now, UserAgent: useragent.For(apiclient.SurfaceCLI, "clock")}
+	return apiclient.MeasureClockOffset(mopts, 0, rt.logger()) // 0 => the library default probe count
 }
 
 // orderedObject renders an ordered list of string params as a JSON object,
 // preserving order (unlike a Go map).
-func orderedObject(kvs []korbit.KV) json.RawMessage {
+func orderedObject(kvs []apiclient.KV) json.RawMessage {
 	var b bytes.Buffer
 	b.WriteByte('{')
 	for i, kv := range kvs {

@@ -16,11 +16,11 @@ import (
 	"testing/fstest"
 	"time"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/callrec"
 	"github.com/korbit-official/korbit-cli/internal/clock"
 	"github.com/korbit-official/korbit-cli/internal/journal"
 	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/output"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
@@ -78,7 +78,7 @@ func testMCPCmd() *cobra.Command {
 // targeting a loopback base URL (http, so signed calls are allowed). When
 // key != "" a bound key of that name is seeded. retryBudget is 0 so the place
 // protocol takes no budgeted sleeps under test.
-func buildTestMCP(t *testing.T, doer korbit.Doer, key string, multiKey bool) (*mcpServer, func()) {
+func buildTestMCP(t *testing.T, doer apiclient.Doer, key string, multiKey bool) (*mcpServer, func()) {
 	t.Helper()
 	home := t.TempDir()
 	if key != "" {

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/logging"
 )
 
@@ -22,8 +22,8 @@ type fakeWire struct {
 	err error
 }
 
-func (f fakeWire) Do(context.Context, korbit.Call, korbit.Policy) (json.RawMessage, korbit.Meta, error) {
-	return f.raw, korbit.Meta{Attempts: 1}, f.err
+func (f fakeWire) Do(context.Context, apiclient.Call, apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
+	return f.raw, apiclient.Meta{Attempts: 1}, f.err
 }
 
 // TestTypedDecodeMismatchLogged asserts the typed layer's one diagnostic: when
@@ -39,7 +39,7 @@ func TestTypedDecodeMismatchLogged(t *testing.T) {
 	body := json.RawMessage(`{"shape":"unexpected-object"}`)
 	c := New(fakeWire{raw: body}, log)
 
-	pairs, raw, _, err := c.Pairs(context.Background(), PairsRequest{}, korbit.Policy{})
+	pairs, raw, _, err := c.Pairs(context.Background(), PairsRequest{}, apiclient.Policy{})
 	if err != nil {
 		t.Fatalf("a decode mismatch must NOT be a call failure: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestTypedDecodeMatchSilent(t *testing.T) {
 	log := logging.New(&sink, logging.LevelTrace) // capture everything
 
 	c := New(fakeWire{raw: json.RawMessage(`[]`)}, log) // empty array fits []Pair
-	if _, _, _, err := c.Pairs(context.Background(), PairsRequest{}, korbit.Policy{}); err != nil {
+	if _, _, _, err := c.Pairs(context.Background(), PairsRequest{}, apiclient.Policy{}); err != nil {
 		t.Fatalf("Pairs: %v", err)
 	}
 	if out := sink.String(); out != "" {
@@ -83,7 +83,7 @@ func TestTypedDecodeMatchSilent(t *testing.T) {
 // TestNilLoggerSilent confirms New tolerates a nil logger (the silent default).
 func TestNilLoggerSilent(t *testing.T) {
 	c := New(fakeWire{raw: json.RawMessage(`{"x":1}`)}, nil)
-	if _, _, _, err := c.Pairs(context.Background(), PairsRequest{}, korbit.Policy{}); err != nil {
+	if _, _, _, err := c.Pairs(context.Background(), PairsRequest{}, apiclient.Policy{}); err != nil {
 		t.Fatalf("Pairs with nil logger: %v", err)
 	}
 }

@@ -8,8 +8,8 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cmdmeta"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/rawapi"
 )
 
@@ -36,7 +36,7 @@ func init() {
 			Auth:     signedAuth("readBalances"),
 			Safety:   cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			seq := reqAccountSeq(in.Values)
 			_, b, meta, err := raw.Balance(ctx, rawapi.BalanceRequest{
 				Currencies: optStr(in.Values, "currencies"),
@@ -69,7 +69,7 @@ func init() {
 			Auth:     signedAuth("readOrders"),
 			Safety:   cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			seq := reqAccountSeq(in.Values)
 			_, b, meta, err := raw.Fees(ctx, rawapi.FeesRequest{
 				Symbol:     optStr(in.Values, "symbol"),
@@ -101,7 +101,7 @@ func init() {
 			Auth:     signedAuth(""),
 			Safety:   cmdmeta.SafetyReadOnly,
 		},
-		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error) {
+		call: func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error) {
 			_, b, meta, err := raw.Whoami(ctx, rawapi.WhoamiRequest{}, pol)
 			return b, meta, err
 		},

@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/korbit-official/korbit-cli/internal/accountseq"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
 	"github.com/korbit-official/korbit-cli/internal/cli/probe"
 	"github.com/korbit-official/korbit-cli/internal/clock"
@@ -30,7 +31,6 @@ import (
 	"github.com/korbit-official/korbit-cli/internal/i18n"
 	"github.com/korbit-official/korbit-cli/internal/keys"
 	"github.com/korbit-official/korbit-cli/internal/keystore"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/netbind"
 	"github.com/korbit-official/korbit-cli/internal/output"
 	"github.com/korbit-official/korbit-cli/internal/progname"
@@ -376,7 +376,7 @@ func doctorSigned(cx *clienv.Cmd, cmd *cobra.Command, rep *Report, add func(name
 		add("signer", CheckFail, err.Error(), i18n.T("re-create the key: %s, then %s", progname.Name()+" key remove "+name, progname.Name()+" key add "+name))
 		return false
 	}
-	creds := &korbit.Credentials{APIKeyID: resolved.APIKeyID, Signer: signer}
+	creds := &apiclient.Credentials{APIKeyID: resolved.APIKeyID, Signer: signer}
 	// doctor honors --time-sync exactly like every other signed command: one shared
 	// clock + syncer, a proactive measure for --time-sync on, and the reactive
 	// resync hook (auto/on) so an EXCEED_TIME_WINDOW rejection is corrected and the
@@ -387,7 +387,7 @@ func doctorSigned(cx *clienv.Cmd, cmd *cobra.Command, rep *Report, add func(name
 	// "doctor" surface is never recorded by DefaultPolicy, so the recorder's DB is
 	// never opened; routing through it keeps the seam uniform.
 	clk := clock.New(cx.Now)
-	syncer := cx.NewClockSyncer(clk, baseURL, doctorTimeout(cmd), korbit.SurfaceDoctor, "clock")
+	syncer := cx.NewClockSyncer(clk, baseURL, doctorTimeout(cmd), apiclient.SurfaceDoctor, "clock")
 	var resync func() error
 	if cx.Modes.TimeSync.Reactive() {
 		resync = syncer.Sync
@@ -398,7 +398,7 @@ func doctorSigned(cx *clienv.Cmd, cmd *cobra.Command, rep *Report, add func(name
 		}
 	}
 	client := cx.BuildClient(clienv.ClientSpec{
-		Surface:   korbit.SurfaceDoctor,
+		Surface:   apiclient.SurfaceDoctor,
 		BaseURL:   baseURL,
 		Creds:     creds,
 		KeyName:   name,
@@ -414,7 +414,7 @@ func doctorSigned(cx *clienv.Cmd, cmd *cobra.Command, rep *Report, add func(name
 	// --retry-timeout budget, plus the --time-sync-gated EXCEED_TIME_WINDOW
 	// corrective resync (a read is always safe to resend). An IP-allowlist
 	// rejection and other 4xx still surface on the first attempt.
-	data, _, err := client.Do(context.Background(), korbit.Call{Method: "GET", Path: "/v2/currentKeyInfo", Auth: true}, korbit.Policy{Idempotent: true, BudgetMs: doctorRetryBudget(cmd)})
+	data, _, err := client.Do(context.Background(), apiclient.Call{Method: "GET", Path: "/v2/currentKeyInfo", Auth: true}, apiclient.Policy{Idempotent: true, BudgetMs: doctorRetryBudget(cmd)})
 	switch {
 	case err == nil:
 		doctorWhoamiOK(cx, rep, data, add)
@@ -574,8 +574,8 @@ var ipFamilies = []struct {
 //
 // It always adds one "ip allowlist" check and never changes the exit code on its
 // own — the failing whoami already set the verdict.
-func doctorDiagnoseAllowlist(cx *clienv.Cmd, base *korbit.Client, iprep probe.Report, timeoutMs int, add func(name, status, detail, fix string)) {
-	call := korbit.Call{Method: "GET", Path: "/v2/currentKeyInfo", Auth: true}
+func doctorDiagnoseAllowlist(cx *clienv.Cmd, base *apiclient.Client, iprep probe.Report, timeoutMs int, add func(name, status, detail, fix string)) {
+	call := apiclient.Call{Method: "GET", Path: "/v2/currentKeyInfo", Auth: true}
 	var accepted, rejected []string
 	whitelist := ""
 	for _, f := range ipFamilies {
@@ -588,7 +588,7 @@ func doctorDiagnoseAllowlist(cx *clienv.Cmd, base *korbit.Client, iprep probe.Re
 		c := *base
 		c.Doer = cx.FamilyDoer(f.network, timeoutMs)
 		c.TimeoutMs = timeoutMs
-		data, _, err := c.Do(context.Background(), call, korbit.Policy{})
+		data, _, err := c.Do(context.Background(), call, apiclient.Policy{})
 		switch {
 		case err == nil:
 			accepted = append(accepted, f.label)

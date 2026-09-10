@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/rawapi"
 )
 
@@ -28,7 +28,7 @@ type pageParams struct {
 type historyOp struct {
 	meta             OpMeta
 	tsField, idField string
-	page             func(ctx context.Context, raw *rawapi.Client, args historyArgs, p pageParams, pol korbit.Policy) (json.RawMessage, error)
+	page             func(ctx context.Context, raw *rawapi.Client, args historyArgs, p pageParams, pol apiclient.Policy) (json.RawMessage, error)
 }
 
 func (op historyOp) Meta() OpMeta { return op.meta }
@@ -94,7 +94,7 @@ func (op historyOp) Run(ctx context.Context, a *API, in RunInput) (Result, error
 	var rows []json.RawMessage
 	pages := 0
 	seen := map[string]bool{}
-	complete, err := WalkHistory(func(pp []korbit.KV) (json.RawMessage, error) {
+	complete, err := WalkHistory(func(pp []apiclient.KV) (json.RawMessage, error) {
 		p := pageParams{}
 		for _, kv := range pp {
 			switch kv.Key {

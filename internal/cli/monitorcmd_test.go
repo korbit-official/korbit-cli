@@ -17,13 +17,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/cli"
 	"github.com/korbit-official/korbit-cli/internal/keys"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/stream"
 )
 
-// doerFunc adapts a function to korbit.Doer, producing a fresh response per
+// doerFunc adapts a function to apiclient.Doer, producing a fresh response per
 // call (the stream layer probes REST more than once).
 type doerFunc func(*http.Request) (*http.Response, error)
 
@@ -31,7 +31,7 @@ func (f doerFunc) Do(r *http.Request) (*http.Response, error) { return f(r) }
 
 // failingDoer fails every REST call; the monitor's startup clock measurement
 // is best-effort, so this exercises the fallback path.
-func failingDoer() korbit.Doer {
+func failingDoer() apiclient.Doer {
 	return doerFunc(func(*http.Request) (*http.Response, error) {
 		return resp(500, `{}`, nil), nil
 	})
@@ -71,7 +71,7 @@ func (c *fakeWSConn) Close() error {
 }
 
 // runMonitorCLI is runCLI plus the WebSocket dial seam.
-func runMonitorCLI(args []string, env map[string]string, doer korbit.Doer, dial stream.Dialer) (string, string, int) {
+func runMonitorCLI(args []string, env map[string]string, doer apiclient.Doer, dial stream.Dialer) (string, string, int) {
 	// The JavaScript bot runtime is gated behind --enable-experimental; enable it
 	// by default here so the many scripting tests exercise the runtime directly.
 	// The gate's own default-off behavior is covered by TestMonitorExperimentalGate.
@@ -1043,7 +1043,7 @@ func TestMonitorDBPersistsAcrossEvents(t *testing.T) {
 // candleDoer answers /v2/candles with one authoritative row (the still-open
 // 1m bucket containing the fake clock's now, 1700000000000) and fails every
 // other REST call (the clock measurement is best-effort).
-func candleDoer() korbit.Doer {
+func candleDoer() apiclient.Doer {
 	return doerFunc(func(r *http.Request) (*http.Response, error) {
 		if strings.Contains(r.URL.Path, "/v2/candles") {
 			return resp(200, `{"success":true,"data":[

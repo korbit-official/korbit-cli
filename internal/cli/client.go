@@ -9,11 +9,11 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/callrec"
 	"github.com/korbit-official/korbit-cli/internal/cli/clienv"
 	"github.com/korbit-official/korbit-cli/internal/clock"
 	"github.com/korbit-official/korbit-cli/internal/journal"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/logging"
 	"github.com/korbit-official/korbit-cli/internal/ops"
 	"github.com/korbit-official/korbit-cli/internal/useragent"
@@ -28,7 +28,7 @@ import (
 func (rt *runtime) NewClockSyncer(state *clock.State, baseURL string, timeoutMs int, surface, detail string) *clock.Syncer {
 	log := rt.surfaceLogger(surface)
 	measure := func() (int64, int64, error) {
-		off, err := korbit.MeasureClockOffset(korbit.Options{
+		off, err := apiclient.MeasureClockOffset(apiclient.Options{
 			BaseURL:   baseURL,
 			Doer:      rt.deps.Doer,
 			TimeoutMs: timeoutMs,
@@ -54,7 +54,7 @@ func (rt *runtime) localNow() func() int64 {
 	return func() int64 { return time.Now().UnixMilli() }
 }
 
-// BuildClient is the cli's single korbit.Client construction site (the
+// BuildClient is the cli's single apiclient.Client construction site (the
 // clienv.Backend capability). Every surface goes through it, so each client
 // uniformly gets its logger, retry-trace Observe, the one per-call journaling
 // closure, Origin, User-Agent, shared clock, and resync hook. The per-call
@@ -63,12 +63,12 @@ func (rt *runtime) localNow() func() int64 {
 // operation); off-operation (an adhoc read like a dry-run preflight) the surface
 // recorder records it standalone. A nil recorder — or a nil handle with no
 // surface recorder — leaves the call un-journaled.
-func (rt *runtime) BuildClient(spec clienv.ClientSpec) *korbit.Client {
+func (rt *runtime) BuildClient(spec clienv.ClientSpec) *apiclient.Client {
 	apiKeyID := ""
 	if spec.Creds != nil {
 		apiKeyID = spec.Creds.APIKeyID
 	}
-	c := &korbit.Client{
+	c := &apiclient.Client{
 		BaseURL:   spec.BaseURL,
 		Doer:      rt.deps.Doer,
 		Creds:     spec.Creds,
@@ -76,7 +76,7 @@ func (rt *runtime) BuildClient(spec clienv.ClientSpec) *korbit.Client {
 		Resync:    spec.Resync,
 		TimeoutMs: spec.TimeoutMs,
 		Sleep:     rt.deps.Sleep,
-		Origin:    korbit.Origin{Surface: spec.Surface, Detail: spec.Detail},
+		Origin:    apiclient.Origin{Surface: spec.Surface, Detail: spec.Detail},
 		UserAgent: useragent.For(spec.Surface, spec.Detail),
 		KeyName:   spec.KeyName,
 		APIKeyID:  apiKeyID,
@@ -91,7 +91,7 @@ func (rt *runtime) BuildClient(spec clienv.ClientSpec) *korbit.Client {
 	}
 	if spec.Rec != nil {
 		rec := spec.Rec
-		c.NewRecorder = func(ctx context.Context, call korbit.Call) korbit.Recorder {
+		c.NewRecorder = func(ctx context.Context, call apiclient.Call) apiclient.Recorder {
 			if h := ops.HandleFromContext(ctx); h != nil {
 				return h.ForCall(string(orderedObject(call.Params)))
 			}

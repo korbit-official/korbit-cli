@@ -21,9 +21,9 @@ import (
 	"time"
 
 	"github.com/korbit-official/korbit-cli/internal/accountseq"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/fslock"
 	"github.com/korbit-official/korbit-cli/internal/keystore"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/logging"
 	"github.com/korbit-official/korbit-cli/internal/output"
 	"github.com/korbit-official/korbit-cli/internal/progname"
@@ -110,11 +110,11 @@ func assertSandboxNaming(name, apiKeyID string) error {
 //   - A private key is worse — it would write a secret into non-secret metadata
 //     (keys.json). The message must never echo the pasted value.
 func assertNotKeyMaterial(apiKeyID string) error {
-	if korbit.LooksLikeEd25519PrivateKey(apiKeyID) {
+	if apiclient.LooksLikeEd25519PrivateKey(apiKeyID) {
 		return output.Usagef(
 			"that value is an ED25519 PRIVATE key — never use private key material as an API key id (it is secret). Register the corresponding public key at https://developers.korbit.co.kr, then paste the KEY ID the portal issues")
 	}
-	if korbit.LooksLikeEd25519PublicKey(apiKeyID) {
+	if apiclient.LooksLikeEd25519PublicKey(apiKeyID) {
 		return output.Usagef(
 			"that value is an ED25519 public key, not an API key id — after you register the public key at https://developers.korbit.co.kr, paste the KEY ID the portal issues, not the public key itself")
 	}
@@ -186,7 +186,7 @@ type SummaryWithPublic struct {
 // resolveInline) and kept behind the unexported signer field, reachable only
 // through Signer(). Unexporting alone does NOT make the struct safe to print —
 // fmt reflects unexported fields — so Resolved also implements fmt.Formatter
-// (see Format) to redact every verb. The signer itself (korbit.Signer) also
+// (see Format) to redact every verb. The signer itself (apiclient.Signer) also
 // self-redacts, so the struct is safe even if Format is ever bypassed.
 type Resolved struct {
 	Name     string
@@ -202,15 +202,15 @@ type Resolved struct {
 	// signer is built from the stored material for this key's type. It is
 	// unexported AND screened by Format so no fmt path can leak it; callers reach
 	// it only via Signer().
-	signer korbit.Signer
+	signer apiclient.Signer
 }
 
-// Signer returns the signer to hand to the signing layer (korbit). It is the
+// Signer returns the signer to hand to the signing layer (apiclient). It is the
 // single seam between stored key material and a usable signer: the per-`type`
 // switch lives in signerFor, which Resolve and resolveInline call to build this
 // value. New code MUST obtain its signer through this method and never hold raw
 // key material.
-func (r Resolved) Signer() (korbit.Signer, error) {
+func (r Resolved) Signer() (apiclient.Signer, error) {
 	if r.signer == nil {
 		// Resolve/resolveInline only return a Resolved with a built signer; a nil
 		// one means a zero-value struct was used directly, which is a programming
@@ -228,20 +228,20 @@ func (r Resolved) Signer() (korbit.Signer, error) {
 // holds the wrong thing for this key). The ed25519 parser's messages never
 // include key bytes, so quoting them cannot leak material; an hmac secret is
 // opaque and is never echoed.
-func signerFor(name, keyType, secret string) (korbit.Signer, error) {
+func signerFor(name, keyType, secret string) (apiclient.Signer, error) {
 	switch keyType {
 	case TypeEd25519:
-		priv, err := korbit.ParsePrivatePEM(secret)
+		priv, err := apiclient.ParsePrivatePEM(secret)
 		if err != nil {
 			return nil, output.Configf(
 				"key %q is not a valid ED25519 private-key PEM (%v)", name, err)
 		}
-		return korbit.NewEd25519Signer(priv), nil
+		return apiclient.NewEd25519Signer(priv), nil
 	case TypeHMACSHA256:
 		if strings.TrimSpace(secret) == "" {
 			return nil, output.Configf("key %q has an empty HMAC-SHA256 secret", name)
 		}
-		return korbit.NewHMACSHA256Signer([]byte(secret)), nil
+		return apiclient.NewHMACSHA256Signer([]byte(secret)), nil
 	default:
 		return nil, output.Configf(
 			"key %q has type %q, which this build cannot sign with (supported: %s, %s) — use a newer CLI for this key", name, keyType, TypeEd25519, TypeHMACSHA256)
@@ -574,14 +574,14 @@ func (m *Manager) Add(name, privatePEM, backend string) (NewKey, error) {
 
 	var publicKey string
 	if privatePEM != "" {
-		if err := korbit.AssertEd25519PrivatePEM(privatePEM); err != nil {
+		if err := apiclient.AssertEd25519PrivatePEM(privatePEM); err != nil {
 			return NewKey{}, err
 		}
-		if publicKey, err = korbit.PublicPEMFromPrivate(privatePEM); err != nil {
+		if publicKey, err = apiclient.PublicPEMFromPrivate(privatePEM); err != nil {
 			return NewKey{}, err
 		}
 	} else {
-		kp, err := korbit.GenerateKeypair()
+		kp, err := apiclient.GenerateKeypair()
 		if err != nil {
 			return NewKey{}, err
 		}
@@ -646,10 +646,10 @@ func (m *Manager) AddBound(name, privatePEM, apiKeyID, backend string) (NewKey, 
 	if err != nil {
 		return NewKey{}, err
 	}
-	if err := korbit.AssertEd25519PrivatePEM(privatePEM); err != nil {
+	if err := apiclient.AssertEd25519PrivatePEM(privatePEM); err != nil {
 		return NewKey{}, err
 	}
-	publicKey, err := korbit.PublicPEMFromPrivate(privatePEM)
+	publicKey, err := apiclient.PublicPEMFromPrivate(privatePEM)
 	if err != nil {
 		return NewKey{}, err
 	}
@@ -1354,7 +1354,7 @@ func (m *Manager) Rename(oldName, newName string) (RenameResult, error) {
 // requiring an API key id binding. It backs the pre-bind check interactive setup
 // runs: signing a candidate id's whoami before persisting the binding. Resolve
 // is the bound-key path used for real calls; this is signing material only.
-func (m *Manager) SignerFor(name string) (korbit.Signer, error) {
+func (m *Manager) SignerFor(name string) (apiclient.Signer, error) {
 	file, err := m.load()
 	if err != nil {
 		return nil, err

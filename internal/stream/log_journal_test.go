@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/logging"
 )
 
@@ -72,19 +72,19 @@ func TestBackfillLogsWireRequests(t *testing.T) {
 	}
 }
 
-// fakeRecorder is a spy korbit.Recorder capturing one Ready invocation.
+// fakeRecorder is a spy apiclient.Recorder capturing one Ready invocation.
 type fakeRecorder struct {
-	onReady func(korbit.CallInfo)
+	onReady func(apiclient.CallInfo)
 }
 
-func (f *fakeRecorder) Ready(info korbit.CallInfo) error {
+func (f *fakeRecorder) Ready(info apiclient.CallInfo) error {
 	if f.onReady != nil {
 		f.onReady(info)
 	}
 	return nil
 }
 
-func (f *fakeRecorder) Record(korbit.CallInfo, korbit.Outcome) int64 { return 0 }
+func (f *fakeRecorder) Record(apiclient.CallInfo, apiclient.Outcome) int64 { return 0 }
 
 // TestBackfillRoutesThroughRecorder pins that backfill reads consult the
 // journaling policy through the Client's own per-call recorder (Client.NewRecorder,
@@ -104,13 +104,13 @@ func TestBackfillRoutesThroughRecorder(t *testing.T) {
 
 	var mu sync.Mutex
 	var factoryCalls int
-	var readyInfos []korbit.CallInfo
+	var readyInfos []apiclient.CallInfo
 	client := testClient("http://example.test", doer, auth)
-	client.NewRecorder = func(_ context.Context, _ korbit.Call) korbit.Recorder {
+	client.NewRecorder = func(_ context.Context, _ apiclient.Call) apiclient.Recorder {
 		mu.Lock()
 		factoryCalls++
 		mu.Unlock()
-		return &fakeRecorder{onReady: func(info korbit.CallInfo) {
+		return &fakeRecorder{onReady: func(info apiclient.CallInfo) {
 			mu.Lock()
 			readyInfos = append(readyInfos, info)
 			mu.Unlock()

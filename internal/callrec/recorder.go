@@ -10,14 +10,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/journal"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
 	"github.com/korbit-official/korbit-cli/internal/logging"
 	"github.com/korbit-official/korbit-cli/internal/output"
 	"github.com/korbit-official/korbit-cli/internal/version"
 )
 
-// Recorder is the journal-backed korbit.Recorder. It enacts a PolicyFunc over a
+// Recorder is the journal-backed apiclient.Recorder. It enacts a PolicyFunc over a
 // lazily-opened journal.Logger: the DB file is created only when a call actually
 // records (at Ready time), so pure public use never touches a read-only home.
 // One Recorder is opened at most once and its handle is reused for the api_calls
@@ -47,7 +47,7 @@ type Recorder struct {
 	Log *slog.Logger
 
 	// clock is the caller's (system) wall clock for EVERY journal time column —
-	// the operations, orders, and api_calls rows alike. korbit.Do brackets a call
+	// the operations, orders, and api_calls rows alike. apiclient.Do brackets a call
 	// with the real, un-injectable wall clock; the journal instead stamps all its
 	// own times from this one injectable clock so every row stays deterministic
 	// under a test clock: api_calls started at Ready (pre-send) / finished at
@@ -85,7 +85,7 @@ func (r *Recorder) log() *slog.Logger { return logging.Or(r.Log) }
 // short-circuits to "don't record" before the policy is consulted, so opting out
 // never opens the DB. It is a pure function of info (no stashing between Ready
 // and Record), which keeps the Recorder concurrency-safe.
-func (r *Recorder) decide(info korbit.CallInfo) Decision {
+func (r *Recorder) decide(info apiclient.CallInfo) Decision {
 	if r.disabled {
 		return Decision{Record: false, Reason: "NO_JOURNAL opt-out"}
 	}
@@ -96,18 +96,18 @@ func (r *Recorder) decide(info korbit.CallInfo) Decision {
 // — the routine "did/didn't journal, here's the reason" diagnostic a --debug run
 // needs to explain a missing journal row. It logs only pre-signing facts
 // (surface/auth/method/path), never params or secrets.
-func (r *Recorder) logDecision(info korbit.CallInfo, d Decision) {
+func (r *Recorder) logDecision(info apiclient.CallInfo, d Decision) {
 	r.log().Debug("journaling decision",
 		"record", d.Record, "reason", d.Reason,
 		"surface", info.Origin.Surface, "auth", info.Auth,
 		"method", info.Method, "path", info.Path)
 }
 
-// ForCall returns a per-call korbit.Recorder bound to this Recorder's journal,
+// ForCall returns a per-call apiclient.Recorder bound to this Recorder's journal,
 // policy, clock, and warn sink, carrying ONE call's own state — the
 // spec/insertion-ordered params JSON for the api_calls row (orderedParams; "" to
 // keep the client's CallInfo.ParamsJSON) and the start timestamp it captures at
-// Ready. A fresh CallRecorder per korbit.Do keeps every call's state isolated, so
+// Ready. A fresh CallRecorder per apiclient.Do keeps every call's state isolated, so
 // concurrent calls — including several of the SAME command through one shared
 // parent Recorder (the monitor surface) — never collide. Wire it as the Client's
 // Rec for exactly one Do.
@@ -115,7 +115,7 @@ func (r *Recorder) ForCall(orderedParams string) *CallRecorder {
 	return &CallRecorder{parent: r, orderedParams: orderedParams}
 }
 
-// CallRecorder is the korbit.Recorder for ONE logical call. It holds only that
+// CallRecorder is the apiclient.Recorder for ONE logical call. It holds only that
 // call's state (its ordered params, its operation link/sequence, and its
 // Ready-captured start), delegating the shared journal/policy/clock to its
 // parent — so it is the per-call isolation seam that makes concurrent recording
@@ -136,7 +136,7 @@ type CallRecorder struct {
 // the command here, BEFORE anything is sent (the hard guarantee). When the call
 // is not recorded it opens nothing and permits the send. It also captures the
 // start timestamp on the injectable clock for the api_calls started_at_ms column.
-func (c *CallRecorder) Ready(info korbit.CallInfo) error {
+func (c *CallRecorder) Ready(info apiclient.CallInfo) error {
 	d := c.parent.decide(info)
 	c.parent.logDecision(info, d)
 	if !d.Record {
@@ -153,7 +153,7 @@ func (c *CallRecorder) Ready(info korbit.CallInfo) error {
 // write failure is delivered to the onPostFailure sink with the call's FailMode
 // (the caller's closure warns or captures-for-fatal) — never returned, so a
 // journal fault can never be conflated with the API error.
-func (c *CallRecorder) Record(info korbit.CallInfo, out korbit.Outcome) int64 {
+func (c *CallRecorder) Record(info apiclient.CallInfo, out apiclient.Outcome) int64 {
 	d := c.parent.decide(info)
 	if !d.Record {
 		return 0
@@ -177,7 +177,7 @@ func (c *CallRecorder) Record(info korbit.CallInfo, out korbit.Outcome) int64 {
 	// Stamp the timing on the injectable clock: started captured at Ready, finished
 	// now. The client's Outcome times come from the un-injectable real wall clock,
 	// so we don't use them for these columns. The fallback (Record without a prior
-	// Ready) can't happen on the korbit.Do path — Do calls Ready before Record —
+	// Ready) can't happen on the apiclient.Do path — Do calls Ready before Record —
 	// but keeps a synthetic-but-consistent (duration 0) row if a future caller ever
 	// bypasses it.
 	started := c.startedMs
@@ -319,7 +319,7 @@ func (r *Recorder) lockedJL() *journal.Logger {
 // for an API rejection (an ApiError, where out.Code is non-empty) — it stays
 // NULL on success and on a pre-response transport failure (the Outcome's
 // synthetic 200 on success is deliberately not stored).
-func callRecordFrom(info korbit.CallInfo, out korbit.Outcome) journal.CallRecord {
+func callRecordFrom(info apiclient.CallInfo, out apiclient.Outcome) journal.CallRecord {
 	retryCount := out.Attempts - 1
 	if retryCount < 0 {
 		retryCount = 0
@@ -354,7 +354,7 @@ func callRecordFrom(info korbit.CallInfo, out korbit.Outcome) journal.CallRecord
 // pre-response transport failure). korbit.buildOutcome fills Code only from an
 // *output.ApiError, so a non-empty Code is the discriminator — equivalent to
 // errors.As(err, *ApiError), but without re-inspecting the error.
-func isAPIError(out korbit.Outcome) bool {
+func isAPIError(out apiclient.Outcome) bool {
 	if out.Code != "" {
 		return true
 	}

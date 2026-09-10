@@ -10,7 +10,7 @@ import (
 	"strconv"
 
 	"github.com/korbit-official/korbit-cli/internal/accountseq"
-	"github.com/korbit-official/korbit-cli/internal/korbit"
+	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/rawapi"
 )
 
@@ -20,7 +20,7 @@ import (
 // verbatim response bytes (used as Result.Data) plus the call meta.
 type passthroughOp struct {
 	meta OpMeta
-	call func(ctx context.Context, raw *rawapi.Client, in RunInput, pol korbit.Policy) (json.RawMessage, korbit.Meta, error)
+	call func(ctx context.Context, raw *rawapi.Client, in RunInput, pol apiclient.Policy) (json.RawMessage, apiclient.Meta, error)
 }
 
 func (op passthroughOp) Meta() OpMeta { return op.meta }

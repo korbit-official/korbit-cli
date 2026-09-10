@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package korbit
+package apiclient
 
 import (
 	"crypto/ed25519"
@@ -144,7 +144,7 @@ func TestHMACSHA256SignerVector(t *testing.T) {
 }
 
 // TestSignersRedactUnderFmt guards the leak-hardening: a Signer rides inside
-// korbit.Credentials, so every fmt verb must render the redaction placeholder,
+// apiclient.Credentials, so every fmt verb must render the redaction placeholder,
 // never key material.
 func TestSignersRedactUnderFmt(t *testing.T) {
 	kp, _ := GenerateKeypair()
