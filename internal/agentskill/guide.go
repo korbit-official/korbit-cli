@@ -14,7 +14,7 @@ import (
 )
 
 // This file reads the skill body for callers that surface its guidance in place
-// rather than installing it to disk — chiefly the MCP `korbit_guide` tool, which
+// rather than installing it to disk — chiefly the MCP guide tool, which
 // is how an MCP-only client (Claude Desktop via the .mcpb Desktop Extension)
 // reaches the same guidance Claude Code gets from the installed skill. It reads
 // the same embedded tree Install writes, so the two can never drift.
@@ -94,16 +94,11 @@ func GuideContent(fsys fs.FS, topic string) (string, error) {
 // unchanged; an unterminated block is left intact (better to show too much than
 // to silently truncate the guide).
 func stripFrontmatter(s string) string {
-	lines := strings.Split(s, "\n")
-	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
+	_, body, ok := splitFrontmatter(s)
+	if !ok {
 		return s
 	}
-	for i := 1; i < len(lines); i++ {
-		if strings.TrimSpace(lines[i]) == "---" {
-			// Trim the blank line(s) between the frontmatter and the body; the
-			// cutset covers \r so a CRLF blank line leaves no stray carriage return.
-			return strings.TrimLeft(strings.Join(lines[i+1:], "\n"), "\r\n")
-		}
-	}
-	return s
+	// Trim the blank line(s) between the frontmatter and the body; the cutset
+	// covers \r so a CRLF blank line leaves no stray carriage return.
+	return strings.TrimLeft(body, "\r\n")
 }

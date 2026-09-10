@@ -203,7 +203,7 @@ func (rt *runtime) runMCP(cmd *cobra.Command, args []string) error {
 	} else {
 		// Always-shown safety disclosure (which key/account this server signs
 		// with), not a level-gated log and not part of stdout JSON-RPC.
-		fmt.Fprintf(rt.io.Err, "korbit-cli: mcp: signing as key %q\n", ka.keyName)
+		fmt.Fprintf(rt.io.Err, "%s: mcp: signing as key %q\n", progname.Name(), ka.keyName)
 	}
 
 	server := srv.build(readOnly, multiKey)
@@ -244,7 +244,7 @@ type mcpServer struct {
 	timeoutMs     int
 	retryBudgetMs int
 	keyNames      []string
-	skillFS       fs.FS // embedded Agent Skill, source for the korbit_guide tool (may be nil)
+	skillFS       fs.FS // embedded Agent Skill, source for the guide tool (may be nil)
 
 	mu        sync.Mutex
 	apis      map[string]*keyAPI // by key name ("" = the launch default)
@@ -405,12 +405,18 @@ func (s *mcpServer) placeDryRunResult(ctx context.Context, chosenKey string, par
 	return toolDataResultValue(doc)
 }
 
+// mcpServerName is the server's identity in the MCP handshake — how a host
+// lists and refers to this server. It is the CLI's own name, fixed rather than
+// derived from argv[0], so the identity a host has stored does not change when
+// the binary is invoked through another filename.
+const mcpServerName = "digitalx-cli"
+
 // build registers one tool per endpoint command (plus list_keys) on a new MCP
 // server. read-only drops every non-GET command; multi-key adds the `key`
 // argument to authenticated tools.
 func (s *mcpServer) build(readOnly, multiKey bool) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{
-		Name:    "korbit-cli",
+		Name:    mcpServerName,
 		Version: version.Version,
 	}, &mcp.ServerOptions{
 		Instructions: mcpInstructions(s.launchKeyLabel(), multiKey, readOnly),
@@ -449,18 +455,30 @@ func (s *mcpServer) build(readOnly, multiKey bool) *mcp.Server {
 	}, makeBotRuntimeReferenceHandler())
 	count++
 
-	// korbit_guide surfaces the bundled Agent Skill's workflow guidance so an
+	// The guide tool surfaces the bundled Agent Skill's workflow guidance so an
 	// MCP-only client (Claude Desktop via the .mcpb bundle), which never loads
 	// the skill the way Claude Code does, can still reach the same safety rules
 	// and per-task playbooks. Topics are discovered from the embedded skill, so
 	// the enum/description can never drift from what `agent skill install` ships.
+	// It is registered under two names — the same handler, schema and topics —
+	// because a tool name can be written down in an agent config or a saved
+	// prompt; the alias's description sends the model to the canonical name.
 	guideTopics, _ := agentskill.GuideTopics(s.skillFS)
+	guideHandler := s.makeGuideHandler()
 	server.AddTool(&mcp.Tool{
-		Name:        korbitGuideName,
-		Description: korbitGuideDesc(guideTopics),
-		InputSchema: korbitGuideSchema(guideTopics),
+		Name:        guideName,
+		Description: guideDesc(guideTopics),
+		InputSchema: guideSchema(guideTopics),
 		Annotations: &mcp.ToolAnnotations{Title: "Korbit workflow guide", ReadOnlyHint: true},
-	}, s.makeGuideHandler())
+	}, guideHandler)
+	count++
+
+	server.AddTool(&mcp.Tool{
+		Name:        legacyGuideName,
+		Description: legacyGuideDesc(guideTopics),
+		InputSchema: guideSchema(guideTopics),
+		Annotations: &mcp.ToolAnnotations{Title: "Korbit workflow guide (deprecated alias)", ReadOnlyHint: true},
+	}, guideHandler)
 	count++
 
 	// Onboarding & diagnostics: setup lets a keyless first-timer get going entirely
@@ -648,7 +666,8 @@ func makeBotRuntimeReferenceHandler() mcp.ToolHandler {
 	}
 }
 
-// makeGuideHandler returns the read-only korbit_guide handler: it returns the
+// makeGuideHandler returns the read-only guide handler (shared by the guide
+// tool and its deprecated alias): it returns the
 // requested skill guidance text (overview when `topic` is omitted, the named
 // playbook otherwise). The SDK does not validate arguments against the schema,
 // so the topic is re-checked here — agentskill.GuideContent rejects an unknown
@@ -1005,7 +1024,7 @@ func installOneLiner() string {
 // this server is, which key it signs with, and the load-bearing safety rules.
 func mcpInstructions(launchKey string, multiKey, readOnly bool) string {
 	var b strings.Builder
-	b.WriteString("Korbit cryptocurrency exchange via the korbit-cli MCP server. ")
+	b.WriteString("Korbit cryptocurrency exchange via the " + mcpServerName + " MCP server. ")
 	b.WriteString("Each tool maps to a Korbit Open API v2 endpoint; arguments are keyed on the wire parameter names. ")
 	b.WriteString(fmt.Sprintf("Authenticated tools sign with the key %q. ", launchKey))
 	if multiKey {
@@ -1018,7 +1037,7 @@ func mcpInstructions(launchKey string, multiKey, readOnly bool) string {
 	}
 	b.WriteString("Money and quantity values are decimal STRINGS (e.g. \"0.001\"), never numbers. ")
 	b.WriteString("Placing an order returns the full order including its clientOrderId; to retry a placement after a failure, reuse that id. ")
-	b.WriteString("For the recommended workflow and safety rules for a task — placing orders, monitoring, funding, debugging, key setup — call the korbit_guide tool (no topic for the overview and task router); consult it before placing an order or driving an unfamiliar flow. ")
+	b.WriteString("For the recommended workflow and safety rules for a task — placing orders, monitoring, funding, debugging, key setup — call the " + guideName + " tool (no topic for the overview and task router); consult it before placing an order or driving an unfamiliar flow. ")
 	b.WriteString(fmt.Sprintf("These tools call REST endpoints directly; the CLI also offers a scriptable `%s monitor` bot runtime (streaming data plus a synchronous `ta` technical-indicator library) that this server cannot run — see the bot_runtime_reference tool. ", progname.Name()))
 	b.WriteString("If no key is configured yet, onboard the user without a terminal: call the setup tool (it returns a registration link to open and confirm with MFA), then call setup again with the issued key id as `apiKey` to bind it, then the doctor tool to verify. ")
 	b.WriteString(fmt.Sprintf("Some capabilities are CLI-only (live streaming via `%s monitor`, `sandbox`, log inspection, full key management) and some hosts refuse money-moving actions entirely; when a user needs one and this host can't provide it, tell them they can get the full experience by installing the CLI (%s) and using it from Claude Code. ", progname.Name(), installOneLiner()))
@@ -1053,7 +1072,7 @@ func mcpPlanDoc(readOnly, multiKey bool, launchKey, baseURL string, keyNames []s
 		}
 		tools = append(tools, toolName(c))
 	}
-	tools = append(tools, "list_keys", botRuntimeReferenceName, korbitGuideName, "setup", "doctor")
+	tools = append(tools, "list_keys", botRuntimeReferenceName, guideName, legacyGuideName, "setup", "doctor")
 	return mcpPlan{
 		DryRun: true, Transport: "stdio", ReadOnly: readOnly, MultiKey: multiKey,
 		LaunchKey: launchKey, BaseURL: baseURL, ConfigKeys: keyNames,

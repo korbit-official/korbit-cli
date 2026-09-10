@@ -231,7 +231,7 @@
 // The session takes a single Config.Client (an *apiclient.Client): it performs REST
 // backfill, signs the WS upgrade, and owns the shared clock (read via
 // Client.Clock, resync via Client.Resync). A consumer that needs signed REST (the
-// monitor command's JavaScript korbit.* bindings) builds its OWN apiclient.Client
+// monitor command's JavaScript api.* bindings) builds its OWN apiclient.Client
 // over the SAME clock.Syncer — so the WS upgrade, backfill, and the consumer's
 // calls all sign against one estimate, measured through one single-flight/cooldown
 // path, and an EXCEED_TIME_WINDOW resync on any surface fixes them all at once.

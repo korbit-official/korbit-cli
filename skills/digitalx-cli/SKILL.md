@@ -1,22 +1,22 @@
 ---
-name: korbit
+name: digitalx-cli
 description: >-
-  Operate the Korbit cryptocurrency exchange (korbit.co.kr) through the korbit-cli tool — its CLI
-  commands or its MCP tools. Consult this skill BEFORE running any `korbit` command or Korbit MCP
-  tool: it carries the safety rules (dry-run-first order placement, idempotency, decimal-string
-  money) and the right workflow for each task. Use it whenever the user wants to do anything on
-  Korbit — place, cancel, or track an order, buy or sell crypto, check prices/orderbooks/candles/
-  balances/fees/fills, watch a market or set a price alert, stream live market or account data,
-  deposit or withdraw funds, set up or fix Korbit API keys, or work out what happened to a Korbit
-  order. Trigger it even when the user only says "Korbit", names a KRW pair like btc_krw, or
-  mentions the korbit/korbit-cli command, and even for simple one-step requests. Do NOT use it for
-  other exchanges (Upbit, Binance, Coinbase), for building a standalone trading bot from scratch, or
-  for hacking on the korbit-cli source itself.
+  Operate the Digital X (Korbit) cryptocurrency exchange through its CLI — the `dgx-cli` command,
+  also installed as `korbit`, packaged as digitalx-cli/korbit-cli — or its MCP tools. Consult this
+  skill BEFORE running any such command or Digital X MCP tool: it carries the safety rules
+  (dry-run-first order placement, idempotency, decimal-string money) and the right workflow for each
+  task. Use it whenever the user wants to do anything on Digital X / 디지털엑스 / Korbit / 코빗 —
+  place, cancel, or track an order, buy or sell crypto, check prices/orderbooks/candles/balances/
+  fees/fills, watch a market or set a price alert, stream live market or account data, deposit or
+  withdraw funds, set up or fix API keys, or work out what happened to an order. Trigger it even
+  when the user only names the exchange or a KRW pair like btc_krw, and for simple one-step
+  requests. Do NOT use it for other exchanges (Upbit, Binance, Coinbase), for building a standalone
+  trading bot from scratch, or for hacking on the CLI's own source.
 ---
 
-# Operating Korbit with `korbit-cli`
+# Operating Digital X with `dgx-cli`
 
-You drive the Korbit exchange through one self-describing tool — **never** call the Korbit REST API
+You drive the Digital X exchange through one self-describing tool — **never** call the Digital X REST API
 directly, handle raw secrets, or compute signatures. The tool owns keys, signing, idempotency,
 clock-sync, retries, and a local action journal. Your job is to pick the right command for the
 user's goal and follow the safety rules below.
@@ -26,12 +26,12 @@ user's goal and follow the safety rules below.
 You'll be operating the tool in one of two ways. **All the workflows and safety rules in this skill
 apply identically to both** — only the call syntax differs.
 
-- **Shell (CLI):** run `korbit <command> … --json`. This is the full surface, including setup, keys,
-  `doctor`, `logs`, `sandbox`, and `monitor`. If the `korbit` command isn't found, the one-line
-  installer places the binary at `~/.local/bin/korbit` (macOS/Linux) or
-  `%LOCALAPPDATA%\bin\korbit.exe` (Windows) — invoke it by that full path, or add the directory to
+- **Shell (CLI):** run `dgx-cli <command> … --json`. This is the full surface, including setup, keys,
+  `doctor`, `logs`, `sandbox`, and `monitor`. If the `dgx-cli` command isn't found, the one-line
+  installer places the binary at `~/.local/bin/dgx-cli` (macOS/Linux) or
+  `%LOCALAPPDATA%\bin\dgx-cli.exe` (Windows) — invoke it by that full path, or add the directory to
   PATH. (`go install` instead produces a binary named `korbit-cli`.)
-- **MCP tools:** if a `korbit` MCP server is connected, each REST command is a tool. `korbit order
+- **MCP tools:** if a `digitalx-cli` MCP server is connected, each REST command is a tool. `dgx-cli order
   place --symbol btc_krw --side buy …` ≡ calling the **`order_place`** tool with `{"symbol":
   "btc_krw", "side": "buy", …}`. Tool argument names are the long flag names without `--`; money
   stays a **string**; the result is already structured JSON (no `--json` needed). Most local/ops
@@ -57,14 +57,14 @@ waiting for a price, live-watching orders/fills/balances, alerting, capture), no
 full key management (only `setup`/`doctor`/`list_keys`) — and some hosts refuse money-moving actions
 outright. When the user needs one of those and you have no shell, don't just say you can't: tell them to
 install the CLI (`curl -fsSL https://docs.korbit.co.kr/install.sh | sh`; Windows `irm
-https://docs.korbit.co.kr/install.ps1 | iex`) and drive `korbit` from **Claude Code** — everything works there.
+https://docs.korbit.co.kr/install.ps1 | iex`) and drive `dgx-cli` from **Claude Code** — everything works there.
 
 Examples below are written in CLI form. Translate to a tool call when you're on MCP.
 
 ## Pick the right tool for the goal
 
-Match the user's intent to the workflow. When in doubt about exact flags/enums, run `korbit commands
---json` (the full machine catalog) or `korbit <command> --help` — don't guess.
+Match the user's intent to the workflow. When in doubt about exact flags/enums, run `dgx-cli commands
+--json` (the full machine catalog) or `dgx-cli <command> --help` — don't guess.
 
 | The user wants to… | Reach for | Details |
 |---|---|---|
@@ -125,7 +125,7 @@ results are already JSON.
 3. **Idempotency is automatic — you don't track `clientOrderId`.** Every `order place` auto-mints a
    UUIDv7 `clientOrderId`, **records it in the local journal before sending**, and reconciles by it, so
    a retry can never double-place. You don't need to remember, persist, or pass it. If a placement ever
-   exits with `UNKNOWN` (the tool couldn't confirm the outcome), recover the id from `korbit logs
+   exits with `UNKNOWN` (the tool couldn't confirm the outcome), recover the id from `dgx-cli logs
    --orders` and check the order's real state with `order get` before doing anything — never blindly
    resend.
 4. **Accepted ≠ filled.** `order place` returns the full reconciled order, but *accepted* is not
@@ -141,12 +141,12 @@ results are already JSON.
 
 ## Setup (one-time, needs the human)
 
-Korbit API keys need human identity verification in the developers portal, so you can't finish setup
+Digital X API keys need human identity verification in the developers portal, so you can't finish setup
 alone. Two calls:
 
 ```sh
-korbit setup --json          # step 1: generate a local ED25519 keypair (key "default"); returns a registrationLink + IP allowlist
-korbit setup --json --wait   # step 2: wait for the human to register, then bind + health-check automatically
+dgx-cli setup --json          # step 1: generate a local ED25519 keypair (key "default"); returns a registrationLink + IP allowlist
+dgx-cli setup --json --wait   # step 2: wait for the human to register, then bind + health-check automatically
 ```
 
 `setup --json` returns immediately — surface the `registrationLink` (and the IP allowlist to whitelist)
@@ -161,7 +161,7 @@ when they finish, or resume instructions after `--wait-timeout` (default 20m). D
 create a key, so it's safe to hand over), then bind + verify in one step:
 
 ```sh
-korbit setup --api-key <KEY_ID_the_user_pasted> --json   # binds the id AND runs doctor
+dgx-cli setup --api-key <KEY_ID_the_user_pasted> --json   # binds the id AND runs doctor
 ```
 
 The `doctor` check is **advisory** — a problem is a warning, never a setup failure — so read the embedded
@@ -179,7 +179,7 @@ off. Re-running `setup` is safe: it resumes an unbound key (re-prints the link),
 reports `alreadyConfigured` and re-runs the complementary `doctor` health check on it.
 
 **Pass `--key <name>` only when there's a real choice to make.** Multiple keys may be different
-accounts (`korbit key list --json` shows them); when more than one exists, pass `--key <name>`
+accounts (`dgx-cli key list --json` shows them); when more than one exists, pass `--key <name>`
 explicitly and tell the user which one you used. The tool prints `signing as key "<name>"` to stderr
 on every signed call (a safety disclosure, always shown), so you always know which key/account acted.
 
@@ -234,7 +234,7 @@ would use, so no credentials are touched):
   skipped. Be cautious on a skip.
 
 ```sh
-korbit order place --symbol btc_krw --side buy --type market --amt 50000 --dry-run --json
+dgx-cli order place --symbol btc_krw --side buy --type market --amt 50000 --dry-run --json
 #  -> { "request": {…}, "simulation": {…, "estAvgFillPrice": "94379999…"}, "warnings": [] }
 ```
 
@@ -254,18 +254,18 @@ order only once live trading is authorized (ground rule 1); start small.
 
 ```sh
 # The tool auto-mints + journals the clientOrderId and echoes it back.
-korbit order place --symbol btc_krw --side buy --type market --amt 50000 --json
+dgx-cli order place --symbol btc_krw --side buy --type market --amt 50000 --json
 #  -> full reconciled order: {"orderId":123,"clientOrderId":"019e…","status":"…",…}
 
 # Confirm actual state when it matters (accepted != resting/filled):
-korbit order get --symbol btc_krw --order-id 123 --json
+dgx-cli order get --symbol btc_krw --order-id 123 --json
 ```
 
 `order place` is **reconciled, not blindly retried**: it sends once, resends only with the *same*
 `clientOrderId` on an ambiguous failure (network/5xx/429) or after one clock re-sync on
 `EXCEED_TIME_WINDOW`, resolves `DUPLICATE_CLIENT_ORDER_ID` by fetching the existing order, and returns
 the full order — or exits non-zero with an `UNKNOWN` error if it genuinely can't confirm. It never
-double-places, so you don't manage any of this. On `UNKNOWN`, find the `clientOrderId` in `korbit logs
+double-places, so you don't manage any of this. On `UNKNOWN`, find the `clientOrderId` in `dgx-cli logs
 --orders` and run `order get` before deciding anything — don't blindly resend.
 
 Order `status` is `pending`, `open`, or `partiallyFilled` while the order is live (`pending` is not
@@ -297,7 +297,7 @@ auto-retried.
 Start a session (and recover after any crash) by reconciling before placing anything new:
 
 ```sh
-korbit whoami --json && korbit balance --json && korbit order open --symbol btc_krw --json
+dgx-cli whoami --json && dgx-cli balance --json && dgx-cli order open --symbol btc_krw --json
 ```
 
 - `order open` = current resting orders (authoritative for "what's live").
@@ -305,7 +305,7 @@ korbit whoami --json && korbit balance --json && korbit order open --symbol btc_
   (use `order get` for that). Watch for `truncated:true`.
 
 When the user asks **"what went wrong?"** or **"what did you do?"**, read the local action journal
-rather than guessing — `korbit logs --json` (recent write calls) and `korbit logs --orders --json`
+rather than guessing — `dgx-cli logs --json` (recent write calls) and `dgx-cli logs --orders --json`
 (every order this tool placed and whether it landed). See `references/debugging.md` for the full
 playbook.
 
@@ -313,7 +313,7 @@ playbook.
 
 This tool is for **research, monitoring/alerting, and simple automated trading** driven by an agent.
 For a large, long-lived, full-featured custom trading bot, the better path is to build directly
-against the Korbit Open API using the LLM docs at **https://docs.korbit.co.kr/llms.txt** (and
+against the Digital X Open API using the LLM docs at **https://docs.korbit.co.kr/llms.txt** (and
 `llms-full.txt`) — that bundle is self-sufficient for implementing your own signed client. If you ever
 need the tool's source as a reference (last resort), it's open source at
-**https://github.com/korbit-official/korbit-cli**; prefer `korbit commands --json` and `--help` first.
+**https://github.com/korbit-official/korbit-cli**; prefer `dgx-cli commands --json` and `--help` first.

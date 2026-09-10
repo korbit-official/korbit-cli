@@ -142,7 +142,7 @@ it receives everything through the `clienv` seam (`cli/clienv`), and `cli`
 dispatches to it via `Run(cx *clienv.Cmd, …)`. Keep this direction acyclic.
 
 **The bundled skill is embedded in `package main`** (`skillfs.go`,
-`//go:embed all:skills/korbit`) because an embed directive can't use `..`. It is
+`//go:embed all:skills/digitalx-cli`) because an embed directive can't use `..`. It is
 injected into `cli` via `Deps.SkillFS`; `internal/agentskill` only ever takes an
 `fs.FS`, so tests inject an `fstest.MapFS`.
 
@@ -313,7 +313,7 @@ get wrong, is **when to use the server clock at all**:
 > it** — read the system clock separately for the local part, even if that means
 > reading the time twice. (Concretely: the place protocol signs with `SignNow`
 > but journals its order row from the system clock; the bot runtime exposes the
-> server clock as `korbit.now()` yet stamps `LastDataAt` from the system clock.)
+> server clock as `api.now()` yet stamps `LastDataAt` from the system clock.)
 
 ### Logging (`internal/logging`)
 
@@ -391,7 +391,7 @@ layer it builds on is `internal/stream` — **read `stream/doc.go`** for the
 recovery matrix, the "up to date or TOLD" property, and the notice/logging
 contract before changing stream behavior. The bot runtime's threading model
 (all JS on one event-loop goroutine; the dispatcher FIFO; the bounded worker
-pool; `Close` drains the pool), the generated `korbit.*`/`db.*` API, the
+pool; `Close` drains the pool), the generated `api.*`/`db.*` API (with `korbit` bound to the same object as a permanent alias), the
 `ta.*`/`state.*` synchronous globals, and the line-oriented output shapes are all
 documented in the package doc of `botapi/botapi.go` and the comments in
 `bindings.go`/`state.go`/`indicators.go`/`jserr.go`. The bot-scripting surface is
@@ -403,7 +403,7 @@ payload) is `internal/candles` — read the `Synth` doc in `candles/synth.go`
 (guarantee inheritance, first-trade-frame-kicked seeds, the {interval, timestamp}
 last-wins rule) before changing it. Two
 facts not in code comments: there is no raw-call escape hatch — every endpoint
-is a validated generated method (no `korbit.get`/`korbit.call`); and the agent
+is a validated generated method (no `api.get`/`api.call`); and the agent
 notes for `ta` flow from the `monitor` spec entry (`spec/registry.go`), the
 single source feeding `--help`, the catalog, and the MCP reference. The exit-code
 mapper is `RunError` in `cli/monitorcmd`.
@@ -415,7 +415,7 @@ catalog, carrying no call policy of its own. Tool generation, the
 onboarding/diagnostics tools (`setup`/`doctor`), the in-session
 `refreshAfterKeyChange`, the one-server-one-key model, and the JSON-RPC output
 contract are documented at their symbols in `mcpcmd.go`/`mcptool.go`. The
-`korbit_guide` tool (`makeGuideHandler`, fed by `agentskill.GuideContent`)
+`digitalx_guide` tool (`makeGuideHandler`, fed by `agentskill.GuideContent`)
 surfaces the bundled Skill's guidance for an MCP-only host that never loads the
 skill the way Claude Code does — see "The bundled Skill" below. **The
 load-bearing warning** (also at the call site): the raw `AddTool` path does
@@ -465,19 +465,28 @@ pointer-present/body-absent.
 
 ## The bundled Skill
 
-`skills/korbit/` is the Agent Skill that consumes this CLI (`SKILL.md` plus
+`skills/digitalx-cli/` is the Agent Skill that consumes this CLI (`SKILL.md` plus
 `references/`). It is mode-agnostic (CLI or `mcp serve`), organized around use
-cases, defers the exhaustive flag/enum surface to `korbit commands` / `--help`,
+cases, defers the exhaustive flag/enum surface to `dgx-cli commands` / `--help`,
 and deliberately **excludes** the experimental JS bot runtime. Shipping is via
-`korbit agent skill install`/`doctor` (embedded in the binary, idempotent,
+`dgx-cli agent skill install`/`doctor` (embedded in the binary, idempotent,
 self-cleaning, drift-checked by content hash) — see `cli/agentskillcmd` and
-`internal/agentskill`.
+`internal/agentskill`. A copy of this same skill sitting at the legacy directory
+name (`skills/korbit`) is removed by `agent skill install` once the current one
+is written, and reported by `agent skill doctor`, so an agent never loads two
+skills with the same triggers. Ownership is proved by `agentskill.Managed`, and
+deleting someone's work is the cost of a false positive, so it requires all
+three of: a frontmatter `name:` that is one of our skill names plus a command we
+drive, this repository's URL in the body, and exactly our `references/` set. A
+hand-written skill that merely names this CLI satisfies only the first, and is
+reported and left alone.
 
 It reaches an MCP host two ways. Claude Code installs the skill files on disk
 (above). A pure MCP host (Claude Desktop via the `.mcpb` bundle) never does, so
-`mcp serve` exposes the **same** content through the read-only `korbit_guide`
-tool: `internal/agentskill/guide.go` reads the embedded tree (`SKILL.md` as the
-overview, each `references/<topic>.md` as a topic) and the server's
+`mcp serve` exposes the **same** content through the read-only `digitalx_guide`
+tool — registered under the deprecated alias `korbit_guide` as well, same
+handler: `internal/agentskill/guide.go` reads the embedded tree (`SKILL.md` as
+the overview, each `references/<topic>.md` as a topic) and the server's
 `Instructions` nudge the model to call it. One embedded source feeds both paths,
 so they cannot drift.
 

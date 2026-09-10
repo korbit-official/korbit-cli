@@ -93,11 +93,17 @@ for doc in LICENSE NOTICE THIRD_PARTY_LICENSES.txt DISCLAIMER.md DISCLAIMER.ko.m
 	cp "$root/$doc" "$stage/$doc"
 done
 
+# `name` is the extension's INSTALL KEY: an MCPB host keys the installed
+# extension on it, so changing it makes a host treat this bundle as a different
+# extension and install it ALONGSIDE the one already there — two servers, two
+# copies of every tool. It must stay "korbit" for as long as installed bundles
+# carry that key. `display_name` is what the user actually reads, and is free to
+# change.
 cat >"$stage/manifest.json" <<EOF
 {
   "manifest_version": "0.3",
   "name": "korbit",
-  "display_name": "Korbit",
+  "display_name": "Digital X CLI",
   "version": "$version",
   "description": "Operate the Korbit cryptocurrency exchange over MCP — every REST endpoint as a tool, with the same validation, signing, journaling, and retries as the CLI.",
   "long_description": "Exposes the Korbit Open API v2 as MCP tools backed by the dgx-cli binary running locally on your machine, so your API keys never leave it. Read market data, manage orders, and check balances; the order-placement tool supports a dry-run that simulates the fill against the live order book before anything is sent. First-time users with no key yet can complete setup entirely in chat via the setup and doctor tools.",
@@ -107,7 +113,7 @@ cat >"$stage/manifest.json" <<EOF
   "repository": { "type": "git", "url": "https://github.com/korbit-official/korbit-cli.git" },
   "license": "Apache-2.0",
   "icon": "icon.png",
-  "keywords": ["korbit", "cryptocurrency", "exchange", "trading", "mcp"],
+  "keywords": ["digitalx", "digitalx-cli", "dgx-cli", "korbit", "cryptocurrency", "exchange", "trading", "mcp"],
   "server": {
     "type": "binary",
     "entry_point": "$entry_point",
@@ -115,8 +121,8 @@ cat >"$stage/manifest.json" <<EOF
       "command": "$command_path",
       "args": ["mcp", "serve"],
       "env": {
-        "KORBIT_CLI_MCP_READ_ONLY": "\${user_config.read_only}",
-        "KORBIT_CLI_MCP_MULTI_KEY": "\${user_config.multi_key}"
+        "DIGITALX_CLI_MCP_READ_ONLY": "\${user_config.read_only}",
+        "DIGITALX_CLI_MCP_MULTI_KEY": "\${user_config.multi_key}"
       }
     }
   },

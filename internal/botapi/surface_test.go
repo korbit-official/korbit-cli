@@ -17,59 +17,59 @@ import (
 )
 
 // This is the GOLDEN surface-pin test: a conscious-edit gate over the generated
-// korbit.* API, the frozen bare hook bindings, the rejection error field names,
+// api.* API, the frozen bare hook bindings, the rejection error field names,
 // and the global surface. The expectations are HARDCODED (derived once, by hand,
 // from the current spec) — deliberately NOT computed from spec.Registry at test
 // time, which would silently absorb a rename/move and defeat the purpose. When a
 // spec refactor changes the surface, this test fails and forces a deliberate
 // decision: extend the golden list additively, or stop the rename.
 
-// wantKorbitMethods is the EXACT set of dotted korbit.* method names. Adding an
+// wantAPIMethods is the EXACT set of dotted api.* method names. Adding an
 // endpoint command adds a line here; renaming/moving one breaks an existing line
-// (that is the gate). korbit.now is asserted separately (it is not spec-derived).
-// korbit.time is intentionally ABSENT: the `time` endpoint command exists in the
+// (that is the gate). api.now is asserted separately (it is not spec-derived).
+// api.time is intentionally ABSENT: the `time` endpoint command exists in the
 // spec but is hidden from the bot surface (jsHiddenCommands) — a script reads the
-// clock locally via Date.now()/korbit.now(), never a REST round-trip. Do not add
+// clock locally via Date.now()/api.now(), never a REST round-trip. Do not add
 // it back to "fix" a generated-surface change; remove it from jsHiddenCommands.
-var wantKorbitMethods = []string{
-	"korbit.balance",
-	"korbit.candles",
-	"korbit.currencies",
-	"korbit.deposit.address",
-	"korbit.deposit.addresses",
-	"korbit.deposit.generate",
-	"korbit.deposit.history",
-	"korbit.deposit.status",
-	"korbit.fees",
-	"korbit.fills",
-	"korbit.krw.deposit.history",
-	"korbit.krw.deposit.request",
-	"korbit.krw.withdraw.history",
-	"korbit.krw.withdraw.request",
-	"korbit.order.cancel",
-	"korbit.order.get",
-	"korbit.order.history",
-	"korbit.order.open",
-	"korbit.order.place",
-	"korbit.orderbook",
-	"korbit.pairs",
-	"korbit.tickSize",
-	"korbit.ticker",
-	"korbit.trades",
-	"korbit.whoami",
-	"korbit.withdraw.addresses",
-	"korbit.withdraw.amount",
-	"korbit.withdraw.cancel",
-	"korbit.withdraw.history",
-	"korbit.withdraw.request",
-	"korbit.withdraw.status",
+var wantAPIMethods = []string{
+	"api.balance",
+	"api.candles",
+	"api.currencies",
+	"api.deposit.address",
+	"api.deposit.addresses",
+	"api.deposit.generate",
+	"api.deposit.history",
+	"api.deposit.status",
+	"api.fees",
+	"api.fills",
+	"api.krw.deposit.history",
+	"api.krw.deposit.request",
+	"api.krw.withdraw.history",
+	"api.krw.withdraw.request",
+	"api.order.cancel",
+	"api.order.get",
+	"api.order.history",
+	"api.order.open",
+	"api.order.place",
+	"api.orderbook",
+	"api.pairs",
+	"api.tickSize",
+	"api.ticker",
+	"api.trades",
+	"api.whoami",
+	"api.withdraw.addresses",
+	"api.withdraw.amount",
+	"api.withdraw.cancel",
+	"api.withdraw.history",
+	"api.withdraw.request",
+	"api.withdraw.status",
 }
 
-// dottedKorbitMethods reads back the dump the surface-probe runtime built in
+// dottedAPIMethods reads back the dump the surface-probe runtime built in
 // --init: the --where evaluation prints the JSON array to (captured) stderr,
 // then this decodes it. (--where is the simplest JS->Go channel that does not
-// touch the gated korbit./db. surface.)
-func dottedKorbitMethods(t *testing.T, r *Runtime) []string {
+// touch the gated api./db. surface.)
+func dottedAPIMethods(t *testing.T, r *Runtime) []string {
 	t.Helper()
 	ok, err := r.Match(dataEvent(`{}`))
 	if err != nil || !ok {
@@ -88,40 +88,40 @@ func dottedKorbitMethods(t *testing.T, r *Runtime) []string {
 // package-level var keeps the plumbing simple (these tests run sequentially).
 var capturedSurface string
 
-func TestGoldenKorbitMethodSet(t *testing.T) {
+func TestGoldenAPIMethodSet(t *testing.T) {
 	capturedSurface = ""
 	ft := newFakeTransport()
 	r := newTestRuntime(t, Options{
 		API: ft.api(apiExtra{}),
-		// Enumerate every dotted function path under korbit, at any nesting depth
-		// (skip korbit.now).
+		// Enumerate every dotted function path under the api global, at any
+		// nesting depth (skip api.now).
 		Init: `globalThis.__dump = (function () {
 			var out = [];
 			(function walk(obj, path) {
 				Object.keys(obj).forEach(function (k) {
-					if (path === 'korbit' && k === 'now') return;
+					if (path === 'api' && k === 'now') return;
 					var v = obj[k];
 					var p = path + '.' + k;
 					if (typeof v === 'function') { out.push(p); return; }
 					if (v && typeof v === 'object') walk(v, p);
 				});
-			})(korbit, 'korbit');
+			})(api, 'api');
 			return JSON.stringify(out);
 		})();`,
 		// --where reports the dump to stderr (captured) and matches.
 		Where:  "(console.error(__dump), true)",
 		Stderr: writerFunc(func(p []byte) { capturedSurface += string(p) }),
 	})
-	got := dottedKorbitMethods(t, r)
+	got := dottedAPIMethods(t, r)
 
-	want := append([]string(nil), wantKorbitMethods...)
+	want := append([]string(nil), wantAPIMethods...)
 	sort.Strings(want)
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
-		t.Fatalf("korbit.* surface drift.\n got: %v\nwant: %v\n(extend the golden list ADDITIVELY, or stop the rename)", got, want)
+		t.Fatalf("api.* surface drift.\n got: %v\nwant: %v\n(extend the golden list ADDITIVELY, or stop the rename)", got, want)
 	}
 }
 
-// wantStateMethods is the EXACT set of state.* method names. Like the korbit.*
+// wantStateMethods is the EXACT set of state.* method names. Like the api.*
 // and ta golden lists, this is HARDCODED so a rename/removal breaks a line and
 // forces a deliberate decision — state joins the frozen, extend-only globals.
 var wantStateMethods = []string{
@@ -262,11 +262,11 @@ func TestGoldenSampledOptionKeys(t *testing.T) {
 		call string // a call carrying a bogus option, to trigger the list
 		want string
 	}{
-		{`korbit.order.place({__x:1})`, "symbol, side, orderType, price, qty, amt, timeInForce, bestNth, clientOrderId, pp, ppPercent, accountSeq"},
-		{`korbit.order.history({__x:1})`, "symbol, limit, startTime, endTime, accountSeq"},
-		{`korbit.fills({__x:1})`, "symbol, limit, startTime, endTime, accountSeq"},
-		{`korbit.candles({__x:1})`, "symbol, interval, limit, startTime, endTime"},
-		{`korbit.deposit.history({__x:1})`, "currency, limit, accountSeq"},
+		{`api.order.place({__x:1})`, "symbol, side, orderType, price, qty, amt, timeInForce, bestNth, clientOrderId, pp, ppPercent, accountSeq"},
+		{`api.order.history({__x:1})`, "symbol, limit, startTime, endTime, accountSeq"},
+		{`api.fills({__x:1})`, "symbol, limit, startTime, endTime, accountSeq"},
+		{`api.candles({__x:1})`, "symbol, interval, limit, startTime, endTime"},
+		{`api.deposit.history({__x:1})`, "currency, limit, accountSeq"},
 	}
 	for _, tc := range cases {
 		ft := newFakeTransport()
@@ -291,7 +291,7 @@ func TestGoldenSampledOptionKeys(t *testing.T) {
 // canary proves no stray binding leaked in.
 func TestGoldenHookBindings(t *testing.T) {
 	bare := []string{"channel", "symbol", "origin", "serverTime", "source", "payload", "rows", "ev"}
-	// --where sees the same bindings as --on (minus korbit./db.). Assert each is
+	// --where sees the same bindings as --on (minus api./db.). Assert each is
 	// defined and a canary name is not — in a single predicate.
 	var checks []string
 	for _, n := range bare {
@@ -325,7 +325,7 @@ func TestGoldenRejectionFields(t *testing.T) {
 		Message: "rate", HTTPStatus: 429, Code: "TOO_MANY_REQUESTS",
 		RetryAfterSec: &ra, Body: json.RawMessage(`{"success":false,"error":{"message":"TOO_MANY_REQUESTS"}}`),
 	}})
-	on := `try { await korbit.balance(); throw new Error('expected a rejection'); }
+	on := `try { await api.balance(); throw new Error('expected a rejection'); }
 		catch (e) {
 			if (e.code !== 'TOO_MANY_REQUESTS') throw new Error('code: ' + e.code);
 			if (e.httpStatus !== 429) throw new Error('httpStatus: ' + e.httpStatus);
@@ -339,7 +339,7 @@ func TestGoldenRejectionFields(t *testing.T) {
 }
 
 // TestGoldenGlobals pins that every documented global is present: the timer
-// globals, console, korbit.now, the ta indicator library, and db (only when
+// globals, console, api.now, the ta indicator library, and db (only when
 // DBPath is set). All asserted from a single --where truthiness probe — which
 // also proves ta is reachable inside --where.
 func TestGoldenGlobals(t *testing.T) {
@@ -352,8 +352,10 @@ func TestGoldenGlobals(t *testing.T) {
 		checks = append(checks, "typeof "+n+" === 'function'")
 	}
 	checks = append(checks,
-		"typeof korbit === 'object'",
-		"typeof korbit.now === 'function'",
+		"typeof api === 'object'",
+		"typeof api.now === 'function'",
+		// `korbit` is a permanent second name for the SAME object.
+		"typeof korbit === 'object' && korbit === api",
 		// ta is a synchronous global usable everywhere, including --where.
 		"typeof ta === 'object'",
 		"typeof ta.sma === 'function'",
@@ -363,9 +365,9 @@ func TestGoldenGlobals(t *testing.T) {
 		// without --stateful, but the surface is present regardless.
 		"typeof state === 'object'",
 		"typeof state.openOrders === 'function'",
-		// korbit.time is deliberately NOT exposed (jsHiddenCommands): a bot reads
-		// the clock locally via Date.now()/korbit.now(), never a REST round-trip.
-		"typeof korbit.time === 'undefined'",
+		// api.time is deliberately NOT exposed (jsHiddenCommands): a bot reads
+		// the clock locally via Date.now()/api.now(), never a REST round-trip.
+		"typeof api.time === 'undefined'",
 		"typeof console === 'object'",
 		"typeof console.log === 'function'",
 		"typeof db === 'object'", // db is installed (its methods are usable) because DBPath is set
@@ -391,3 +393,53 @@ func TestGoldenGlobals(t *testing.T) {
 // jsString renders s as a double-quoted JS string literal for embedding in test
 // source (the option lists contain no quotes/backslashes, so this is enough).
 func jsString(s string) string { return `"` + s + `"` }
+
+// TestKorbitGlobalIsAnAliasOfAPI: the API global answers to two names bound to
+// one object, so a script written against either — including one already
+// written and saved by a user — runs unchanged. The alias is not a copy: a
+// property set through one name is visible through the other.
+func TestKorbitGlobalIsAnAliasOfAPI(t *testing.T) {
+	ft := newFakeTransport()
+	checks := []string{
+		"korbit === api",
+		"korbit.order === api.order",
+		"typeof korbit.order.place === 'function'",
+		"typeof korbit.now === 'function'",
+		"(api.__probe = 1, korbit.__probe === 1)",
+	}
+	r := newTestRuntime(t, Options{API: ft.api(apiExtra{}), Where: strings.Join(checks, " && ")})
+	ok, err := r.Match(dataEvent(`{}`))
+	if err != nil {
+		t.Fatalf("alias probe failed: %v", err)
+	}
+	if !ok {
+		t.Fatalf("the korbit global must be the same object as api")
+	}
+}
+
+// TestScriptWrittenAgainstKorbitStillRuns: an --on handler that calls through
+// the alias reaches the same operation, with the same validation and the same
+// result, as one written against the primary name.
+func TestScriptWrittenAgainstKorbitStillRuns(t *testing.T) {
+	for _, global := range []string{"api", "korbit"} {
+		t.Run(global, func(t *testing.T) {
+			ft := newFakeTransport()
+			ft.on("GET", "/v2/tickers", step{data: json.RawMessage(`{"btc_krw":{"close":"100"}}`)})
+			var out string
+			err := runOn(t, Options{
+				API:    ft.api(apiExtra{}),
+				On:     "var tk = await " + global + ".ticker('btc_krw'); console.log('close=' + tk.btc_krw.close)",
+				Stderr: writerFunc(func(p []byte) { out += string(p) }),
+			}, dataEvent(`{}`))
+			if err != nil {
+				t.Fatalf("%s.ticker: %v", global, err)
+			}
+			if !strings.Contains(out, "close=100") {
+				t.Fatalf("%s.ticker produced %q", global, out)
+			}
+			if calls := ft.calls("GET", "/v2/tickers"); len(calls) != 1 {
+				t.Fatalf("%s.ticker made %d calls", global, len(calls))
+			}
+		})
+	}
+}

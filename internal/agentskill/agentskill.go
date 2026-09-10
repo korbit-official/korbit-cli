@@ -28,15 +28,23 @@ import (
 )
 
 // SkillName is the directory name the skill installs under inside an agent's
-// skills directory (…/skills/korbit). It matches the embedded source's root dir.
-const SkillName = "korbit"
+// skills directory (…/skills/digitalx-cli). It matches the embedded source's
+// root dir, and the frontmatter `name:` the skill declares.
+const SkillName = "digitalx-cli"
+
+// LegacySkillName is the other directory name an installed copy of THIS skill
+// can carry: a binary that shipped the skill under that name wrote
+// …/skills/korbit, and an agent that finds both loads two skills with the same
+// triggers. Install replaces such a copy (only when Managed proves it is ours)
+// and doctor reports one it finds.
+const LegacySkillName = "korbit"
 
 // SkillBinary is the command name the bundled skill tells agents to run. It is
 // intentionally separate from the running executable name: the binary can be
 // invoked through another filename such as "korbit-cli", while the installed
-// skill contains literal `korbit ...` commands. Doctor and command metadata must
-// describe the command the skill actually executes.
-const SkillBinary = "korbit"
+// skill contains literal `dgx-cli ...` commands. Doctor and command metadata
+// must describe the command the skill actually executes.
+const SkillBinary = "dgx-cli"
 
 // Agent is a target agent runtime whose skills directory we install into.
 // SkillRel is the path of its skills directory relative to a root (the user's
@@ -68,14 +76,24 @@ func AgentByID(id string) (Agent, bool) {
 	return Agent{}, false
 }
 
-// SkillDir is the absolute skill directory under root (…/skills/korbit).
+// SkillDir is the absolute skill directory under root (…/skills/digitalx-cli).
 func (a Agent) SkillDir(root string) string {
+	return a.skillDirNamed(root, SkillName)
+}
+
+// LegacySkillDir is the absolute directory a copy under LegacySkillName would
+// occupy under root (…/skills/korbit).
+func (a Agent) LegacySkillDir(root string) string {
+	return a.skillDirNamed(root, LegacySkillName)
+}
+
+func (a Agent) skillDirNamed(root, name string) string {
 	// Build into a freshly sized slice rather than chained appends, so we never
 	// risk aliasing a.SkillRel's backing array.
 	parts := make([]string, 0, len(a.SkillRel)+2)
 	parts = append(parts, root)
 	parts = append(parts, a.SkillRel...)
-	parts = append(parts, SkillName)
+	parts = append(parts, name)
 	return filepath.Join(parts...)
 }
 
@@ -139,7 +157,7 @@ type Outcome struct {
 	Hash   string   `json:"contentHash"`
 }
 
-// Install writes the skill from src into dir (the skill directory, …/korbit),
+// Install writes the skill from src into dir (the skill directory, …/digitalx-cli),
 // then prunes any file there that the embedded skill no longer ships — so a
 // renamed or removed reference file from an older binary can't linger. It is
 // idempotent: an on-disk copy already matching the embedded one is left

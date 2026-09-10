@@ -6,7 +6,7 @@ package botapi
 
 import "sync"
 
-// pool bounds the number of korbit.*/db.* calls in flight at once. Submission
+// pool bounds the number of api.*/db.* calls in flight at once. Submission
 // never blocks the caller (the event loop must never wait on the pool): each
 // task is its own goroutine parked on the semaphore until a slot frees up, so
 // pending work queues in scheduler space rather than stalling JavaScript.

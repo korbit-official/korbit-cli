@@ -14,7 +14,7 @@ import (
 // of the materialized stream/state.Store (open orders, fills, balances, tickers,
 // orderbooks, public trades, connection health). It is a sibling of `ta` — a
 // plain synchronous global usable everywhere (--init, --where, --on), NOT behind
-// the inWhere deny-gate that blocks the async korbit.*/db.* surface, because a
+// the inWhere deny-gate that blocks the async api.*/db.* surface, because a
 // state read is a local memory lookup, not I/O.
 //
 // The Store is built (and fed) only when --stateful is set; the methods are

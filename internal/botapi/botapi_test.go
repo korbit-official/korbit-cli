@@ -217,7 +217,7 @@ func TestWhereExceptionIsPerEvent(t *testing.T) {
 
 func TestKorbitDeniedInWhere(t *testing.T) {
 	ft := newFakeTransport()
-	r := newTestRuntime(t, Options{Where: "korbit.ticker('btc_krw')", API: ft.api(apiExtra{})})
+	r := newTestRuntime(t, Options{Where: "api.ticker('btc_krw')", API: ft.api(apiExtra{})})
 	_, err := r.Match(dataEvent(`{}`))
 	if err == nil || !strings.Contains(err.Error(), "not available inside --where") {
 		t.Fatalf("expected the --where gate, got %v", err)
@@ -235,13 +235,13 @@ func TestDBDeniedInWhere(t *testing.T) {
 	}
 }
 
-func TestOnAwaitsKorbitCall(t *testing.T) {
+func TestOnAwaitsAPICall(t *testing.T) {
 	ft := newFakeTransport()
 	ft.on("GET", "/v2/tickers", step{data: json.RawMessage(`{"btc_krw":{"close":"100"}}`)})
 	var got string
 	err := runOn(t, Options{
 		API:    ft.api(apiExtra{}),
-		On:     "var tk = await korbit.ticker('btc_krw'); report(tk.btc_krw.close)",
+		On:     "var tk = await api.ticker('btc_krw'); report(tk.btc_krw.close)",
 		Stderr: writerFunc(func(p []byte) { got += string(p) }),
 		Init:   "function report(v){ console.log('close=' + v) }",
 	}, dataEvent(`{}`))
@@ -273,7 +273,7 @@ func TestPromiseAllRunsConcurrently(t *testing.T) {
 
 	r := newTestRuntime(t, Options{
 		API: ft.api(apiExtra{}),
-		On:  "await Promise.all([korbit.ticker('btc_krw'), korbit.orderbook('btc_krw')])",
+		On:  "await Promise.all([api.ticker('btc_krw'), api.orderbook('btc_krw')])",
 	})
 	done := make(chan error, 1)
 	go func() { done <- r.RunHandler(dataEvent(`{}`)) }()
@@ -305,7 +305,7 @@ func TestUnhandledRejectionIsFatal(t *testing.T) {
 	ft.on("GET", "/v2/tickers", step{err: &output.ApiError{Message: "nope", HTTPStatus: 400, Code: "BAD"}})
 	r := newTestRuntime(t, Options{
 		API: ft.api(apiExtra{}),
-		On:  "korbit.ticker('btc_krw'); 1", // fire-and-forget, nobody catches
+		On:  "api.ticker('btc_krw'); 1", // fire-and-forget, nobody catches
 	})
 	if err := r.RunHandler(dataEvent(`{}`)); err != nil {
 		t.Fatalf("the handler itself should succeed, got %v", err)
@@ -327,7 +327,7 @@ func TestUnhandledRejectionIsFatal(t *testing.T) {
 func TestHandlerRejectionCarriesApiError(t *testing.T) {
 	ft := newFakeTransport()
 	ft.on("GET", "/v2/balance", step{err: &output.ApiError{Message: "denied", HTTPStatus: 403, Code: "FORBIDDEN"}})
-	err := runOn(t, Options{API: ft.api(apiExtra{}), On: "await korbit.balance()"}, dataEvent(`{}`))
+	err := runOn(t, Options{API: ft.api(apiExtra{}), On: "await api.balance()"}, dataEvent(`{}`))
 	var ae *output.ApiError
 	if !errors.As(err, &ae) || ae.Code != "FORBIDDEN" || ae.HTTPStatus != 403 {
 		t.Fatalf("expected the ApiError to survive the JS boundary, got %v", err)
@@ -340,7 +340,7 @@ func TestCatchSeesStructuredError(t *testing.T) {
 	err := runOn(t, Options{
 		API: ft.api(apiExtra{}),
 		On: `try {
-			await korbit.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1'});
+			await api.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1'});
 			throw new Error('should not get here');
 		} catch (e) {
 			if (e.code !== 'INSUFFICIENT_BALANCE' || e.httpStatus !== 400) throw new Error('bad shape: ' + e.code + '/' + e.httpStatus);
@@ -355,7 +355,7 @@ func TestMoneyMustBeStrings(t *testing.T) {
 	ft := newFakeTransport()
 	err := runOn(t, Options{
 		API: ft.api(apiExtra{}),
-		On:  "await korbit.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price: 100, qty: '1'})",
+		On:  "await api.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price: 100, qty: '1'})",
 	}, dataEvent(`{}`))
 	if err == nil || !strings.Contains(err.Error(), "decimal STRING") {
 		t.Fatalf("expected the money-string guardrail, got %v", err)
@@ -369,7 +369,7 @@ func TestSizingMatrixEnforcedBeforeSend(t *testing.T) {
 	ft := newFakeTransport()
 	err := runOn(t, Options{
 		API: ft.api(apiExtra{}),
-		On:  "await korbit.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', qty:'1'})",
+		On:  "await api.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', qty:'1'})",
 	}, dataEvent(`{}`))
 	if err == nil || !strings.Contains(err.Error(), "--price") {
 		t.Fatalf("expected the sizing matrix to fire, got %v", err)
@@ -380,7 +380,7 @@ func TestUnknownOptionRejected(t *testing.T) {
 	ft := newFakeTransport()
 	err := runOn(t, Options{
 		API: ft.api(apiExtra{}),
-		On:  "await korbit.ticker({symbl:'btc_krw'})",
+		On:  "await api.ticker({symbl:'btc_krw'})",
 	}, dataEvent(`{}`))
 	if err == nil || !strings.Contains(err.Error(), `unknown option "symbl"`) {
 		t.Fatalf("expected an unknown-option error, got %v", err)
@@ -392,14 +392,14 @@ func TestCredsMissingThrowsClearly(t *testing.T) {
 	err := runOn(t, Options{
 		API:      ft.api(apiExtra{}),
 		CredsErr: `no key configured; add one with "korbit key add"`,
-		On:       "await korbit.balance()",
+		On:       "await api.balance()",
 	}, dataEvent(`{}`))
 	if err == nil || !strings.Contains(err.Error(), "needs a signing key") || !strings.Contains(err.Error(), "no key configured") {
 		t.Fatalf("expected the creds guidance, got %v", err)
 	}
 	// Public methods still work without creds.
 	ft.on("GET", "/v2/tickers", step{data: json.RawMessage(`{"symbol":"btc_krw"}`)})
-	err = runOn(t, Options{API: ft.api(apiExtra{}), CredsErr: "no key", On: "await korbit.ticker('btc_krw')"}, dataEvent(`{}`))
+	err = runOn(t, Options{API: ft.api(apiExtra{}), CredsErr: "no key", On: "await api.ticker('btc_krw')"}, dataEvent(`{}`))
 	if err != nil {
 		t.Fatalf("public method should work credless: %v", err)
 	}
@@ -413,7 +413,7 @@ func TestPlaceMintsClientOrderIdAndFetchesFullOrder(t *testing.T) {
 	ft.on("GET", "/v2/orders", step{data: json.RawMessage(placedOrderDoc)})
 	err := runOn(t, Options{
 		API: ft.api(apiExtra{}),
-		On: `var o = await korbit.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1'});
+		On: `var o = await api.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1'});
 			if (o.orderId !== 987) throw new Error('not the full order: ' + JSON.stringify(o));
 			if (o.price !== '100') throw new Error('money must stay strings');`,
 	}, dataEvent(`{}`))
@@ -448,7 +448,7 @@ func TestPlaceMintsClientOrderIdAndFetchesFullOrder(t *testing.T) {
 	}
 }
 
-// TestPlaceRegistersLocalHold: on a stateful runtime, korbit.order.place
+// TestPlaceRegistersLocalHold: on a stateful runtime, api.order.place
 // registers the order's local balance hold — sized with the account's
 // quote-fee headroom, fetched once and cached per {account, symbol} — before
 // the order is sent; state.balances() shows Available net of the in-flight
@@ -472,13 +472,13 @@ func TestPlaceRegistersLocalHold(t *testing.T) {
 			}
 			if (payload.step === 'place') {
 				// 100000 x 3 = 300000, x1.002 quote-fee headroom = 300600.
-				await korbit.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100000', qty:'3', clientOrderId:'cid-1'});
+				await api.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100000', qty:'3', clientOrderId:'cid-1'});
 				if (krw() !== '699400') throw new Error('hold (with fee headroom) must survive the accept: ' + krw());
 			} else if (payload.step === 'released') {
 				if (krw() !== '1000000') throw new Error('myOrder observation must release the hold: ' + krw());
 			} else if (payload.step === 'reject') {
 				try {
-					await korbit.order.place({symbol:'btc_krw', side:'buy', orderType:'market', amt:'200000', clientOrderId:'cid-2'});
+					await api.order.place({symbol:'btc_krw', side:'buy', orderType:'market', amt:'200000', clientOrderId:'cid-2'});
 					throw new Error('place should have been rejected');
 				} catch (e) {
 					if (e.code !== 'NO_BALANCE') throw e;
@@ -533,7 +533,7 @@ func TestPlaceReconcileNetworkFailThenDuplicate(t *testing.T) {
 				}, nil
 			},
 		}),
-		On: `var o = await korbit.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1', clientOrderId:'cid-1'});
+		On: `var o = await api.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1', clientOrderId:'cid-1'});
 			if (o.orderId !== 987) throw new Error('expected the reconciled order');`,
 	}, dataEvent(`{}`))
 	if err != nil {
@@ -571,7 +571,7 @@ func TestPlaceCleanRejectionDoesNotResend(t *testing.T) {
 				}, nil
 			},
 		}),
-		On: "await korbit.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1'})",
+		On: "await api.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1'})",
 	}, dataEvent(`{}`))
 	var ae *output.ApiError
 	if !errors.As(err, &ae) || ae.Code != "INSUFFICIENT_BALANCE" {
@@ -592,7 +592,7 @@ func TestPlaceBudgetExhaustedFinalReconcileFindsOrder(t *testing.T) {
 	ft.on("GET", "/v2/orders", step{data: json.RawMessage(placedOrderDoc)})
 	err := runOn(t, Options{
 		API: ft.api(apiExtra{}),
-		On: `var o = await korbit.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1', clientOrderId:'cid-1'});
+		On: `var o = await api.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1', clientOrderId:'cid-1'});
 			if (o.orderId !== 987) throw new Error('expected the recovered order');`,
 	}, dataEvent(`{}`))
 	if err != nil {
@@ -608,7 +608,7 @@ func TestPlaceBudgetExhaustedIsUnknownNotFailed(t *testing.T) {
 	ft.on("GET", "/v2/orders", step{err: &output.ApiError{Message: "no such order", HTTPStatus: 404, Code: "ORDER_NOT_FOUND"}})
 	err := runOn(t, Options{
 		API: ft.api(apiExtra{}),
-		On:  "await korbit.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1', clientOrderId:'cid-1'})",
+		On:  "await api.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1', clientOrderId:'cid-1'})",
 	}, dataEvent(`{}`))
 	if err == nil || !strings.Contains(err.Error(), "UNKNOWN") {
 		t.Fatalf("expected the state-unknown failure, got %v", err)
@@ -625,7 +625,7 @@ func TestPlaceAcceptedButUnreadableSurfacesNoteToJS(t *testing.T) {
 	ft.on("GET", "/v2/orders", step{data: json.RawMessage(`{}`)}) // never visible
 	err := runOn(t, Options{
 		API: ft.api(apiExtra{}),
-		On: `var o = await korbit.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1', clientOrderId:'cid-1'});
+		On: `var o = await api.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1', clientOrderId:'cid-1'});
 			if (o.orderId !== 987) throw new Error('expected the accept ack orderId, got '+JSON.stringify(o));
 			if (o.acknowledgmentOnly !== true) throw new Error('expected acknowledgmentOnly flag, got '+JSON.stringify(o));
 			if (!o.note) throw new Error('expected a note on the ack');`,
@@ -641,7 +641,7 @@ func TestPlaceStateUnknownWhenLookupAlsoFails(t *testing.T) {
 	ft.on("GET", "/v2/orders", step{err: errors.New("still down")})
 	err := runOn(t, Options{
 		API: ft.api(apiExtra{}),
-		On:  "await korbit.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1', clientOrderId:'cid-1'})",
+		On:  "await api.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1', clientOrderId:'cid-1'})",
 	}, dataEvent(`{}`))
 	if err == nil || !strings.Contains(err.Error(), "UNKNOWN") || !strings.Contains(err.Error(), "cid-1") {
 		t.Fatalf("expected the state-unknown failure with instructions, got %v", err)
@@ -656,7 +656,7 @@ func TestPlaceJournalFailureBlocksSend(t *testing.T) {
 				return nil, errors.New("journal: disk full")
 			},
 		}),
-		On: "await korbit.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1'})",
+		On: "await api.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1'})",
 	}, dataEvent(`{}`))
 	if err == nil || !strings.Contains(err.Error(), "journal") {
 		t.Fatalf("expected the journal failure, got %v", err)
@@ -672,9 +672,9 @@ func TestSingleShotWritesNeverResend(t *testing.T) {
 		on   string
 		path string
 	}{
-		{"withdraw.request", "await korbit.withdraw.request('btc', {amount:'0.1', address:'addr1'})", "/v2/coin/withdrawal"},
-		{"krw.deposit.request", "await korbit.krw.deposit.request('50000')", "/v2/krw/sendKrwDepositPush"},
-		{"krw.withdraw.request", "await korbit.krw.withdraw.request('50000')", "/v2/krw/sendKrwWithdrawalPush"},
+		{"withdraw.request", "await api.withdraw.request('btc', {amount:'0.1', address:'addr1'})", "/v2/coin/withdrawal"},
+		{"krw.deposit.request", "await api.krw.deposit.request('50000')", "/v2/krw/sendKrwDepositPush"},
+		{"krw.withdraw.request", "await api.krw.withdraw.request('50000')", "/v2/krw/sendKrwWithdrawalPush"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ft := newFakeTransport()
@@ -699,7 +699,7 @@ func TestIdempotentCancelOptsIntoRetry(t *testing.T) {
 	ft.on("DELETE", "/v2/orders", step{data: json.RawMessage(`{"success":true}`)})
 	err := runOn(t, Options{
 		API: ft.api(apiExtra{}),
-		On:  "await korbit.order.cancel({symbol:'btc_krw', orderId: 987})",
+		On:  "await api.order.cancel({symbol:'btc_krw', orderId: 987})",
 	}, dataEvent(`{}`))
 	if err != nil {
 		t.Fatalf("cancel failed: %v", err)
@@ -728,7 +728,7 @@ func TestHistoryWalkPagesAndDedupes(t *testing.T) {
 	)
 	err := runOn(t, Options{
 		API: ft.api(apiExtra{}),
-		On: `var rows = await korbit.order.history({symbol:'btc_krw', startTime: 500});
+		On: `var rows = await api.order.history({symbol:'btc_krw', startTime: 500});
 			if (rows.length !== 1001) throw new Error('expected 1001 deduped rows, got ' + rows.length);
 			if (rows.truncated) throw new Error('must not be marked truncated');`,
 	}, dataEvent(`{}`))
@@ -750,7 +750,7 @@ func TestHistoryLimitCapsRows(t *testing.T) {
 	ft.on("GET", "/v2/myTrades", step{data: json.RawMessage("[" + strings.Join(rows, ",") + "]")})
 	err := runOn(t, Options{
 		API: ft.api(apiExtra{}),
-		On: `var r = await korbit.fills({symbol:'btc_krw', limit: 10});
+		On: `var r = await api.fills({symbol:'btc_krw', limit: 10});
 			if (r.length !== 10) throw new Error('limit must cap the rows, got ' + r.length);`,
 	}, dataEvent(`{}`))
 	if err != nil {
@@ -767,7 +767,7 @@ func TestFundingHistoryCapNote(t *testing.T) {
 	ft.on("GET", "/v2/coin/recentDeposits", step{data: json.RawMessage("[" + strings.Join(rows, ",") + "]")})
 	err := runOn(t, Options{
 		API: ft.api(apiExtra{}),
-		On: `var rows = await korbit.deposit.history('btc');
+		On: `var rows = await api.deposit.history('btc');
 			if (rows.length !== 100) throw new Error('rows: ' + rows.length);
 			if (rows.truncated !== true) throw new Error('expected the truncation note');
 			if (!/cannot be reached/.test(rows.note)) throw new Error('note: ' + rows.note);`,
@@ -803,7 +803,7 @@ func TestCandlesAutoPages(t *testing.T) {
 	ft.on("GET", "/v2/candles", step{data: mk(1000, 200)}, step{data: mk(800, 100)})
 	err := runOn(t, Options{
 		API: ft.api(apiExtra{}),
-		On: `var c = await korbit.candles('btc_krw', {interval:'1', limit: 300});
+		On: `var c = await api.candles('btc_krw', {interval:'1', limit: 300});
 			if (c.length !== 300) throw new Error('candles: ' + c.length);
 			if (c[0].timestamp !== 701) throw new Error('must be ascending, first=' + c[0].timestamp);
 			if (c[299].timestamp !== 1000) throw new Error('last=' + c[299].timestamp);`,
@@ -832,7 +832,7 @@ func TestCandlesLimitCeiling(t *testing.T) {
 	ft := newFakeTransport()
 	err := runOn(t, Options{
 		API: ft.api(apiExtra{}),
-		On:  "await korbit.candles('btc_krw', {interval:'1', limit: 100000})",
+		On:  "await api.candles('btc_krw', {interval:'1', limit: 100000})",
 	}, dataEvent(`{}`))
 	if err == nil || !strings.Contains(err.Error(), "5000") {
 		t.Fatalf("expected the candles ceiling, got %v", err)
@@ -895,7 +895,7 @@ func TestInitTopLevelAwait(t *testing.T) {
 	ft.on("GET", "/v2/candles", step{data: json.RawMessage(`[{"timestamp":1,"close":"5"}]`)})
 	r := newTestRuntime(t, Options{
 		API: ft.api(apiExtra{}),
-		Init: `var warm = await korbit.candles('btc_krw', {interval:'1', limit:1});
+		Init: `var warm = await api.candles('btc_krw', {interval:'1', limit:1});
 			globalThis.last = Number(warm[0].close)`,
 		Where: "last === 5",
 	})
@@ -922,7 +922,7 @@ func TestOnSyntaxErrorReported(t *testing.T) {
 func TestKorbitGetIsGone(t *testing.T) {
 	err := runOn(t, Options{
 		API: newFakeTransport().api(apiExtra{}),
-		On:  "if (typeof korbit.get !== 'undefined') throw new Error('korbit.get must be removed')",
+		On:  "if (typeof api.get !== 'undefined') throw new Error('api.get must be removed')",
 	}, dataEvent(`{}`))
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -955,7 +955,7 @@ func TestTimeWindowResyncOnPlace(t *testing.T) {
 	resyncs := 0
 	err := runOn(t, Options{
 		API: ft.api(apiExtra{Resync: func() error { resyncs++; return nil }}),
-		On:  "await korbit.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1', clientOrderId:'cid-1'})",
+		On:  "await api.order.place({symbol:'btc_krw', side:'buy', orderType:'limit', price:'100', qty:'1', clientOrderId:'cid-1'})",
 	}, dataEvent(`{}`))
 	if err != nil {
 		t.Fatalf("place after resync failed: %v", err)

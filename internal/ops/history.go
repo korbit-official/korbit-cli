@@ -143,7 +143,7 @@ func jsName(segment string) string {
 	return segment
 }
 
-// opJSKeyName renders an operation's dotted method name without the korbit.
+// opJSKeyName renders an operation's dotted method name without the api.
 // prefix — the history/funding truncation notes name the JS method this way.
 func opJSKeyName(m OpMeta) string {
 	name := jsName(m.ID[0])

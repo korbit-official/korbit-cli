@@ -4,7 +4,7 @@
 
 // Package botapi is the monitor command's JavaScript bot runtime: a goja
 // event loop on a dedicated script goroutine, an asynchronous Promise-based
-// korbit.* API generated from the command spec, and a script-local SQLite
+// api.* API generated from the command spec, and a script-local SQLite
 // db.* surface — so a small script passed via --init/--where/--on can be a
 // complete trading bot.
 //
@@ -12,12 +12,12 @@
 //
 //   - ALL JavaScript runs on one event-loop goroutine (goja runtimes are not
 //     goroutine-safe). The WebSocket pipeline runs no JS.
-//   - Every korbit.* / db.* method returns a Promise immediately and hands
+//   - Every api.* / db.* method returns a Promise immediately and hands
 //     its blocking work (REST, SQLite) to a bounded worker-goroutine pool;
 //     the worker resolves the Promise back onto the loop. The loop therefore
 //     NEVER blocks on I/O, and Promise.all of several calls is genuine
 //     concurrency (bounded by the pool size).
-//   - --where stays a cheap synchronous filter with no korbit./db. access; it
+//   - --where stays a cheap synchronous filter with no api./db. access; it
 //     shares the runtime with --init/--on, so indicator state built anywhere
 //     is visible everywhere.
 //   - --on handler invocations are serialized by the caller (RunHandler
@@ -95,15 +95,15 @@ type Options struct {
 	// Where is the per-data-event predicate expression (optional).
 	Where string
 	// On is the per-event handler body, run after Where passes and for every
-	// notice (optional). May use await; korbit.*/db.* are available.
+	// notice (optional). May use await; api.*/db.* are available.
 	On string
 	// Init is a script run once before streaming (optional). May use await;
-	// korbit.*/db.* are available. No time budget — only SignalCtx bounds it.
+	// api.*/db.* are available. No time budget — only SignalCtx bounds it.
 	Init string
 
-	// API is the L2 operations layer behind every korbit.* method — it owns the
+	// API is the L2 operations layer behind every api.* method — it owns the
 	// retry/idempotency policy and the place/history/candles/funding protocols.
-	// nil makes korbit.* unavailable. The bindings carry NO call policy of their
+	// nil makes api.* unavailable. The bindings carry NO call policy of their
 	// own: they parse+validate, then call API.{PlaceOrder,History,Candles,
 	// FundingHistory,Invoke}. The order-row journal seam, the clock-resync hook,
 	// the reconcile Sleep, and the per-call retry budget all live on the API.
@@ -149,10 +149,10 @@ type Options struct {
 	// keeps those flags false (as they were when balances/orders never latched).
 	AccountSeqs []int
 
-	// MaxConcurrency caps in-flight korbit.*/db.* work (default 8).
+	// MaxConcurrency caps in-flight api.*/db.* work (default 8).
 	MaxConcurrency int
 
-	// ServerNow is the session's server-clock estimate, behind korbit.now() (a bot
+	// ServerNow is the session's server-clock estimate, behind api.now() (a bot
 	// reads it to compare against server-stamped timestamps). It is NOT used for any
 	// local record — see Now.
 	ServerNow func() int64
@@ -162,7 +162,7 @@ type Options struct {
 	// estimate). nil = time.Now().UnixMilli().
 	Now func() int64
 	// Sleep delays db.* retries and is injectable for tests (default time.Sleep).
-	// The korbit.* reconcile sleeps use ops.API.Sleep instead.
+	// The api.* reconcile sleeps use ops.API.Sleep instead.
 	Sleep func(time.Duration)
 	// Stderr receives console output and runtime warnings (default: discard).
 	Stderr io.Writer
@@ -201,7 +201,7 @@ type Runtime struct {
 	settleFn  goja.Callable // prelude __settle: attaches a Go callback to a promise
 	jsonParse goja.Callable
 
-	inWhere   bool // set on the loop while --where evaluates: korbit./db. deny gate
+	inWhere   bool // set on the loop while --where evaluates: api./db. deny gate
 	unhandled map[*goja.Promise]bool
 	fatalCh   chan error // first unhandled promise rejection
 	closed    chan struct{}
@@ -238,7 +238,7 @@ func (r *Runtime) opCtx() context.Context {
 }
 
 // New builds the runtime: starts the event loop, installs the prelude and the
-// korbit./db. bindings, compiles Where/On, and runs Init to completion.
+// api./db. bindings, compiles Where/On, and runs Init to completion.
 // Errors are user-facing and name the flag they came from. If SignalCtx is
 // canceled during Init, the returned error wraps the context error so the
 // caller can tell "user aborted" from "init is broken".
@@ -343,7 +343,7 @@ func (r *Runtime) setupOnLoop(vm *goja.Runtime) error {
 		return errors.New("internal: prelude __settle missing")
 	}
 
-	// Track unhandled promise rejections: a fire-and-forget korbit.* call
+	// Track unhandled promise rejections: a fire-and-forget api.* call
 	// whose rejection nobody handles must stop the bot, not vanish — an
 	// action script in an unknown state should not keep firing.
 	vm.SetPromiseRejectionTracker(func(p *goja.Promise, op goja.PromiseRejectionOperation) {
@@ -656,7 +656,7 @@ func (r *Runtime) Ingest(ev stream.Event) {
 }
 
 // Fatal exposes the first unhandled promise rejection (a fire-and-forget
-// korbit.* call that failed with nobody listening). The controller should
+// api.* call that failed with nobody listening). The controller should
 // select on it alongside its event queue and treat a received error as fatal.
 func (r *Runtime) Fatal() <-chan error { return r.fatalCh }
 
@@ -671,7 +671,7 @@ func (r *Runtime) reportFatal(err error) {
 // script database. Draining the pool first is load-bearing: a worker mid-call
 // (e.g. an order placement still writing to the journal) must finish before
 // the caller's deferred teardown — closing the journal, etc. — runs, or it
-// would hit closed resources. A fire-and-forget korbit.* call left running by
+// would hit closed resources. A fire-and-forget api.* call left running by
 // a handler that already returned is included; each worker is bounded by the
 // REST timeout, so the wait is finite. Close must only be called after
 // Match/RunHandler callers are done.

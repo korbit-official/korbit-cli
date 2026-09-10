@@ -21,6 +21,9 @@ func (r skillInstallResult) FormatText(w io.Writer) {
 		if len(o.Pruned) > 0 {
 			fmt.Fprintf(w, "\n      removed stale files: %s", strings.Join(o.Pruned, ", "))
 		}
+		if o.LegacyRemoved != "" {
+			fmt.Fprintf(w, "\n      removed the copy at %s (same skill, legacy name)", o.LegacyRemoved)
+		}
 	}
 	if len(r.Warnings) > 0 {
 		fmt.Fprint(w, "\n\nWarnings:")
@@ -46,7 +49,7 @@ func actionMark(action string) string {
 // FormatText renders the skill-doctor checklist for human output
 // (textout.TextFormatter); the --json path marshals the same struct.
 func (r skillDoctorReport) FormatText(w io.Writer) {
-	fmt.Fprintf(w, "Korbit Agent Skill — %s %s", r.Binary, r.CliVersion)
+	fmt.Fprintf(w, "%q Agent Skill — %s %s", r.Skill, r.Binary, r.CliVersion)
 	if r.NameMatches {
 		fmt.Fprintf(w, "\n  ✓ running as %q (the command the skill invokes)", r.Binary)
 	} else {
@@ -81,6 +84,13 @@ func (r skillDoctorReport) FormatText(w io.Writer) {
 		}
 		if t.Fix != "" {
 			fmt.Fprintf(w, "\n      fix: %s", t.Fix)
+		}
+		if t.LegacyNote != "" {
+			mark := "⚠"
+			if t.LegacyStatus == "foreign" {
+				mark = "·"
+			}
+			fmt.Fprintf(w, "\n      %s %s", mark, t.LegacyNote)
 		}
 	}
 }

@@ -59,7 +59,7 @@ func (op fundingHistoryOp) Run(ctx context.Context, a *API, in RunInput) (Result
 	res := Result{Data: joinRows(rows)}
 	if len(rows) >= args.limit {
 		res.Truncated = true
-		res.Note = fmt.Sprintf("korbit.%s: the endpoint returned its full %d-row limit — older rows exist but cannot be reached (the endpoint has no time range or cursor)", opJSKeyName(op.meta), args.limit)
+		res.Note = fmt.Sprintf("api.%s: the endpoint returned its full %d-row limit — older rows exist but cannot be reached (the endpoint has no time range or cursor)", opJSKeyName(op.meta), args.limit)
 		fmt.Fprintf(a.stderr(), "korbit-cli: %s\n", res.Note)
 	}
 	res.JournalErr = finishOK(a, h)

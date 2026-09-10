@@ -59,7 +59,7 @@ import (
 // The scripting hooks (--init/--where/--on) run in one shared botapi runtime:
 // --where filters data events synchronously; --on is the (possibly async)
 // action handler, run serially per event AND for every notice; --init warms
-// state up front. korbit.*/db.* are the Promise-based bot API (see
+// state up front. api.*/db.* are the Promise-based bot API (see
 // internal/botapi). An unhandled --on failure is FATAL by design — an action
 // script in an unknown state placing real orders should stop, not keep
 // firing: an API rejection exits 3, anything else exits 1.
@@ -383,7 +383,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 	// Credentials are resolved EAGERLY whenever JS is active: a bot may
 	// subscribe only public channels yet still place orders. For private
 	// channels a resolution failure is fatal (as always); for a public-only
-	// subscription it degrades — the monitor runs and authenticated korbit.*
+	// subscription it degrades — the monitor runs and authenticated api.*
 	// methods throw the resolution error.
 	var streamCreds *apiclient.Credentials
 	var keyName, apiKeyID, credsErr string
@@ -415,7 +415,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 	// subscription, drop the credentials instead of refusing to stream.
 	if streamCreds != nil && !private {
 		if err := probe.ValidateBaseURL(baseURL, true); err != nil {
-			log.Warn(fmt.Sprintf("%v — authenticated korbit.* calls are disabled", err))
+			log.Warn(fmt.Sprintf("%v — authenticated api.* calls are disabled", err))
 			credsErr = "credentials are not sent over plaintext http to a non-local host"
 			streamCreds = nil
 			keyName, apiKeyID = "", ""
@@ -429,7 +429,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 	defer stopSignals()
 
 	// ONE shared server-clock estimate covers the whole monitor: the WS upgrade
-	// signing, REST backfill, AND the JS korbit.* calls all sign through it, so
+	// signing, REST backfill, AND the JS api.* calls all sign through it, so
 	// an EXCEED_TIME_WINDOW resync triggered by any surface fixes signing for
 	// all of them at once. The stream session shares it via its Config.Client
 	// (built below); the monitor's own JS-call client shares the same *clock.State.
@@ -440,7 +440,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 	mlog := cx.Log
 	// One journal-backed recorder (internal/callrec) for the whole monitor, built
 	// before the session so the stream's backfill reads route through the SAME
-	// single-home journaling policy as the JS korbit.* calls. The policy's surface
+	// single-home journaling policy as the JS api.* calls. The policy's surface
 	// rows decide what is recorded: "stream-backfill" is exempt (recovery reads,
 	// not actions — consulted but never journaled), while a JS call (surface
 	// "monitor") is journaled when it is a write, or any call in --debug, warning
@@ -546,7 +546,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 	// the --log-file file when diverted there.
 	var bot *botapi.Runtime
 	if jsActive {
-		// The monitor's own L1 client for JS korbit.* calls: same BaseURL/Doer/
+		// The monitor's own L1 client for JS api.* calls: same BaseURL/Doer/
 		// timeout as the WS/backfill side, signing through the SHARED clock so
 		// one resync fixes every surface. Creds are attached only when a key
 		// resolved (else authenticated methods degrade via CredsErr in botapi).

@@ -269,7 +269,7 @@ func TestForCallOverridesParamsJSON(t *testing.T) {
 // TestConcurrentSameCommandIsolated: two concurrent recorded calls of the SAME
 // command through ONE shared parent recorder must not clobber each other's
 // per-call state (start time, ordered params). This is the monitor surface's
-// concurrent korbit.order.place scenario; ForCall gives each call its own state.
+// concurrent api.order.place scenario; ForCall gives each call its own state.
 func TestConcurrentSameCommandIsolated(t *testing.T) {
 	home := t.TempDir()
 	r := New(journal.DefaultPath(home), false, false, DefaultPolicy(false), nil, nil)

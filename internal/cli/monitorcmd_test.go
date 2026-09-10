@@ -892,7 +892,7 @@ func TestMonitorOnPlacesOrder(t *testing.T) {
 		[]string{"monitor", "--symbols", "btc_krw", "--ticker", "--key", "bot", "--json",
 			"--base-url", "https://api.example.test", "--max-events", "1",
 			"--where", `Number(payload.data.close) < 140000000`,
-			"--on", `if (ev.type === "data") { var o = await korbit.order.place({symbol:"btc_krw", side:"buy", orderType:"limit", price:"139000000", qty:"0.001"}); console.log("placed " + o.orderId) }`},
+			"--on", `if (ev.type === "data") { var o = await api.order.place({symbol:"btc_krw", side:"buy", orderType:"limit", price:"139000000", qty:"0.001"}); console.log("placed " + o.orderId) }`},
 		map[string]string{"DIGITALX_CLI_HOME": home},
 		doer, dialFrames(tickerFrame("100"), tickerFrame("200")))
 	if code != 0 {
@@ -934,7 +934,7 @@ func TestMonitorOnUnhandledApiErrorExits3(t *testing.T) {
 	_, errb, code := runMonitorCLI(
 		[]string{"monitor", "--symbols", "btc_krw", "--ticker", "--key", "bot", "--json",
 			"--base-url", "https://api.example.test",
-			"--on", `await korbit.balance()`},
+			"--on", `await api.balance()`},
 		map[string]string{"DIGITALX_CLI_HOME": home},
 		doer, dialFrames(tickerFrame("100")))
 	if code != 3 {

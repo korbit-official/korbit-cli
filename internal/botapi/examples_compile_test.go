@@ -19,7 +19,7 @@ import (
 // --where/--on and runs --init, so a bad snippet fails here.
 //
 // The monitor examples' --init only uses the synchronous ta library (no
-// korbit.*/db. calls), so a nil API is enough to drive compilation + init.
+// api.*/db. calls), so a nil API is enough to drive compilation + init.
 func TestMonitorExamplesCompile(t *testing.T) {
 	cmd := spec.Find([]string{"monitor"})
 	if cmd == nil {

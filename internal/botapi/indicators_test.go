@@ -176,7 +176,7 @@ func TestGoldenTASurface(t *testing.T) {
 }
 
 // TestTAUsableInWhere pins the deliberate decision that ta — being synchronous
-// and pure — IS available inside --where, unlike the async korbit.*/db. surface
+// and pure — IS available inside --where, unlike the async api.*/db. surface
 // which is gated off there.
 func TestTAUsableInWhere(t *testing.T) {
 	r := newTestRuntime(t, Options{

@@ -10,18 +10,22 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"testing/fstest"
 	"time"
 
+	"github.com/korbit-official/korbit-cli/internal/agentskill"
 	"github.com/korbit-official/korbit-cli/internal/apiclient"
 	"github.com/korbit-official/korbit-cli/internal/callrec"
 	"github.com/korbit-official/korbit-cli/internal/clock"
 	"github.com/korbit-official/korbit-cli/internal/journal"
 	"github.com/korbit-official/korbit-cli/internal/keys"
 	"github.com/korbit-official/korbit-cli/internal/output"
+	"github.com/korbit-official/korbit-cli/internal/progname"
+	"github.com/korbit-official/korbit-cli/internal/version"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
 )
@@ -135,11 +139,11 @@ func buildTestMCP(t *testing.T, doer apiclient.Doer, key string, multiKey bool) 
 }
 
 // testSkillFS is a minimal stand-in for the embedded Agent Skill: a SKILL.md
-// (with frontmatter, to exercise the strip) plus one reference, so the
-// korbit_guide tool registers with a discoverable topic.
+// (with frontmatter, to exercise the strip) plus one reference, so the guide
+// tool registers with a discoverable topic.
 func testSkillFS() fstest.MapFS {
 	return fstest.MapFS{
-		"SKILL.md":                 {Data: []byte("---\nname: korbit\n---\n\n# Operating Korbit\n\nbody\n")},
+		"SKILL.md":                 {Data: []byte("---\nname: digitalx-cli\n---\n\n# Operating Digital X\n\nbody\n")},
 		"references/monitoring.md": {Data: []byte("# Monitoring\n\nplaybook\n")},
 	}
 }
@@ -297,14 +301,15 @@ func TestMCPBuildToolSetAndReadOnly(t *testing.T) {
 	if ro >= full {
 		t.Fatalf("read-only (%d) should expose fewer tools than full (%d)", ro, full)
 	}
-	// full = every endpoint command + the five hand-registered non-endpoint tools
-	// (list_keys, bot_runtime_reference, korbit_guide, setup, doctor).
+	// full = every endpoint command + the six hand-registered non-endpoint tools
+	// (list_keys, bot_runtime_reference, the guide tool under both its names,
+	// setup, doctor).
 	// The onboarding tools (setup/doctor) and the read-only doc tools are exposed in
 	// both modes — they act on the local keystore or return text, not the exchange —
 	// so read-only only drops non-GET endpoints.
 	endpoints := len(endpointSurface())
-	if full != endpoints+5 {
-		t.Fatalf("full tool count = %d, want %d (endpoints + list_keys + bot_runtime_reference + korbit_guide + setup + doctor)", full, endpoints+5)
+	if full != endpoints+6 {
+		t.Fatalf("full tool count = %d, want %d (endpoints + list_keys + bot_runtime_reference + %s + %s + setup + doctor)", full, endpoints+6, guideName, legacyGuideName)
 	}
 }
 
@@ -681,28 +686,28 @@ func TestMCPBotRuntimeReferenceTool(t *testing.T) {
 	// It makes no API call — purely local documentation, so no signing key needed.
 }
 
-func TestMCPKorbitGuideTool(t *testing.T) {
+func TestMCPGuideTool(t *testing.T) {
 	srv, done := buildTestMCP(t, &mcpHTTPStub{route: okJSON(`{}`)}, "", false)
 	defer done()
 	h := srv.makeGuideHandler()
 
 	// No topic → the SKILL.md overview, with its YAML frontmatter stripped.
-	res := callNamedTool(t, h, korbitGuideName, `{}`)
+	res := callNamedTool(t, h, guideName, `{}`)
 	if res.IsError {
-		t.Fatalf("korbit_guide overview errored: %s", resultText(res))
+		t.Fatalf("guide overview errored: %s", resultText(res))
 	}
 	overview := resultText(res)
-	if !strings.Contains(overview, "# Operating Korbit") {
+	if !strings.Contains(overview, "# Operating Digital X") {
 		t.Fatalf("overview missing body:\n%s", overview)
 	}
-	if strings.Contains(overview, "name: korbit") || strings.HasPrefix(overview, "---") {
+	if strings.Contains(overview, "name: digitalx-cli") || strings.HasPrefix(overview, "---") {
 		t.Fatalf("overview should have frontmatter stripped:\n%s", overview)
 	}
 
 	// A known topic → that reference verbatim.
-	res = callNamedTool(t, h, korbitGuideName, `{"topic":"monitoring"}`)
+	res = callNamedTool(t, h, guideName, `{"topic":"monitoring"}`)
 	if res.IsError {
-		t.Fatalf("korbit_guide topic errored: %s", resultText(res))
+		t.Fatalf("guide topic errored: %s", resultText(res))
 	}
 	if !strings.Contains(resultText(res), "# Monitoring") {
 		t.Fatalf("monitoring topic missing body:\n%s", resultText(res))
@@ -710,7 +715,7 @@ func TestMCPKorbitGuideTool(t *testing.T) {
 
 	// An unknown topic → a recoverable error naming the valid topics (the handler
 	// is the guard; the SDK does not validate against the schema enum).
-	res = callNamedTool(t, h, korbitGuideName, `{"topic":"nope"}`)
+	res = callNamedTool(t, h, guideName, `{"topic":"nope"}`)
 	if !res.IsError {
 		t.Fatalf("unknown topic should error, got: %s", resultText(res))
 	}
@@ -719,7 +724,7 @@ func TestMCPKorbitGuideTool(t *testing.T) {
 	}
 }
 
-func TestKorbitGuideBuildersZeroTopics(t *testing.T) {
+func TestGuideBuildersZeroTopics(t *testing.T) {
 	// With no topics (no skill embedded), the schema must still be valid JSON with
 	// no `topic` property, and the description must omit the "Topics:" suffix.
 	var schema struct {
@@ -727,7 +732,7 @@ func TestKorbitGuideBuildersZeroTopics(t *testing.T) {
 		Properties           map[string]json.RawMessage `json:"properties"`
 		AdditionalProperties bool                       `json:"additionalProperties"`
 	}
-	if err := json.Unmarshal(korbitGuideSchema(nil), &schema); err != nil {
+	if err := json.Unmarshal(guideSchema(nil), &schema); err != nil {
 		t.Fatalf("zero-topic schema is invalid json: %v", err)
 	}
 	if schema.Type != "object" || schema.AdditionalProperties {
@@ -736,7 +741,7 @@ func TestKorbitGuideBuildersZeroTopics(t *testing.T) {
 	if _, ok := schema.Properties[mcpGuideTopicArg]; ok {
 		t.Fatal("zero-topic schema should not advertise a topic property")
 	}
-	if strings.Contains(korbitGuideDesc(nil), "Topics:") {
+	if strings.Contains(guideDesc(nil), "Topics:") {
 		t.Fatal("zero-topic description should omit the Topics suffix")
 	}
 }
@@ -1032,5 +1037,91 @@ func TestMCPBoolFlagOrEnv(t *testing.T) {
 				t.Errorf("got %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// TestMCPGuideAliasIsRegisteredAndIdentical: the guide tool is reachable under
+// both its names — a saved agent config or prompt may name either — and the two
+// registrations are the same tool: one handler, one schema, same topics. Only
+// the descriptions differ, and the alias's says which name to prefer.
+func TestMCPGuideAliasIsRegisteredAndIdentical(t *testing.T) {
+	srv, done := buildTestMCP(t, &mcpHTTPStub{route: okJSON(`{}`)}, "", false)
+	defer done()
+	srv.build(false, false)
+
+	plan := mcpPlanDoc(false, false, "", "https://example.invalid", nil)
+	for _, want := range []string{guideName, legacyGuideName} {
+		if !slices.Contains(plan.Tools, want) {
+			t.Errorf("the plan must list the %q tool: %v", want, plan.Tools)
+		}
+	}
+	if plan.ToolCount != srv.toolCount {
+		t.Errorf("plan tool count %d != served tool count %d", plan.ToolCount, srv.toolCount)
+	}
+
+	topics, err := agentskill.GuideTopics(srv.skillFS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(legacyGuideDesc(topics), guideName) || !strings.Contains(legacyGuideDesc(topics), "DEPRECATED") {
+		t.Errorf("the alias description must mark it deprecated and name %q: %q", guideName, legacyGuideDesc(topics))
+	}
+	if !strings.Contains(legacyGuideDesc(topics), guideDesc(topics)) {
+		t.Errorf("the alias must describe the same tool: %q", legacyGuideDesc(topics))
+	}
+
+	// One handler serves both names, so the alias returns the same content.
+	h := srv.makeGuideHandler()
+	canonical := callNamedTool(t, h, guideName, `{}`)
+	alias := callNamedTool(t, h, legacyGuideName, `{}`)
+	if resultText(canonical) != resultText(alias) {
+		t.Errorf("alias content differs:\n%s\n---\n%s", resultText(canonical), resultText(alias))
+	}
+}
+
+// TestMCPHandshakeServerName pins the server's identity as a client actually
+// receives it: a real initialize over an in-memory transport, reading ServerInfo
+// off the handshake. A host stores this name (and a user's config refers to it),
+// so it is a contract, not a label — and it is fixed rather than derived from
+// argv[0], so invoking the binary under another filename cannot change it.
+func TestMCPHandshakeServerName(t *testing.T) {
+	srv, done := buildTestMCP(t, &mcpHTTPStub{route: okJSON(`{}`)}, "", false)
+	defer done()
+
+	// Prove it does not follow the running program's name.
+	prev := progname.Name()
+	progname.Set("korbit-cli")
+	t.Cleanup(func() { progname.Set(prev) })
+
+	server := srv.build(false, false)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	serverT, clientT := mcp.NewInMemoryTransports()
+	ss, err := server.Connect(ctx, serverT, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ss.Close()
+	cs, err := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "0"}, nil).Connect(ctx, clientT, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+
+	info := cs.InitializeResult().ServerInfo
+	if info.Name != mcpServerName {
+		t.Errorf("handshake ServerInfo.Name = %q, want %q", info.Name, mcpServerName)
+	}
+	if mcpServerName != "digitalx-cli" {
+		t.Errorf("the MCP server name is %q — a host has the old one stored; change it deliberately or not at all", mcpServerName)
+	}
+	if info.Version != version.Version {
+		t.Errorf("handshake ServerInfo.Version = %q, want %q", info.Version, version.Version)
+	}
+	// The server-level instructions name the same server, so the model's guidance
+	// and the host's server list cannot drift apart.
+	if !strings.Contains(mcpInstructions("k", false, false), mcpServerName) {
+		t.Errorf("the instructions must name the server %q", mcpServerName)
 	}
 }

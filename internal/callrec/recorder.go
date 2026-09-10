@@ -351,7 +351,7 @@ func callRecordFrom(info apiclient.CallInfo, out apiclient.Outcome) journal.Call
 }
 
 // isAPIError reports whether the outcome describes an API rejection (vs a
-// pre-response transport failure). korbit.buildOutcome fills Code only from an
+// pre-response transport failure). apiclient.buildOutcome fills Code only from an
 // *output.ApiError, so a non-empty Code is the discriminator — equivalent to
 // errors.As(err, *ApiError), but without re-inspecting the error.
 func isAPIError(out apiclient.Outcome) bool {

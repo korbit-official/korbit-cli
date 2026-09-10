@@ -19,10 +19,10 @@ import (
 	"github.com/korbit-official/korbit-cli/internal/stream/state"
 )
 
-// The korbit.* surface is GENERATED from the ops catalog — every endpoint
-// operation becomes a method: one-segment ids attach to korbit directly
-// (korbit.ticker), deeper ids nest one object per segment (korbit.order.place,
-// korbit.krw.deposit.history). Arguments are a
+// The api.* surface is GENERATED from the ops catalog — every endpoint
+// operation becomes a method: one-segment ids attach to api directly
+// (api.ticker), deeper ids nest one object per segment (api.order.place,
+// api.krw.deposit.history). Arguments are a
 // single options object keyed on WIRE parameter names (the names the `commands`
 // catalog publishes), with the obvious single positional (symbol/currency/
 // amount) allowed positionally. Values run through the same ops validation
@@ -36,11 +36,11 @@ import (
 // jsNames maps a command-id segment to its JS name where they differ.
 var jsNames = map[string]string{"ticksize": "tickSize"}
 
-// jsHiddenCommands are endpoint operations deliberately NOT exposed as korbit.*
-// methods, even though they remain CLI commands. korbit.time (GET /v2/time) is
+// jsHiddenCommands are endpoint operations deliberately NOT exposed as api.*
+// methods, even though they remain CLI commands. api.time (GET /v2/time) is
 // a footgun in a bot: it is a network round-trip for the current time, which a
 // script should read locally with Date.now() (or the clock-corrected
-// korbit.now()). Exposing it only invites a needless REST call — and rate-limit
+// api.now()). Exposing it only invites a needless REST call — and rate-limit
 // exposure — for a value the runtime already has.
 var jsHiddenCommands = map[string]bool{"time": true}
 
@@ -51,28 +51,38 @@ func jsName(segment string) string {
 	return segment
 }
 
+// jsGlobal is the name of the API global scripts call, and the prefix every
+// method name is rendered with in error messages. jsGlobalAlias is bound to the
+// SAME object: it is a permanent second name for it, so a script written against
+// either keeps running unchanged.
+const (
+	jsGlobal      = "api"
+	jsGlobalAlias = "korbit"
+)
+
 // jsMethodName renders the user-facing method name for error messages.
 func jsMethodName(id []string) string {
 	parts := make([]string, len(id))
 	for i, s := range id {
 		parts[i] = jsName(s)
 	}
-	return "korbit." + strings.Join(parts, ".")
+	return jsGlobal + "." + strings.Join(parts, ".")
 }
 
-// installKorbit builds the korbit global from the ops catalog.
+// installKorbit builds the API global from the ops catalog and binds it under
+// both of its names.
 func (r *Runtime) installKorbit(vm *goja.Runtime) error {
-	korbitObj := vm.NewObject()
+	apiObj := vm.NewObject()
 	groups := map[string]*goja.Object{}
 
 	// groupFor returns the nested object a command-id prefix maps to, creating
-	// every intermediate level on demand. The empty prefix is korbit itself, so a
-	// one-segment id attaches its method directly and a deeper id nests one object
-	// per leading segment (korbit.order, korbit.krw.deposit).
+	// every intermediate level on demand. The empty prefix is the API global
+	// itself, so a one-segment id attaches its method directly and a deeper id
+	// nests one object per leading segment (api.order, api.krw.deposit).
 	var groupFor func(prefix []string) (*goja.Object, error)
 	groupFor = func(prefix []string) (*goja.Object, error) {
 		if len(prefix) == 0 {
-			return korbitObj, nil
+			return apiObj, nil
 		}
 		key := strings.Join(prefix, ".")
 		if g, ok := groups[key]; ok {
@@ -104,20 +114,25 @@ func (r *Runtime) installKorbit(vm *goja.Runtime) error {
 		}
 	}
 
-	// korbit.now(): the session's server-clock estimate in unix ms.
+	// api.now(): the session's server-clock estimate in unix ms.
 	now := func(goja.FunctionCall) goja.Value {
 		if r.opts.ServerNow != nil {
 			return vm.ToValue(r.opts.ServerNow())
 		}
 		return vm.ToValue(time.Now().UnixMilli())
 	}
-	if err := korbitObj.Set("now", now); err != nil {
+	if err := apiObj.Set("now", now); err != nil {
 		return err
 	}
-	return vm.Set("korbit", korbitObj)
+	// One object, two names: `api === korbit`, so a script can hold either and
+	// mutating one is visible through the other.
+	if err := vm.Set(jsGlobal, apiObj); err != nil {
+		return err
+	}
+	return vm.Set(jsGlobalAlias, apiObj)
 }
 
-// makeMethod builds one korbit.* method: parse+validate synchronously (a
+// makeMethod builds one api.* method: parse+validate synchronously (a
 // malformed call throws a TypeError before any network), then dispatch the
 // operation to the worker pool and return a Promise. The operation owns the
 // behavior — there is no per-method behavior switch here.
@@ -323,7 +338,7 @@ func (r *Runtime) resolveResult(vm *goja.Runtime, res ops.Result) (goja.Value, e
 	return v, nil
 }
 
-// gateAPI enforces the access rules every korbit.* call shares. It panics
+// gateAPI enforces the access rules every api.* call shares. It panics
 // with a TypeError (the goja way to throw) when the call is not allowed here.
 func (r *Runtime) gateAPI(vm *goja.Runtime, name string, auth bool) {
 	if r.inWhere {

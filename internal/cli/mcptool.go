@@ -37,21 +37,27 @@ const mcpKeyArg = "key"
 // tool's schema on purpose — only a placement is worth previewing.
 const mcpDryRunArg = "dryRun"
 
-// korbitGuideName is the read-only tool that returns the bundled Korbit Agent
-// Skill's workflow guidance — the safety rules and the recommended workflow for
-// each task. An MCP-only client (e.g. Claude Desktop via the .mcpb Desktop
+// guideName is the read-only tool that returns the bundled Korbit Agent Skill's
+// workflow guidance — the safety rules and the recommended workflow for each
+// task. An MCP-only client (e.g. Claude Desktop via the .mcpb Desktop
 // Extension) never loads the skill the way Claude Code does, so this tool is how
 // it reaches the same guidance. The text is read from the embedded skill, so it
 // cannot drift from what `agent skill install` writes to disk.
-const korbitGuideName = "korbit_guide"
+const guideName = "digitalx_guide"
 
-// mcpGuideTopicArg selects a focused playbook for korbit_guide; omitted, the
+// legacyGuideName is the same tool under its other name, registered alongside
+// guideName and served by the same handler. An agent config, saved prompt, or
+// stored plan can name a tool literally, so removing the name would break a
+// caller that has it written down; its description points at guideName.
+const legacyGuideName = "korbit_guide"
+
+// mcpGuideTopicArg selects a focused playbook for the guide tool; omitted, the
 // tool returns the overview and task router (SKILL.md).
 const mcpGuideTopicArg = "topic"
 
-// korbitGuideDesc renders the korbit_guide description, naming the focused
-// topics discovered in the skill so the model can target one directly.
-func korbitGuideDesc(topics []string) string {
+// guideDesc renders the guide tool's description, naming the focused topics
+// discovered in the skill so the model can target one directly.
+func guideDesc(topics []string) string {
 	var b strings.Builder
 	b.WriteString("Korbit workflow guidance from the bundled agent skill: the safety rules (dry-run-first order placement, idempotency, decimal-string money) and the recommended workflow for each task. Call with no `topic` for the overview and task router; pass a `topic` for a focused playbook. Read this before placing an order or driving an unfamiliar flow. Read-only; returns documentation text and makes no API call.")
 	if len(topics) > 0 {
@@ -60,10 +66,16 @@ func korbitGuideDesc(topics []string) string {
 	return b.String()
 }
 
-// korbitGuideSchema is the input schema for korbit_guide: an optional `topic`
+// legacyGuideDesc is guideDesc plus the line telling the model which name to
+// prefer, so a model choosing between the two identical tools picks guideName.
+func legacyGuideDesc(topics []string) string {
+	return "DEPRECATED alias of the `" + guideName + "` tool — identical behavior; call `" + guideName + "` instead. " + guideDesc(topics)
+}
+
+// guideSchema is the input schema for the guide tool: an optional `topic`
 // constrained to the discovered playbook names. With no topics (no skill
 // embedded) the topic argument is omitted entirely.
-func korbitGuideSchema(topics []string) json.RawMessage {
+func guideSchema(topics []string) json.RawMessage {
 	if len(topics) == 0 {
 		return json.RawMessage(`{"type":"object","properties":{},"additionalProperties":false}`)
 	}
@@ -98,18 +110,18 @@ func toolDescription(c surfaceCmd) string {
 }
 
 // botRuntimeReferenceName is the read-only doc tool that describes the CLI's bot
-// runtime (the monitor command's JavaScript hooks, the korbit.*/db.* API, and the
+// runtime (the monitor command's JavaScript hooks, the api.*/db.* API, and the
 // ta indicator library). An MCP client drives REST endpoints as tools but cannot
 // run a streaming bot itself, so this tool only tells a capable agent the runtime
 // exists and how to invoke it from a shell.
 const botRuntimeReferenceName = "bot_runtime_reference"
 
-const botRuntimeReferenceDesc = "Reference for the korbit-cli bot runtime: the `monitor` command's --init/--where/--on JavaScript hooks, the async korbit.*/db.* API, and the synchronous `ta` technical-indicator library. This MCP server exposes REST endpoints as tools but cannot run a streaming bot — use the CLI (`" + progPlaceholder + " monitor --enable-experimental ...`) to run one. The bot runtime is EXPERIMENTAL and off by default (hence the --enable-experimental flag), and its API may change. Read-only; returns documentation text and makes no API call."
+const botRuntimeReferenceDesc = "Reference for the korbit-cli bot runtime: the `monitor` command's --init/--where/--on JavaScript hooks, the async api.*/db.* API, and the synchronous `ta` technical-indicator library. This MCP server exposes REST endpoints as tools but cannot run a streaming bot — use the CLI (`" + progPlaceholder + " monitor --enable-experimental ...`) to run one. The bot runtime is EXPERIMENTAL and off by default (hence the --enable-experimental flag), and its API may change. Read-only; returns documentation text and makes no API call."
 
 // botRuntimeReferenceText renders the monitor command's surface entry — summary,
 // flags, notes, examples — into model-facing markdown. It is sourced entirely
 // from the unified surface (the same data behind `monitor --help`), so the
-// ta/korbit/db reference can never drift from the command surface.
+// ta/api/db reference can never drift from the command surface.
 func botRuntimeReferenceText() string {
 	c := findSurface([]string{"monitor"})
 	if c == nil {
@@ -118,7 +130,7 @@ func botRuntimeReferenceText() string {
 	var b strings.Builder
 	b.WriteString("# korbit-cli bot runtime (`" + progPlaceholder + " monitor`)\n\n")
 	b.WriteString(c.Summary)
-	b.WriteString("\n\nRun it from a shell — this MCP server cannot stream a bot. The JavaScript hooks (--init/--where/--on) share one runtime with the full async korbit.*/db.* API and the synchronous ta/ta.stream indicator library.\n")
+	b.WriteString("\n\nRun it from a shell — this MCP server cannot stream a bot. The JavaScript hooks (--init/--where/--on) share one runtime with the full async api.*/db.* API and the synchronous ta/ta.stream indicator library.\n")
 	if len(c.Params) > 0 {
 		b.WriteString("\n## Flags\n")
 		for _, p := range c.Params {

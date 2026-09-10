@@ -61,6 +61,10 @@ type skillInstallOne struct {
 	Action  string   `json:"action"` // "created" | "updated" | "unchanged"
 	Files   int      `json:"files"`
 	Pruned  []string `json:"pruned,omitempty"`
+	// LegacyRemoved is a directory holding this same skill under
+	// agentskill.LegacySkillName that install deleted after writing Dir, so the
+	// agent is left with exactly one copy of it.
+	LegacyRemoved string `json:"legacyRemoved,omitempty"`
 }
 
 func runInstall(cx *clienv.Cmd, cmd *cobra.Command, src fs.FS) error {
@@ -93,10 +97,25 @@ func runInstall(cx *clienv.Cmd, cmd *cobra.Command, src fs.FS) error {
 			return fmt.Errorf("installing the skill for %s: %w", a.Name, err)
 		}
 		res.ContentHash = out.Hash
-		res.Installs = append(res.Installs, skillInstallOne{
+		one := skillInstallOne{
 			Agent: a.Name, AgentID: a.ID, Dir: out.Dir,
 			Action: out.Action, Files: out.Files, Pruned: out.Pruned,
-		})
+		}
+		// Clear a copy of this same skill sitting under the legacy name, so the
+		// agent never loads two skills with identical triggers. It happens only
+		// AFTER the new copy is on disk (so a failure above leaves the working
+		// one alone) and only when the ownership proof passes — a skill someone
+		// else wrote at that name is reported and left exactly as it is.
+		if legacy := a.LegacySkillDir(root); legacy != out.Dir && isDir(legacy) {
+			if !agentskill.Managed(legacy) {
+				res.Warnings = append(res.Warnings, fmt.Sprintf("%s holds a skill this CLI did not install, so it was left alone — if it duplicates this skill's triggers, remove it yourself", legacy))
+			} else if err := os.RemoveAll(legacy); err != nil {
+				res.Warnings = append(res.Warnings, fmt.Sprintf("could not remove the copy of this skill at %s: %v — delete it yourself, or the agent loads two skills with the same triggers", legacy, err))
+			} else {
+				one.LegacyRemoved = legacy
+			}
+		}
+		res.Installs = append(res.Installs, one)
 	}
 
 	// The skill shells out to the public command; if it isn't on PATH the agent
@@ -170,6 +189,13 @@ type skillDoctorTarget struct {
 	InstalledHash string `json:"installedHash,omitempty"`
 	Status        string `json:"status"` // "ok" | "stale" | "missing" | "n/a"
 	Fix           string `json:"fix,omitempty"`
+	// A directory under agentskill.LegacySkillName, present alongside (or
+	// instead of) Dir. LegacyStatus is "managed" when it holds this same skill —
+	// a re-install clears it — or "foreign" when it holds someone else's, which
+	// this CLI never touches.
+	LegacyDir    string `json:"legacyDir,omitempty"`
+	LegacyStatus string `json:"legacyStatus,omitempty"` // "managed" | "foreign"
+	LegacyNote   string `json:"legacyNote,omitempty"`
 }
 
 func runDoctor(cx *clienv.Cmd, src fs.FS) error {
@@ -189,8 +215,9 @@ func runDoctor(cx *clienv.Cmd, src fs.FS) error {
 	}
 	// Check 1: this executable is itself named the command the skill invokes.
 	// `go install` produces a "korbit-cli" binary, but the installed skill runs
-	// literal `korbit …` commands — so a mismatch is the usual reason `korbit`
-	// isn't found below, and the fix is to expose this binary under that name.
+	// literal `dgx-cli …` commands (agentskill.SkillBinary) — so a mismatch is
+	// the usual reason that command isn't found below, and the fix is to expose
+	// this binary under that name.
 	rep.NameMatches = rep.InvokedAs == agentskill.SkillBinary
 	if !rep.NameMatches {
 		self := rep.InvokedAs // fallback if the executable path can't be resolved
@@ -206,7 +233,7 @@ func runDoctor(cx *clienv.Cmd, src fs.FS) error {
 		rep.PathFix = fmt.Sprintf("put %q on your PATH — the skill runs it as a shell command", agentskill.SkillBinary)
 	}
 
-	anyInstalled, anyStale := false, false
+	anyInstalled, anyStale, anyLegacy := false, false, false
 	for _, a := range agentskill.Agents {
 		dir := a.SkillDir(home)
 		t := skillDoctorTarget{Agent: a.Name, AgentID: a.ID, Dir: dir, AgentDetected: isDir(a.ConfigRoot(home))}
@@ -231,6 +258,29 @@ func runDoctor(cx *clienv.Cmd, src fs.FS) error {
 		default:
 			t.Status = "n/a" // agent not detected on this machine
 		}
+		// A copy under the legacy name is a live skill for the agent: reported
+		// whether or not the current-name one is installed, because two copies
+		// carry the same triggers. It counts toward the exit code only for an
+		// agent that is actually on this machine — a leftover directory for an
+		// agent the user does not run is worth naming, not worth failing over.
+		if legacy := a.LegacySkillDir(home); legacy != dir && isDir(legacy) {
+			t.LegacyDir = legacy
+			if agentskill.Managed(legacy) {
+				t.LegacyStatus = "managed"
+				also := ""
+				if installed {
+					also = "also " // both copies are on disk, with the same triggers
+				}
+				t.LegacyNote = fmt.Sprintf("%sinstalled under the legacy name %q (%s) — run `%s agent skill install --%s` to refresh it as %q and remove that copy",
+					also, agentskill.LegacySkillName, legacy, progname.Name(), a.ID, agentskill.SkillName)
+				if t.Status != "n/a" {
+					anyLegacy = true
+				}
+			} else {
+				t.LegacyStatus = "foreign"
+				t.LegacyNote = fmt.Sprintf("a skill this CLI did not install sits at %s; it is left alone", legacy)
+			}
+		}
 		rep.Targets = append(rep.Targets, t)
 	}
 
@@ -241,7 +291,7 @@ func runDoctor(cx *clienv.Cmd, src fs.FS) error {
 	}
 	// A problem worth fixing: a stale install, or a skill installed for a local
 	// agent while the binary it shells out to isn't reachable on PATH.
-	if anyStale || (anyInstalled && !rep.OnPath) {
+	if anyStale || anyLegacy || (anyInstalled && !rep.OnPath) {
 		return clienv.ExitError{Code: output.ExitConfig}
 	}
 	return nil

@@ -139,7 +139,7 @@ func (op historyOp) Run(ctx context.Context, a *API, in RunInput) (Result, error
 	res := Result{Data: joinRows(rows)}
 	if !complete && !gotEnough {
 		res.Truncated = true
-		res.Note = fmt.Sprintf("korbit.%s: the requested window was too large to fully cover — the result is incomplete; narrow startTime/endTime or set --limit", opJSKeyName(op.meta))
+		res.Note = fmt.Sprintf("api.%s: the requested window was too large to fully cover — the result is incomplete; narrow startTime/endTime or set --limit", opJSKeyName(op.meta))
 		fmt.Fprintf(a.stderr(), "korbit-cli: %s\n", res.Note)
 	}
 	res.JournalErr = finishOK(a, h)

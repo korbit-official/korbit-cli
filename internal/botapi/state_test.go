@@ -64,7 +64,7 @@ func TestStateThrowsWithoutStateful(t *testing.T) {
 }
 
 // TestStateUsableInWhere: state.* is a synchronous global usable inside --where
-// (it is NOT behind the inWhere deny-gate that blocks korbit.*/db.*).
+// (it is NOT behind the inWhere deny-gate that blocks api.*/db.*).
 func TestStateUsableInWhere(t *testing.T) {
 	r := newTestRuntime(t, Options{Stateful: true, Where: "state.openOrders().length === 0 && Array.isArray(state.fills())"})
 	ok, err := r.Match(dataEvent(`{}`))
@@ -122,7 +122,7 @@ func TestStateMaterializesViaIngest(t *testing.T) {
 // TestLastDataAtUsesSystemClock pins the clock-frame split in the state store:
 // Health.LastDataAt (a local receive time) is stamped from Options.Now (the system
 // clock), NOT from Options.ServerNow (the server-clock estimate, which backs only
-// korbit.now()). The two seams return distinct values so a regression that wires
+// api.now()). The two seams return distinct values so a regression that wires
 // LastDataAt back to the server clock — or swaps the two — is caught.
 func TestLastDataAtUsesSystemClock(t *testing.T) {
 	r := newTestRuntime(t, Options{
@@ -131,7 +131,7 @@ func TestLastDataAtUsesSystemClock(t *testing.T) {
 		ServerNow: func() int64 { return 1_750_000_000_000 },
 		On: `var h = state.health();
 			if (h.lastDataAt !== 777000) throw new Error('lastDataAt must come from the system clock (Options.Now), got ' + h.lastDataAt);
-			if (korbit.now() !== 1750000000000) throw new Error('korbit.now() must be the server clock (Options.ServerNow), got ' + korbit.now());`,
+			if (api.now() !== 1750000000000) throw new Error('api.now() must be the server clock (Options.ServerNow), got ' + api.now());`,
 	})
 	r.Ingest(tickerData("141000000"))
 	if err := r.RunHandler(dataEvent(`{}`)); err != nil {

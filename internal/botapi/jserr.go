@@ -13,7 +13,7 @@ import (
 	"github.com/korbit-official/korbit-cli/internal/output"
 )
 
-// jsError converts a Go error into the JS value a korbit.*/db.* promise
+// jsError converts a Go error into the JS value a api.*/db.* promise
 // rejects with: a real Error instance (so `instanceof Error` holds and stack
 // traces exist), carrying the structured fields the docs promise for an API
 // rejection — .code (symbolic), .httpStatus, .description, .body — so
