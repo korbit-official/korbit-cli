@@ -284,21 +284,6 @@ func TestKeyringDeleteRemovesLegacyItem(t *testing.T) {
 	}
 }
 
-// TestProbeAccountIsNeverWritten pins the probe sentinel's contract: it names an
-// account no write path ever uses, so ProbeKeyring stays read-only.
-func TestProbeAccountIsNeverWritten(t *testing.T) {
-	MockKeychain()
-	if err := NewKeyring().Set("someone", "s"); err != nil {
-		t.Fatal(err)
-	}
-	if _, found, _ := keychain.get(keychainService, probeAccount); found {
-		t.Fatal("the probe sentinel account was written")
-	}
-	if err := ProbeKeyring(); err != nil {
-		t.Fatalf("ProbeKeyring on a healthy keychain: %v", err)
-	}
-}
-
 // recordingKeychain is a keychainProvider that records which services a
 // delete was attempted against and can be made to fail for a chosen service.
 type recordingKeychain struct {

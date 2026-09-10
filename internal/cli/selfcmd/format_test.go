@@ -202,20 +202,25 @@ func TestSelfViewsUseTheRunningProgramName(t *testing.T) {
 	}
 }
 
-// TestDoctorViewReportsAliasAndLegacyLayout pins the two alias lines the text
-// view adds: the alias-only layout is called out as healthy-but-older (with what
-// the next update will do), and an adopted alias shows where it points, so a
-// user can see which binary the second command name actually runs.
+// TestDoctorViewReportsAliasAndLegacyLayout pins the alias lines the text view
+// adds: an informational note (the alias-only layout is healthy, and a verb
+// fixes it) is rendered as a note rather than a fault, and an adopted alias
+// shows where it points, so a user can see which binary the second command name
+// actually runs.
 func TestDoctorViewReportsAliasAndLegacyLayout(t *testing.T) {
 	var legacy strings.Builder
 	doctorView{&selfupdate.DoctorReport{
 		RunningVersion: "v1.2.3",
 		Executable:     "/b/korbit",
 		LegacyLayout:   true,
+		Notes:          []string{"this install runs as `korbit`; run `aliased-name self update` to add the `dgx-cli` command and keep `korbit` as an alias for it"},
 	}}.FormatText(&legacy)
 	out := legacy.String()
-	if !strings.Contains(out, "running as `korbit`") || !strings.Contains(out, "keeps korbit as an alias") {
+	if !strings.Contains(out, "    - this install runs as `korbit`") || !strings.Contains(out, "keep `korbit` as an alias") {
 		t.Errorf("legacy-layout note missing:\n%s", out)
+	}
+	if strings.Contains(out, "! this install runs as") {
+		t.Errorf("a note must not render as a problem:\n%s", out)
 	}
 
 	var adopted strings.Builder
@@ -223,7 +228,7 @@ func TestDoctorViewReportsAliasAndLegacyLayout(t *testing.T) {
 		RunningVersion: "v1.2.3",
 		Executable:     "/b/dgx-cli",
 		Aliases: []selfupdate.AliasStatus{
-			{Name: "korbit", Path: "/b/korbit", Target: "dgx-cli", Present: true},
+			{Name: "korbit", Path: "/b/korbit", Target: "dgx-cli", Present: true, Valid: true},
 		},
 	}}.FormatText(&adopted)
 	if got := adopted.String(); !strings.Contains(got, "alias korbit") || !strings.Contains(got, "/b/korbit → dgx-cli") {

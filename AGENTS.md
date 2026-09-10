@@ -113,6 +113,7 @@ internal/
   output/      stdout/stderr contract, JSON emit, error taxonomy -> exit codes
   config/      config.json + CLI home resolution (DIGITALX_CLI_HOME)
   fslock/      advisory cross-process file lock serializing read-modify-write over on-disk state — see the package doc in fslock/fslock.go
+  sqlitefile/  the one SQLite DSN builder every opener of a database under the CLI home shares, so a home path containing `?` or `%` resolves to the same file everywhere — see the package doc in sqlitefile/sqlitefile.go
   progname/    the program's invoked name (set once at startup; read by help/examples/guidance) — see the package doc in progname/progname.go
   ids/         UUIDv7 minting + clientOrderId charset
   stream/      resilient real-time WebSocket layer                      — see stream/doc.go
@@ -126,7 +127,7 @@ internal/
   sandbox/     local API-sandbox lifecycle manager (+ sandbox/deno managed runtime) — see the package doc in sandbox/sandbox.go
   tui/         interactive trading terminal (Bubble Tea v2)             — see tui/README.md
   agentskill/  install/inspect the bundled Agent Skill from an embedded fs.FS — see the package doc in agentskill/agentskill.go
-  selfupdate/  on-disk install layout + self-update mechanics (install/update/uninstall/doctor, PATH wiring, manifest) — see the package doc in selfupdate/selfupdate.go
+  selfupdate/  on-disk install layout + self-update mechanics (install/update/uninstall/doctor, PATH wiring, manifest) — see the package doc in selfupdate/selfupdate.go. It moves and renames NOTHING: no command relocates a CLI home, an artifact cache, or a file inside them. Home resolution, a home's file names, and the by-hand move are the user-facing contract in MIGRATION.md; the two states `self doctor` reports about it live in selfupdate/doctor.go
   cli/         cobra tree built from the unified surface; dispatch; help; the
                error->exit-code wrapper. Subpackages behind the clienv seam:
                  clienv/    the per-invocation Env + Backend/Console contracts
@@ -474,11 +475,8 @@ self-cleaning, drift-checked by content hash) — see `cli/agentskillcmd` and
 `internal/agentskill`. A copy of this same skill sitting at the legacy directory
 name (`skills/korbit`) is removed by `agent skill install` once the current one
 is written, and reported by `agent skill doctor`, so an agent never loads two
-skills with the same triggers. Ownership is proved by `agentskill.Managed`, and
-deleting someone's work is the cost of a false positive, so it requires all
-three of: a frontmatter `name:` that is one of our skill names plus a command we
-drive, this repository's URL in the body, and exactly our `references/` set. A
-hand-written skill that merely names this CLI satisfies only the first, and is
+skills with the same triggers. Removal requires proof of ownership
+(`agentskill.Managed`); a hand-written skill that merely names this CLI is
 reported and left alone.
 
 It reaches an MCP host two ways. Claude Code installs the skill files on disk

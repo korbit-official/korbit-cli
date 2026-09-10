@@ -429,7 +429,7 @@ func TestUpdate(t *testing.T) {
 	archive := makeArchive(t, c.os(), l.BinName(), newBin)
 	c.Doer = &fakeDoer{repo: c.repo(), tag: "v2.0.0", asset: c.assetName(), archive: archive, kit: newSignerKit(t)}
 
-	res, err := c.Update(context.Background(), "", false)
+	res, err := c.Update(context.Background(), UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -466,7 +466,7 @@ func TestUpdateRejectsTamperedArchive(t *testing.T) {
 	d := &fakeDoer{repo: c.repo(), tag: "v2.0.0", asset: c.assetName(), archive: archive, kit: newSignerKit(t)}
 	d.tamperChecksum = true // advertise a wrong hash
 	c.Doer = d
-	if _, err := c.Update(context.Background(), "", false); err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
+	if _, err := c.Update(context.Background(), UpdateOptions{}); err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
 		t.Fatalf("expected a checksum-mismatch error, got %v", err)
 	}
 	// The binary is untouched on a rejected update.
@@ -496,7 +496,7 @@ func TestUpdateRejectsBadSignature(t *testing.T) {
 	c, l := managedForUpdate(t)
 	archive := makeArchive(t, c.os(), l.BinName(), "BINARY-v2")
 	c.Doer = &fakeDoer{repo: c.repo(), tag: "v2.0.0", asset: c.assetName(), archive: archive, kit: newSignerKit(t), signWrong: true}
-	if _, err := c.Update(context.Background(), "", false); err == nil || !strings.Contains(err.Error(), "did not verify") {
+	if _, err := c.Update(context.Background(), UpdateOptions{}); err == nil || !strings.Contains(err.Error(), "did not verify") {
 		t.Fatalf("expected a signature-verification failure, got %v", err)
 	}
 	if got := mustContent(t, l.ExecutablePath()); got != "BINARY-v1" {
@@ -511,7 +511,7 @@ func TestUpdateRejectsMissingSignature(t *testing.T) {
 	c, l := managedForUpdate(t)
 	archive := makeArchive(t, c.os(), l.BinName(), "BINARY-v2")
 	c.Doer = &fakeDoer{repo: c.repo(), tag: "v2.0.0", asset: c.assetName(), archive: archive, kit: newSignerKit(t), omitSig: true}
-	if _, err := c.Update(context.Background(), "", false); err == nil || !strings.Contains(err.Error(), "not signed") {
+	if _, err := c.Update(context.Background(), UpdateOptions{}); err == nil || !strings.Contains(err.Error(), "not signed") {
 		t.Fatalf("expected a missing-signature (downgrade) failure, got %v", err)
 	}
 	if got := mustContent(t, l.ExecutablePath()); got != "BINARY-v1" {
@@ -528,7 +528,7 @@ func TestUpdateSkipsWhenCertEmpty(t *testing.T) {
 	archive := makeArchive(t, c.os(), l.BinName(), newBin)
 	// No kit: the signature endpoint 404s, and it must not matter.
 	c.Doer = &fakeDoer{repo: c.repo(), tag: "v2.0.0", asset: c.assetName(), archive: archive, certBody: []byte("\n  \n")}
-	res, err := c.Update(context.Background(), "", false)
+	res, err := c.Update(context.Background(), UpdateOptions{})
 	if err != nil {
 		t.Fatalf("update with verification disabled failed: %v", err)
 	}
@@ -549,7 +549,7 @@ func TestUpdateFailsWhenCertUnreachable(t *testing.T) {
 	c, l := managedForUpdate(t)
 	archive := makeArchive(t, c.os(), l.BinName(), "BINARY-v2")
 	c.Doer = &fakeDoer{repo: c.repo(), tag: "v2.0.0", asset: c.assetName(), archive: archive, kit: newSignerKit(t), certErr: true}
-	if _, err := c.Update(context.Background(), "", false); err == nil || !strings.Contains(err.Error(), "release-signing certificate") {
+	if _, err := c.Update(context.Background(), UpdateOptions{}); err == nil || !strings.Contains(err.Error(), "release-signing certificate") {
 		t.Fatalf("expected a fail-closed cert-fetch error, got %v", err)
 	}
 	if got := mustContent(t, l.ExecutablePath()); got != "BINARY-v1" {
@@ -563,7 +563,7 @@ func TestUpdateFailsWhenCertEndpointErrors(t *testing.T) {
 	c, l := managedForUpdate(t)
 	archive := makeArchive(t, c.os(), l.BinName(), "BINARY-v2")
 	c.Doer = &fakeDoer{repo: c.repo(), tag: "v2.0.0", asset: c.assetName(), archive: archive, kit: newSignerKit(t), certStatus: 503}
-	if _, err := c.Update(context.Background(), "", false); err == nil || !strings.Contains(err.Error(), "unexpected status 503") {
+	if _, err := c.Update(context.Background(), UpdateOptions{}); err == nil || !strings.Contains(err.Error(), "unexpected status 503") {
 		t.Fatalf("expected a fail-closed cert-fetch error, got %v", err)
 	}
 	if got := mustContent(t, l.ExecutablePath()); got != "BINARY-v1" {
@@ -578,7 +578,7 @@ func TestUpdateFailsOnSoftFour04Cert(t *testing.T) {
 	c, l := managedForUpdate(t)
 	archive := makeArchive(t, c.os(), l.BinName(), "BINARY-v2")
 	c.Doer = &fakeDoer{repo: c.repo(), tag: "v2.0.0", asset: c.assetName(), archive: archive, kit: newSignerKit(t), certBody: []byte("<!doctype html><title>404 Not Found</title>")}
-	if _, err := c.Update(context.Background(), "", false); err == nil || !strings.Contains(err.Error(), "valid PEM certificate") {
+	if _, err := c.Update(context.Background(), UpdateOptions{}); err == nil || !strings.Contains(err.Error(), "valid PEM certificate") {
 		t.Fatalf("expected a non-cert-body failure, got %v", err)
 	}
 	if got := mustContent(t, l.ExecutablePath()); got != "BINARY-v1" {
@@ -597,7 +597,7 @@ func TestUpdateRotatesCert(t *testing.T) {
 	// Publish two certs: a stale one first, then the one that actually signs.
 	bundle := append(append([]byte{}, stale.certPEM...), signing.certPEM...)
 	c.Doer = &fakeDoer{repo: c.repo(), tag: "v2.0.0", asset: c.assetName(), archive: archive, kit: signing, certBody: bundle}
-	res, err := c.Update(context.Background(), "", false)
+	res, err := c.Update(context.Background(), UpdateOptions{})
 	if err != nil {
 		t.Fatalf("update against a rotated cert bundle failed: %v", err)
 	}
@@ -633,7 +633,7 @@ func TestUpdateDryRun(t *testing.T) {
 	c.exeOverride = l.ExecutablePath()
 	c.Doer = &fakeDoer{repo: c.repo(), tag: "v2.0.0", asset: c.assetName(), archive: makeArchive(t, c.os(), l.BinName(), "BINARY-v2")}
 
-	res, err := c.Update(context.Background(), "", true)
+	res, err := c.Update(context.Background(), UpdateOptions{DryRun: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -654,7 +654,7 @@ func TestUpdateAlreadyLatest(t *testing.T) {
 	}
 	c.exeOverride = c.Layout().ExecutablePath()
 	c.Doer = &fakeDoer{repo: c.repo(), tag: "v1.0.0", asset: c.assetName()}
-	res, err := c.Update(context.Background(), "", false)
+	res, err := c.Update(context.Background(), UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -668,7 +668,7 @@ func TestUpdateRefusesUnmanaged(t *testing.T) {
 	c := testConfig(home)
 	// No install → no manifest.
 	c.exeOverride = writeFakeBinary(t, "x")
-	_, err := c.Update(context.Background(), "", false)
+	_, err := c.Update(context.Background(), UpdateOptions{})
 	var pe *ProvenanceError
 	if err == nil || !asProvenance(err, &pe) {
 		t.Fatalf("expected a ProvenanceError, got %v", err)
@@ -1317,17 +1317,13 @@ func TestInstallUpgradeIsNotARepair(t *testing.T) {
 // ---- helper unit tests ----
 
 func TestParseChecksums(t *testing.T) {
-	data := []byte("aa11  digitalx-cli_linux_amd64.tar.gz\nbb22 *digitalx-cli_windows_amd64.zip\ncc33  korbit_linux_amd64.tar.gz\n\n")
+	data := []byte("aa11  digitalx-cli_linux_amd64.tar.gz\nbb22 *digitalx-cli_windows_amd64.zip\n\n")
 	m := parseChecksums(data)
 	if m["digitalx-cli_linux_amd64.tar.gz"] != "aa11" {
 		t.Errorf("linux hash = %q", m["digitalx-cli_linux_amd64.tar.gz"])
 	}
 	if m["digitalx-cli_windows_amd64.zip"] != "bb22" { // "*" binary-mode marker stripped
 		t.Errorf("windows hash = %q", m["digitalx-cli_windows_amd64.zip"])
-	}
-	// One checksums.txt covers both archive sets a release publishes.
-	if m["korbit_linux_amd64.tar.gz"] != "cc33" {
-		t.Errorf("legacy asset hash = %q", m["korbit_linux_amd64.tar.gz"])
 	}
 }
 

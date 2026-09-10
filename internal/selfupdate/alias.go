@@ -55,6 +55,11 @@ import (
 //     primary, so this also recognizes an alias whose manifest entry was lost.
 //
 // Anything else at that name is someone else's file.
+//
+// The manifest proof compares the recorded name for EQUALITY against the one
+// managed name, so a manifest carrying anything else — a relative path, another
+// command's name — proves nothing here. See managedAliasNames for why every
+// other consumer of that field filters it the same way.
 func (c Config) ownsLegacyAlias(l Layout, m Manifest, runningExe string) bool {
 	aliasPath := l.LegacyExecutablePath()
 	switch {
@@ -87,13 +92,42 @@ func (c Config) aliasesToKeep(l Layout, m Manifest, runningExe string) (names, w
 	return nil, nil
 }
 
+// managedAliasNames filters a list of alias names — a manifest's `aliases`
+// field, or anything derived from it — down to the one name this package
+// manages, logging and dropping the rest.
+//
+// The filter is a safety boundary, not tidiness. Every alias name is JOINED
+// ONTO THE INSTALL DIR to produce a path that install overwrites and uninstall
+// deletes, so an entry like "../config.json" would reach outside that directory
+// entirely. The manifest is a plain file in the user's home that any process
+// can rewrite, so its contents are input to be validated, not a source of
+// truth about which paths are ours.
+func (c Config) managedAliasNames(l Layout, names []string) []string {
+	var out []string
+	for _, name := range names {
+		if name != l.LegacyBinName() {
+			c.log().Debug("ignoring an unmanaged alias name recorded in the manifest", "name", name, "managed", l.LegacyBinName())
+			continue
+		}
+		out = append(out, name)
+	}
+	return out
+}
+
 // syncAliases writes/refreshes every alias in names so it runs the primary
 // binary, and returns the names that are now in place plus a warning per alias
 // that could not be written. It is called AFTER the primary binary is in place:
 // on the alias-only layout the primary is what the alias will point at, and
 // writing it first means neither name is ever missing.
+//
+// The returned list is what an install actually achieved, which is NOT what the
+// manifest records: the manifest records every name the install OWNS
+// (aliasesToKeep), including one whose write just failed, so the next run
+// retries it and doctor reports it as a broken command in the meantime. A
+// manifest that only ever listed successful writes would silently forget the
+// alias on its first transient failure.
 func (c Config) syncAliases(l Layout, names []string) (kept []string, warnings []string) {
-	for _, name := range names {
+	for _, name := range c.managedAliasNames(l, names) {
 		if err := c.writeAlias(l, name); err != nil {
 			c.log().Debug("could not write alias", "alias", name, "err", err.Error())
 			warnings = append(warnings, fmt.Sprintf("could not keep the `%s` command pointing at %s (%v) — run the install one-liner again to repair it", name, l.BinName(), err))
@@ -122,10 +156,19 @@ func (c Config) writeAlias(l Layout, name string) error {
 	return symlinkAtomic(l.BinName(), aliasPath)
 }
 
-// applyCopy writes primary's bytes to aliasPath through minio/selfupdate, so a
-// target that is itself running is renamed aside rather than refused (the
-// Windows path) and a failed write is rolled back.
+// applyCopy writes primary's bytes to aliasPath as a second copy of the binary.
+//
+// The mechanism depends on whether anything is at aliasPath, because
+// minio/selfupdate starts by renaming the existing target aside — that rename
+// is exactly how a RUNNING Windows executable gets replaced, and it also rolls
+// the old file back if the write fails. With nothing at aliasPath there is
+// nothing to rename and Apply fails, so an absent target takes a plain atomic
+// create instead: nothing is running at a path that does not exist, so there is
+// neither a swap to perform nor a state to roll back to.
 func applyCopy(primary, aliasPath string) error {
+	if !pathPresent(aliasPath) {
+		return copyFileAtomic(aliasPath, primary, 0o755)
+	}
 	f, err := os.Open(primary)
 	if err != nil {
 		return err

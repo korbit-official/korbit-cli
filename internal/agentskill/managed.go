@@ -46,16 +46,11 @@ var managedNames = []string{SkillName, LegacySkillName}
 var managedMarkers = []string{SkillBinary, "korbit-cli"}
 
 // managedRepoMarkers are the repository URLs a copy of this skill cites in its
-// body as where the tool's source lives. Every revision of the skill carries
-// one of them, so the presence of any is a fact about the file's provenance
-// rather than about its subject matter.
-//
-// Both count, and must keep counting: a binary that ships the skill citing the
-// second URL writes a copy that carries it, and such a copy — typically the one
-// at LegacySkillName — is exactly what Install has to recognise in order to
-// replace it. Judging it foreign leaves it in place beside the current skill,
-// and an agent that finds both loads two skills with the same triggers, which is
-// the outcome this file exists to prevent.
+// body as where the tool's source lives. Every revision of the skill carries one
+// of them, so the presence of any is a fact about the file's provenance rather
+// than about its subject matter — and both must keep counting, since a copy
+// citing the second URL is exactly the one Install has to recognise in order to
+// replace it.
 var managedRepoMarkers = []string{
 	"github.com/digitalx-official/digitalx-cli",
 	"github.com/korbit-official/korbit-cli",

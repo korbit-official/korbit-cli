@@ -31,6 +31,10 @@ irm https://docs.digitalx.miraeasset.com/install.ps1 | iex
 
 The binary then manages itself — `dgx-cli self update`, `dgx-cli self doctor`, `dgx-cli self uninstall`.
 
+Installed under the earlier product name, as `korbit`? It keeps working. How to
+come onto `dgx-cli` from that install, and what happens to its data directory,
+is in [`MIGRATION.md`](MIGRATION.md).
+
 Prefer to manage it yourself? Download a release binary, or install from source with `go install github.com/digitalx-official/digitalx-cli@latest`.
 
 ## Quickstart

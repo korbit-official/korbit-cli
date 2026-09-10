@@ -36,11 +36,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
+	"github.com/digitalx-official/digitalx-cli/internal/config"
 	"github.com/digitalx-official/digitalx-cli/internal/keys"
-	"github.com/digitalx-official/digitalx-cli/internal/legacyfile"
 	"github.com/digitalx-official/digitalx-cli/internal/logging"
 	"github.com/digitalx-official/digitalx-cli/internal/sandbox/deno"
 )
@@ -80,7 +79,7 @@ type Config struct {
 	// Port is the requested fixed port (0 ⇒ DefaultPort with ephemeral fallback;
 	// a non-zero value forces that exact port with no fallback).
 	Port int
-	// DB overrides the database path (default <home>/sandbox/digitalx-sandbox.db).
+	// DB overrides the database path (default <home>/sandbox/sandbox.db; see DBFileName).
 	DB string
 	// KeyName overrides the imported key's name (default DefaultKeyName).
 	KeyName string
@@ -156,13 +155,6 @@ type Deps struct {
 type Manager struct {
 	cfg  Config
 	deps Deps
-
-	// dbOnce guards the one-time database-path resolution (see resolveDBPath),
-	// which may adopt a database left under the earlier product name. Resolving
-	// once keeps every path derived from it — the sidecars, the pidfile, the
-	// market snapshot — pointing at the same database for the process's life.
-	dbOnce     sync.Once
-	dbResolved string
 }
 
 // New builds a Manager, applying defaults.
@@ -191,102 +183,81 @@ func StateDir(home string) string { return filepath.Join(home, "sandbox") }
 // stateDir is DIGITALX_CLI_HOME/sandbox — the per-home mutable state root.
 func (m *Manager) stateDir() string { return StateDir(m.cfg.Home) }
 
-// DBFileName is the sandbox database under the state dir; LegacyDBFileName is
-// the name a state dir created under the earlier product name carries.
+// DBDefaultName is the sandbox database's name under the state dir. It carries
+// no product name: the CLI home above it already says whose data it is.
+// LegacyDBFileName is the name a state dir under a home created with the earlier
+// product's directory name carries, used for exactly one home (see DBFileName).
 const (
-	DBFileName       = "digitalx-sandbox.db"
+	DBDefaultName    = "sandbox.db"
 	LegacyDBFileName = "korbit-sandbox.db"
 )
 
+// DBFileName is the sandbox database's filename inside home's state dir:
+// DBDefaultName, except under a home whose own directory name is the earlier
+// product's (config.LegacyLayout), where it is LegacyDBFileName so an older
+// `korbit` binary still sharing that directory serves the same database.
+//
+// It takes the HOME, not the state dir, because the home's name is what decides
+// the layout — the state dir is always named "sandbox".
+func DBFileName(home string) string {
+	if config.LegacyLayout(home) {
+		return LegacyDBFileName
+	}
+	return DBDefaultName
+}
+
 // dbCompanions are the files SQLite and the bundle keep beside the database:
 // the write-ahead log, its shared-memory index, the {pid,port} pidfile, and the
-// market snapshot cache. They move with the database when the legacy name is
-// adopted, so none of them is left pointing at a database that is gone.
+// market snapshot cache. They belong to the database — none of them may be left
+// pointing at a database that has moved or gone.
 var dbCompanions = []string{"-wal", "-shm", "-pid", ".market-snapshot.json"}
 
-// dbPath is the sandbox database path — the explicit override, else the state
-// dir's, resolved once per Manager (see resolveDBPath).
+// DBCompanionSuffixes returns the suffixes of every file that belongs beside a
+// sandbox database (see dbCompanions), so a caller moving or removing the
+// database takes them with it. It is exported because the set is documented for
+// users too — MIGRATION.md's hand-rename recipe lists exactly these — and a
+// second copy of the list would be one that could go stale.
+func DBCompanionSuffixes() []string { return append([]string{}, dbCompanions...) }
+
+// dbPath is the sandbox database path — the explicit override, else the one the
+// state dir's layout implies (DBFileName). The directory decides the filename
+// and nothing is renamed on open, so this is a pure path computation.
 func (m *Manager) dbPath() string {
 	if m.cfg.DB != "" {
 		return m.cfg.DB
 	}
-	m.dbOnce.Do(func() { m.dbResolved = m.resolveDBPath() })
-	return m.dbResolved
+	return filepath.Join(m.stateDir(), DBFileName(m.cfg.Home))
 }
 
-// resolveDBPath returns the state dir's database path, adopting a database left
-// under the earlier product name (companions included) so its balances, orders,
-// and trades stay in play.
-//
-// A sandbox still SERVING the legacy database is left alone: renaming the file
-// out from under a running server would leave it writing to a path nothing else
-// can find, and its pidfile would no longer match the database `stop` looks for.
-// See legacyServerRunning for what counts as serving. A crashed run's stale
-// pidfile does not block adoption; while a live server does, this process keeps
-// using the legacy name and the next run after that server stops adopts it.
-//
-// A rename that FAILS also keeps the legacy name, so nothing is created under
-// the current name and the next run retries.
-func (m *Manager) resolveDBPath() string {
-	current := filepath.Join(m.stateDir(), DBFileName)
-	legacy := filepath.Join(m.stateDir(), LegacyDBFileName)
-	if _, err := os.Lstat(current); err == nil {
-		return current
-	}
-	if _, err := os.Lstat(legacy); err != nil {
-		return current
-	}
-	if m.legacyServerRunning(legacy) {
-		return legacy
-	}
-	adopted, err := legacyfile.Adopt(current, legacy, dbCompanions...)
-	switch {
-	case err == nil:
-		m.log().Info("adopted the existing sandbox database", "from", legacy, "to", current)
-		return current
-	case !adopted:
-		m.log().Warn("could not adopt the existing sandbox database — using it under its existing name",
-			"from", legacy, "to", current, "err", err)
-		return legacy
-	default:
-		m.log().Warn("adopted the sandbox database but left a companion behind",
-			"from", legacy, "to", current, "err", err)
-		return current
-	}
-}
+// pidfileSuffix is what the bundle appends to the database path to get its
+// {pid,port} file.
+const pidfileSuffix = "-pid"
 
-// legacyServerRunning reports whether a sandbox is actively serving the database
-// at the legacy name, from its pidfile: the pid must resolve to a live process
-// AND the recorded port must answer /v2/time.
-//
-// The port probe is not redundant with the pid check. A pid alone is weak
-// evidence — the number can be recycled by an unrelated process, and on some
-// platforms a resolvable pid is all the OS will tell you cheaply — so a stale
-// pidfile could otherwise pin the database to the legacy name forever. Requiring
-// the port to answer makes "running" mean what the rest of this package means by
-// it (the same readiness probe `start` and `status` use). The cost is paid only
-// while a legacy database is still present and its pidfile parses: once adopted,
-// resolveDBPath returns at the first check.
-func (m *Manager) legacyServerRunning(legacy string) bool {
-	pf, err := parsePidfile(legacy + "-pid")
-	if err != nil || pf.PID <= 0 || pf.Port == 0 {
-		return false
+// pidfileCandidates are the pidfiles that could belong to this state dir, the
+// one this home's own layout implies FIRST. An explicit --db has exactly one; a
+// default state dir may carry the other spelling too, left by an older binary or
+// by a home renamed without its files, and a stale one there must be visible
+// rather than silently outranked.
+func (m *Manager) pidfileCandidates() []string {
+	if m.cfg.DB != "" {
+		return []string{m.cfg.DB + pidfileSuffix}
 	}
-	if !processAlive(pf.PID) {
-		return false
+	inUse := DBFileName(m.cfg.Home)
+	names := []string{inUse}
+	for _, other := range []string{DBDefaultName, LegacyDBFileName} {
+		if other != inUse {
+			names = append(names, other)
+		}
 	}
-	if !m.probeReady(context.Background(), pf.Port) {
-		m.log().Debug("sandbox pidfile names a live pid but its port does not answer — treating it as stale",
-			"db", legacy, "pid", pf.PID, "port", pf.Port)
-		return false
+	out := make([]string, 0, len(names))
+	for _, n := range names {
+		out = append(out, filepath.Join(m.stateDir(), n+pidfileSuffix))
 	}
-	m.log().Info("sandbox running against the previous database name — keeping it for this run",
-		"db", legacy, "pid", pf.PID, "port", pf.Port)
-	return true
+	return out
 }
 
 // pidfilePath is where the bundle writes {pid,port} — <db>-pid.
-func (m *Manager) pidfilePath() string { return m.dbPath() + "-pid" }
+func (m *Manager) pidfilePath() string { return m.dbPath() + pidfileSuffix }
 
 // logPath is the detached child's captured stdout/stderr.
 func (m *Manager) logPath() string { return filepath.Join(m.stateDir(), "run.log") }
@@ -319,9 +290,8 @@ func (m *Manager) readPidfile() (Pidfile, error) {
 	return pf, nil
 }
 
-// parsePidfile reads the bundle's {pid,port} pidfile at an explicit path. It is
-// separate from readPidfile so the database-path resolution can consult the
-// LEGACY pidfile without going through the paths it is still resolving.
+// parsePidfile reads the bundle's {pid,port} pidfile at an explicit path, for
+// the callers that walk pidfileCandidates rather than the one path in use.
 func parsePidfile(path string) (Pidfile, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {

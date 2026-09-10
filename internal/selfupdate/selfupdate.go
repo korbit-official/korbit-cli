@@ -24,6 +24,32 @@
 // the `korbit` command keeps working on an install that has it. install and
 // update keep every alias current; uninstall removes them with the primary.
 //
+// # Two generations of names
+//
+// The binary, the CLI home, the artifact cache, and the databases inside a home
+// each have a current name and an earlier one, and both keep working.
+// MIGRATION.md is the user-facing contract for how they coexist; the command
+// names are implemented in alias.go. Three invariants split the work between the
+// verbs, and every one of them is load bearing:
+//
+//   - self update leaves the COMMAND LAYOUT correct — dgx-cli is the real file
+//     with the current bytes, and an owned korbit name points at it — including
+//     on a run that finds nothing to update (repairLayout). repairLayout ships
+//     inside the release being downloaded, so an install still running the
+//     korbit-era binary gains dgx-cli on its SECOND update run; MIGRATION.md
+//     documents that two-run upgrade.
+//   - NOTHING here moves or renames a directory, or a file inside one. No verb
+//     does, and no flag asks for it: install (and therefore the install
+//     one-liner) repairs the command layout, update swaps a binary, doctor is
+//     read-only by contract, and a CLI home under the earlier directory name is
+//     simply used as it is, indefinitely. A user who wants the current directory
+//     name performs the move themselves (MIGRATION.md spells it out).
+//   - A home's DIRECTORY NAME and the FILE NAMES inside it are one unit
+//     (config.LegacyLayout): a home named `.korbit-cli` holds the earlier
+//     filenames, and every other directory holds the current ones. A directory
+//     renamed without its files would be a full home the CLI reads as empty,
+//     which is the state doctor reports as a problem.
+//
 // Trust is TLS + sha256 + a release signature: self update fetches the release
 // checksums.txt and verifies the downloaded archive's sha256 against it before
 // the swap, and — gated by a release-signing certificate published on the
@@ -45,6 +71,7 @@ import (
 	"runtime"
 
 	"github.com/digitalx-official/digitalx-cli/internal/config"
+	"github.com/digitalx-official/digitalx-cli/internal/envalias"
 	"github.com/digitalx-official/digitalx-cli/internal/logging"
 )
 
@@ -109,6 +136,13 @@ type Config struct {
 	// (windows). The cli layer wires a /dev/tty-backed confirm that renders the
 	// addition's diff preview and defaults an empty answer to yes.
 	PathConfirm func(add PathAddition) (bool, error)
+	// HomeDBNames are the databases a CLI home holds, each under the two
+	// filenames it can carry (see HomeDBName). The names belong to their owners —
+	// internal/journal, internal/sandbox, the monitor command — which this
+	// package must not import, so the cli layer supplies them. Empty means the
+	// caller supplied none, and the file-layout diagnosis is then skipped rather
+	// than guessed at.
+	HomeDBNames []HomeDBName
 	// Progress is the human progress/instruction sink (stderr). It is never the
 	// result: everything an agent needs is in the returned struct.
 	Progress io.Writer
@@ -198,13 +232,68 @@ func (c Config) Layout() Layout {
 	return Layout{getenv: orGetenv(c.Getenv), goos: c.os()}
 }
 
-// Home is the CLI home (config.Home): $DIGITALX_CLI_HOME (or the legacy
-// $KORBIT_CLI_HOME) when set, else ~/.digitalx-cli, falling back to an existing
-// ~/.korbit-cli. The manifest and the lock live under it.
-func (l Layout) Home() string { return config.Home(l.getenv) }
+// Home is the CLI home: $DIGITALX_CLI_HOME (or the legacy $KORBIT_CLI_HOME)
+// when set, else ~/.digitalx-cli, falling back to an existing ~/.korbit-cli.
+// The manifest and the lock live under it.
+//
+// It applies config.Home's rule, but resolves the user home through this
+// Layout's own userHome — so the home and the installed-binary directory always
+// mean the SAME user home, and a caller that redirects the environment (an
+// agent with its own HOME, a test) gets a consistent layout rather than a
+// manifest under one user's home and a binary under another's.
+//
+// A pinned path is normalized exactly as config.Home normalizes it, so this
+// package and the rest of the CLI reason about one spelling of one directory.
+func (l Layout) Home() string {
+	if env := l.HomeEnvVar(); env != "" {
+		return config.NormalizeHome(l.getenv(env))
+	}
+	if current := l.CurrentHomeDir(); dirExists(current) {
+		return current
+	}
+	if legacy := l.LegacyHomeDir(); dirExists(legacy) {
+		return legacy
+	}
+	return l.CurrentHomeDir()
+}
+
+// CurrentHomeDir and LegacyHomeDir are the two standard CLI home locations
+// under the OS user home — ~/.digitalx-cli and ~/.korbit-cli. They are what
+// Home() chooses between when nothing pins the home, and are named separately
+// because the health report reasons about BOTH (Home() only ever returns one).
+// Neither need exist.
+func (l Layout) CurrentHomeDir() string { return filepath.Join(l.userHome(), config.DirName) }
+
+// LegacyHomeDir is the CLI home an installation made under the earlier product
+// name carries; see CurrentHomeDir.
+func (l Layout) LegacyHomeDir() string { return filepath.Join(l.userHome(), config.LegacyDirName) }
+
+// LegacyEnvHome is the accepted older spelling of the home-relocating
+// environment variable, derived from the canonical name so the two cannot
+// drift from what config.Home actually reads.
+var LegacyEnvHome = func() string {
+	if legacy, ok := envalias.LegacyName(config.EnvHome); ok {
+		return legacy
+	}
+	return config.EnvHome
+}()
+
+// HomeEnvVar returns the name of the environment variable that pins the CLI
+// home in this environment, or "" when nothing does. The canonical name wins,
+// matching config.Home. A caller uses it to refuse to move a home the user
+// placed deliberately, and to name the variable in its advice.
+func (l Layout) HomeEnvVar() string {
+	if l.getenv(config.EnvHome) != "" {
+		return config.EnvHome
+	}
+	if l.getenv(LegacyEnvHome) != "" {
+		return LegacyEnvHome
+	}
+	return ""
+}
 
 // ManifestPath is the install manifest: <home>/install.json.
-func (l Layout) ManifestPath() string { return filepath.Join(l.Home(), "install.json") }
+func (l Layout) ManifestPath() string { return filepath.Join(l.Home(), manifestFileName) }
 
 // LockPath is the advisory lock serializing install/update/uninstall against a
 // concurrent digitalx-cli process mutating the same store.
@@ -458,7 +547,7 @@ func (l Layout) isManagedBinary(path string) bool {
 	return l.isInstalledBinary(path) || l.isLegacyBinary(path)
 }
 
-// defaultGOOS / defaultGOARCH fill a zero Config from the build's own platform.
+// os / arch fill a zero Config from the build's own platform.
 func (c Config) os() string {
 	if c.GOOS != "" {
 		return c.GOOS

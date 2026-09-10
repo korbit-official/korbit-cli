@@ -394,52 +394,26 @@ func TestGoldenGlobals(t *testing.T) {
 // source (the option lists contain no quotes/backslashes, so this is enough).
 func jsString(s string) string { return `"` + s + `"` }
 
-// TestKorbitGlobalIsAnAliasOfAPI: the API global answers to two names bound to
-// one object, so a script written against either — including one already
-// written and saved by a user — runs unchanged. The alias is not a copy: a
-// property set through one name is visible through the other.
-func TestKorbitGlobalIsAnAliasOfAPI(t *testing.T) {
-	ft := newFakeTransport()
-	checks := []string{
-		"korbit === api",
-		"korbit.order === api.order",
-		"typeof korbit.order.place === 'function'",
-		"typeof korbit.now === 'function'",
-		"(api.__probe = 1, korbit.__probe === 1)",
-	}
-	r := newTestRuntime(t, Options{API: ft.api(apiExtra{}), Where: strings.Join(checks, " && ")})
-	ok, err := r.Match(dataEvent(`{}`))
-	if err != nil {
-		t.Fatalf("alias probe failed: %v", err)
-	}
-	if !ok {
-		t.Fatalf("the korbit global must be the same object as api")
-	}
-}
-
 // TestScriptWrittenAgainstKorbitStillRuns: an --on handler that calls through
 // the alias reaches the same operation, with the same validation and the same
-// result, as one written against the primary name.
+// result, as one written against the primary name. (TestGoldenGlobals pins that
+// the two names are one object.)
 func TestScriptWrittenAgainstKorbitStillRuns(t *testing.T) {
-	for _, global := range []string{"api", "korbit"} {
-		t.Run(global, func(t *testing.T) {
-			ft := newFakeTransport()
-			ft.on("GET", "/v2/tickers", step{data: json.RawMessage(`{"btc_krw":{"close":"100"}}`)})
-			var out string
-			err := runOn(t, Options{
-				API:    ft.api(apiExtra{}),
-				On:     "var tk = await " + global + ".ticker('btc_krw'); console.log('close=' + tk.btc_krw.close)",
-				Stderr: writerFunc(func(p []byte) { out += string(p) }),
-			}, dataEvent(`{}`))
-			if err != nil {
-				t.Fatalf("%s.ticker: %v", global, err)
-			}
-			if !strings.Contains(out, "close=100") {
-				t.Fatalf("%s.ticker produced %q", global, out)
-			}
-			if calls := ft.calls("GET", "/v2/tickers"); len(calls) != 1 {
-				t.Fatalf("%s.ticker made %d calls", global, len(calls))
-			}
-		})
+	ft := newFakeTransport()
+	ft.on("GET", "/v2/tickers", step{data: json.RawMessage(`{"btc_krw":{"close":"100"}}`)})
+	var out string
+	err := runOn(t, Options{
+		API:    ft.api(apiExtra{}),
+		On:     "var tk = await korbit.ticker('btc_krw'); console.log('close=' + tk.btc_krw.close)",
+		Stderr: writerFunc(func(p []byte) { out += string(p) }),
+	}, dataEvent(`{}`))
+	if err != nil {
+		t.Fatalf("korbit.ticker: %v", err)
+	}
+	if !strings.Contains(out, "close=100") {
+		t.Fatalf("korbit.ticker produced %q", out)
+	}
+	if calls := ft.calls("GET", "/v2/tickers"); len(calls) != 1 {
+		t.Fatalf("korbit.ticker made %d calls", len(calls))
 	}
 }

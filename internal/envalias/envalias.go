@@ -45,15 +45,19 @@ func Lookup(getenv func(string) string, name string) string {
 	if v := getenv(name); v != "" {
 		return v
 	}
-	if legacy, ok := legacyName(name); ok {
+	if legacy, ok := LegacyName(name); ok {
 		return getenv(legacy)
 	}
 	return ""
 }
 
-// legacyName maps a canonical name to its legacy spelling, reporting false for
-// a name that carries no canonical prefix (nothing to fall back to).
-func legacyName(name string) (string, bool) {
+// LegacyName returns the legacy KORBIT_CLI_* spelling of a canonical
+// DIGITALX_CLI_* name, reporting false for a name outside the canonical prefix
+// (which has no second spelling). A caller that must name BOTH variables — a
+// diagnostic that says which one is set, or advice to rename one — derives the
+// legacy name here rather than writing it out, so the pair cannot drift from
+// what Lookup actually reads.
+func LegacyName(name string) (string, bool) {
 	rest, ok := strings.CutPrefix(name, Prefix)
 	if !ok {
 		return "", false

@@ -93,14 +93,11 @@ for doc in LICENSE NOTICE THIRD_PARTY_LICENSES.txt DISCLAIMER.md DISCLAIMER.ko.m
 	cp "$root/$doc" "$stage/$doc"
 done
 
-# `name` is the extension's INSTALL KEY and `display_name` is what the user
-# reads; both carry the product's name. A host keys the installed extension on
-# `name`, so a host that already holds a bundle under a different key shows this
-# one as a SECOND extension side by side — the two do not merge, and the user
-# removes the one they no longer want by hand. That is the accepted behaviour: a
-# Desktop Extension has no self-update and no migration path, so there is nothing
-# for a stable key to carry forward, and the name a newcomer reads in the
-# extension list matters more than continuity with a key they never see.
+# `name` is the extension's INSTALL KEY and `display_name` is what the user reads.
+# A host keys the installed extension on `name`, so a bundle whose key differs
+# from one the host already holds installs as a SECOND extension beside it rather
+# than replacing it; a Desktop Extension has no self-update path, so the user
+# removes the older one by hand.
 cat >"$stage/manifest.json" <<EOF
 {
   "manifest_version": "0.3",

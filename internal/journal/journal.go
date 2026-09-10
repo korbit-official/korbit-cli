@@ -30,25 +30,42 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/digitalx-official/digitalx-cli/internal/config"
 	"github.com/digitalx-official/digitalx-cli/internal/envalias"
-	"github.com/digitalx-official/digitalx-cli/internal/fslock"
-	"github.com/digitalx-official/digitalx-cli/internal/legacyfile"
 	"github.com/digitalx-official/digitalx-cli/internal/logging"
+	"github.com/digitalx-official/digitalx-cli/internal/sqlitefile"
 	_ "modernc.org/sqlite" // pure-Go SQLite driver (no cgo — keeps cross-compiles working)
 )
 
-// FileName is the journal database file under the CLI home; LegacyFileName is
-// the name a home created under the earlier product name carries. Open adopts
-// an existing legacy database (see adoptLegacy) so the recorded history stays
-// readable instead of being replaced by an empty file beside it.
+// DefaultFileName is the journal database's name under a CLI home. It carries
+// no product name: the directory already says whose data it is.
+//
+// LegacyFileName is the name a home created under the earlier product name
+// carries, and it is used for exactly one home — see FileName.
 const (
-	FileName       = "digitalx-cli.db"
-	LegacyFileName = "korbit-cli.db"
+	DefaultFileName = "journal.db"
+	LegacyFileName  = "korbit-cli.db"
 )
 
+// FileName is the journal database's filename inside home: DefaultFileName,
+// except in a home whose own directory name is the earlier product's
+// (config.LegacyLayout), where it is LegacyFileName so an older `korbit` binary
+// still sharing that directory reads and writes the same file.
+//
+// The directory decides the filename and nothing is ever renamed — not on open,
+// and not by any command in this CLI. A user who wants the current names moves
+// the directory and renames the files by hand (MIGRATION.md).
+func FileName(home string) string {
+	if config.LegacyLayout(home) {
+		return LegacyFileName
+	}
+	return DefaultFileName
+}
+
 // sqliteSidecars are the write-ahead-log files SQLite keeps beside a database.
-// They move with it: a database renamed without its -wal would strand the
-// committed-but-uncheckpointed tail of the log.
+// They belong to it: a database moved without its -wal would strand the
+// committed-but-uncheckpointed tail of the log, and one removed without its -wal
+// leaves that tail behind.
 var sqliteSidecars = []string{"-wal", "-shm"}
 
 // schemaVersion is the journal schema version, stamped into the SQLite file
@@ -62,65 +79,35 @@ var sqliteSidecars = []string{"-wal", "-shm"}
 // schema honest with no migration code to maintain.
 const schemaVersion = 2
 
-// DefaultPath returns the journal database path under home.
-func DefaultPath(home string) string { return filepath.Join(home, FileName) }
+// DefaultPath returns the journal database path under home, under the filename
+// that home's own layout implies (see FileName).
+func DefaultPath(home string) string { return filepath.Join(home, FileName(home)) }
 
-// LegacyPaths returns the journal files a home created under the earlier
-// product name carries — the database and its SQLite sidecars. Open adopts them
-// onto the current name; a caller removing the CLI's data (`self uninstall`)
-// lists them alongside DefaultPath so a home that was never opened since the
-// rename is still cleaned up.
-func LegacyPaths(home string) []string {
-	legacy := filepath.Join(home, LegacyFileName)
-	paths := []string{legacy}
-	for _, sidecar := range sqliteSidecars {
-		paths = append(paths, legacy+sidecar)
+// Paths returns every journal file that belongs to home: the database under
+// BOTH spellings, each with its SQLite sidecars. A caller removing the CLI's
+// data (`self uninstall`) needs both, because a home whose directory was renamed
+// without its files still carries the other spelling, and leaving it behind
+// would mean an uninstall did not finish. Non-existent entries are the caller's
+// to ignore.
+func Paths(home string) []string {
+	var paths []string
+	for _, name := range []string{FileName(home), otherFileName(home)} {
+		db := filepath.Join(home, name)
+		paths = append(paths, db)
+		for _, sidecar := range sqliteSidecars {
+			paths = append(paths, db+sidecar)
+		}
 	}
 	return paths
 }
 
-// adoptLegacy moves a journal database written under the earlier product name
-// onto the current one, sidecars included, and returns the path Open should
-// actually use. It applies only to the default file name under a home — an
-// explicitly supplied path is used verbatim.
-//
-// A rename that FAILS returns the legacy path, so this run keeps recording into
-// the database that exists. Returning the current path instead would have
-// sql.Open create an empty database there, and the next run would see the
-// current name present and never retry — orphaning the recorded history for
-// good. That is the realistic Windows case: renaming a file another process
-// holds open fails.
-//
-// The rename is serialized against concurrent CLI processes by the journal's own
-// sidecar lock (the fslock convention "<datafile>.lock"). Two processes racing
-// here would otherwise both see "current absent, legacy present" and the loser's
-// rename would fail for no reason. The lock is taken only around the rename —
-// no other code acquires it, so it has no ordering constraint against the
-// registry/vault/config locks. A lock that cannot be taken is not fatal: the
-// adoption is attempted unlocked rather than failing the command.
-func adoptLegacy(path string, log *slog.Logger) string {
-	if filepath.Base(path) != FileName {
-		return path
+// otherFileName is the journal filename this home does NOT use — the one a home
+// renamed without its files may still carry.
+func otherFileName(home string) string {
+	if config.LegacyLayout(home) {
+		return DefaultFileName
 	}
-	legacy := filepath.Join(filepath.Dir(path), LegacyFileName)
-	if unlock, err := fslock.Lock(path + ".lock"); err == nil {
-		defer unlock()
-	} else {
-		log.Debug("journal adoption lock unavailable — proceeding unlocked", "lock", path+".lock", "err", err)
-	}
-	adopted, err := legacyfile.Adopt(path, legacy, sqliteSidecars...)
-	switch {
-	case err == nil:
-		return path
-	case !adopted:
-		log.Warn("could not adopt the existing action journal — recording into it under its existing name",
-			"from", legacy, "to", path, "err", err)
-		return legacy
-	default:
-		log.Warn("adopted the action journal but left a sidecar behind",
-			"from", legacy, "to", path, "err", err)
-		return path
-	}
+	return LegacyFileName
 }
 
 // Disabled reports whether journaling has been turned off via the environment
@@ -232,8 +219,9 @@ func Open(path string, noFsync bool, log *slog.Logger) (*Logger, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, fmt.Errorf("create journal directory: %w", err)
 	}
-	path = adoptLegacy(path, log)
-	db, err := sql.Open("sqlite", path)
+	// sqlitefile.DSN, not the bare path: the driver reads a bare path as
+	// `<path>?<query>`, so a home containing a `?` would open a truncated path.
+	db, err := sql.Open("sqlite", sqlitefile.DSN(path))
 	if err != nil {
 		return nil, err
 	}

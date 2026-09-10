@@ -17,10 +17,12 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/digitalx-official/digitalx-cli/internal/cli/clienv"
+	"github.com/digitalx-official/digitalx-cli/internal/cli/monitorcmd"
 	clihome "github.com/digitalx-official/digitalx-cli/internal/config"
 	"github.com/digitalx-official/digitalx-cli/internal/journal"
 	"github.com/digitalx-official/digitalx-cli/internal/keys"
@@ -56,15 +58,43 @@ func Run(cx *clienv.Cmd, c *spec.Command, cmd *cobra.Command, args []string) err
 // confirm (install only) is set by the caller afterward via cfg.PathConfirm.
 func config(cx *clienv.Cmd) selfupdate.Config {
 	return selfupdate.Config{
-		Getenv:   cx.Getenv,
-		Now:      cx.Now,
-		Doer:     cx.Doer,
-		GOOS:     runtime.GOOS,
-		GOARCH:   runtime.GOARCH,
-		Version:  version.Version,
-		Repo:     selfupdate.DefaultRepo,
-		Progress: cx.IO.Err,
-		Logger:   cx.Log,
+		Getenv:      cx.Getenv,
+		Now:         cx.Now,
+		Doer:        cx.Doer,
+		GOOS:        runtime.GOOS,
+		GOARCH:      runtime.GOARCH,
+		Version:     version.Version,
+		Repo:        selfupdate.DefaultRepo,
+		HomeDBNames: homeDBNames(),
+		Progress:    cx.IO.Err,
+		Logger:      cx.Log,
+	}
+}
+
+// homeDBNames describes the databases a CLI home holds, in both of the spellings
+// a home can carry. `self doctor` uses it to report a home holding databases its
+// own directory name says it will not read, and to name the rename the user has
+// to perform to fix that.
+//
+// Each name belongs to its own package (internal/journal, the monitor command,
+// internal/sandbox), and internal/selfupdate must not import any of them — it
+// manages an install layout, not a journal or a sandbox — so the two meet here.
+//
+// When a NEW database is added under the CLI home, add it here too: a database
+// missing from this list is one doctor cannot see stranded under the wrong
+// filename, and one MIGRATION.md's rename table would not mention.
+//
+// The paths are home-relative with forward slashes — how a user reads them, and
+// how MIGRATION.md writes them.
+func homeDBNames() []selfupdate.HomeDBName {
+	sandboxDir := filepath.Base(sandbox.StateDir(""))
+	return []selfupdate.HomeDBName{
+		{Current: journal.DefaultFileName, Legacy: journal.LegacyFileName},
+		{Current: monitorcmd.BotDBDefaultName, Legacy: monitorcmd.LegacyBotDBFileName},
+		{
+			Current: sandboxDir + "/" + sandbox.DBDefaultName,
+			Legacy:  sandboxDir + "/" + sandbox.LegacyDBFileName,
+		},
 	}
 }
 
@@ -223,7 +253,10 @@ func runUpdate(cx *clienv.Cmd, cmd *cobra.Command) error {
 	// timeout of its own); the release archives are tens of MB.
 	ctx, cancel := context.WithTimeout(context.Background(), updateTimeout)
 	defer cancel()
-	res, err := config(cx).Update(ctx, tag, cx.Modes.DryRun)
+	res, err := config(cx).Update(ctx, selfupdate.UpdateOptions{
+		TargetVersion: tag,
+		DryRun:        cx.Modes.DryRun,
+	})
 	if err != nil {
 		return mapErr(err)
 	}
@@ -274,34 +307,158 @@ type uninstallPlan struct {
 	cacheShow  []string              // cache dirs that exist (display)
 	edits      []selfupdate.PathEdit // pending PATH-undo edits, with diff previews
 
-	dataPaths []string // config + journal (+sidecars) handed to Uninstall
-	keyFiles  []string // keys.json + keystore.json handed to purgeKeys
-	artifacts []string // all candidate cache dirs handed to Uninstall
+	dataPaths []string   // config + journal (+sidecars) handed to Uninstall
+	homes     []string   // every CLI home this uninstall acts on, the one in use first
+	keyPurges []keyPurge // per CLI home: clear every key, then remove its key files
+	artifacts []string   // all candidate cache dirs handed to Uninstall
+}
+
+// keyPurge is one CLI home whose keys must be cleared from their backends before
+// its key files are deleted. There is normally one; a machine that still carries
+// a home under the earlier product's directory name has two, and each needs its
+// own key manager built from its OWN config.json — the backend is a per-home
+// setting, so purging a `"keystore": "keychain"` home through another home's
+// file backend would delete its keys.json and leave its keychain items orphaned,
+// where nothing can find them again.
+type keyPurge struct {
+	home  string
+	files []string
 }
 
 // buildUninstallPlan resolves the candidate paths/edits read-only (no changes).
-func buildUninstallPlan(cx *clienv.Cmd, su selfupdate.Config, home string) uninstallPlan {
+//
+// It covers BOTH directory generations: an uninstall must leave nothing behind,
+// and a machine still on the earlier directory name (or one carrying a leftover
+// legacy home beside the current one) holds keys and a journal under the earlier
+// product's directory names. Those paths are added only when they exist, so the
+// usual single-home case is unchanged.
+func buildUninstallPlan(cx *clienv.Cmd, su selfupdate.Config, home, oh string) uninstallPlan {
 	l := su.Layout()
 	artifacts := []string{sandbox.StateDir(home)}
-	if cacheDir, err := sandbox.ResolveCacheDir(cx.Getenv); err == nil {
-		artifacts = append(artifacts, cacheDir)
+	cands, cerr := sandbox.CacheDirs(cx.Getenv)
+	if cerr == nil {
+		artifacts = append(artifacts, cands.Current)
+		if cands.Legacy != "" {
+			artifacts = append(artifacts, cands.Legacy)
+		}
+	}
+	homes := uninstallHomes(l, home)
+	for _, h := range homes[1:] {
+		artifacts = append(artifacts, sandbox.StateDir(h))
+	}
+	var dataPaths, dataShow []string
+	var keyPurges []keyPurge
+	for _, h := range homes {
+		dataPaths = append(dataPaths, homeDataPaths(h)...)
+		dataShow = append(dataShow, clihome.Path(h), keys.RegistryPath(h), keystore.FilePath(h))
+		dataShow = append(dataShow, journal.Paths(h)...)
+		dataShow = append(dataShow, monitorcmd.BotDBPaths(h)...)
+		dataShow = append(dataShow, debugBundles(h)...)
+		keyPurges = append(keyPurges, keyPurge{home: h, files: keyFilePaths(h)})
 	}
 	return uninstallPlan{
 		binaryShow: existing(append(append([]string{l.ExecutablePath()}, su.AliasPaths()...), l.ManifestPath())...),
-		dataShow:   existing(append([]string{clihome.Path(home), keys.RegistryPath(home), keystore.FilePath(home), journal.DefaultPath(home)}, journal.LegacyPaths(home)...)...),
-		keyNames:   keyDisplayNames(cx, home),
+		dataShow:   existing(dataShow...),
+		keyNames:   keyDisplayNames(cx, homes, oh),
 		cacheShow:  existingDirs(artifacts...),
 		edits:      su.PathEdits(),
 		// config + journal removed directly by Uninstall; the key registry + vault
 		// are removed by purgeKeys AFTER it clears each key's material, so
 		// keychain-backed keys are never orphaned by deleting keys.json first.
-		// A home that predates the rename may still hold the journal under its
-		// pre-rename name (it is adopted on the next open, but an uninstall may
-		// come first), so the legacy file and its sidecars are removed too.
-		dataPaths: append([]string{clihome.Path(home), journal.DefaultPath(home), journal.DefaultPath(home) + "-wal", journal.DefaultPath(home) + "-shm"}, journal.LegacyPaths(home)...),
-		keyFiles:  []string{keys.RegistryPath(home), keystore.FilePath(home)},
+		// Each home's files are listed under BOTH spellings — the one that home's
+		// own directory name implies and the other one — so a home whose directory
+		// was renamed without its files is still cleaned out completely.
+		dataPaths: dataPaths,
+		homes:     homes,
+		keyPurges: keyPurges,
 		artifacts: artifacts,
 	}
+}
+
+// uninstallHomes lists every CLI home this uninstall acts on, the one in use
+// FIRST (it owns the key backends the previews are built from), then any other
+// standard location that exists on disk.
+//
+// All THREE candidates are considered, not just the legacy pair. The home in use
+// may be the pinned one, or the legacy one, while a current-named home also sits
+// on disk holding keys — and selfupdate's own pruneHome already removes all
+// three once they are empty, so listing fewer here would leave files behind in a
+// directory the same uninstall then tries to delete.
+//
+// A home that does not exist is skipped rather than listed: every consumer
+// filters by existence anyway, and an absent home contributes nothing but noise
+// to the previews.
+func uninstallHomes(l selfupdate.Layout, inUse string) []string {
+	homes := []string{inUse}
+	for _, other := range []string{l.LegacyHomeDir(), l.CurrentHomeDir()} {
+		if other == "" || slices.Contains(homes, other) || !dirIsPresent(other) {
+			continue
+		}
+		homes = append(homes, other)
+	}
+	return homes
+}
+
+// homeDataPaths are the CLI-home data files an uninstall removes directly: the
+// config, the action journal, the monitor bot database, and any `debug bundle`
+// this home has collected. The key registry and vault are NOT here — purgeKeys
+// removes them after clearing each key's material from its backend, and the
+// sandbox state directory is removed whole as an artifact dir.
+//
+// Every database is listed under BOTH of its spellings (sidecars included), so a
+// home whose directory was renamed without its files is cleaned out rather than
+// left holding a stray file under the name it used to carry.
+func homeDataPaths(home string) []string {
+	paths := []string{clihome.Path(home)}
+	paths = append(paths, journal.Paths(home)...)
+	paths = append(paths, monitorcmd.BotDBPaths(home)...)
+	return append(paths, debugBundles(home)...)
+}
+
+// debugBundles are the `debug bundle` files sitting in home. The bundle name
+// carries a timestamp, so they can only be found by glob — and the earlier
+// product-named spelling is matched too, since a bundle written under it is
+// still the user's diagnostic file to remove.
+//
+// The patterns are the two names this CLI has ever written, not a wildcard like
+// `*-debug-*.json`: these paths are DELETED, and the CLI home is a directory a
+// user may keep their own notes in. A pattern broad enough to catch
+// `run-debug-2.json` would take a file the CLI never created.
+//
+// A glob that cannot be read yields nothing: an uninstall does not fail over a
+// bundle it could not enumerate.
+func debugBundles(home string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, pattern := range []string{
+		"debug-*.json",            // current
+		"korbit-cli-debug-*.json", // the earlier name
+	} {
+		matches, err := filepath.Glob(filepath.Join(home, pattern))
+		if err != nil {
+			continue
+		}
+		for _, m := range matches {
+			if seen[m] {
+				continue
+			}
+			seen[m] = true
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// keyFilePaths are the key registry and vault files under one CLI home — what
+// purgeKeys removes once it has cleared every key's material.
+func keyFilePaths(home string) []string {
+	return []string{keys.RegistryPath(home), keystore.FilePath(home)}
+}
+
+// dirIsPresent reports whether path exists and is a directory.
+func dirIsPresent(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.IsDir()
 }
 
 // runUninstall drives the interactive-only uninstall: it lists each item's files,
@@ -315,7 +472,7 @@ func runUninstall(cx *clienv.Cmd, _ *cobra.Command) error {
 	oh := osHome(cx.Getenv)
 	su := config(cx)
 	dry := cx.Modes.DryRun
-	plan := buildUninstallPlan(cx, su, home)
+	plan := buildUninstallPlan(cx, su, home, oh)
 
 	if cx.Modes.JSONMode {
 		return output.Usagef("`%s self uninstall` is interactive and does not support --json/--compact", progname.Name())
@@ -394,15 +551,35 @@ func runUninstall(cx *clienv.Cmd, _ *cobra.Command) error {
 	// these callbacks — so a lock failure happens before any destruction and the
 	// whole outcome comes back in one result that is never discarded.
 	clearKeys := func() (rm, warn []string) {
-		_, cfg, lerr := cx.LoadConfig()
-		if lerr != nil {
-			return nil, []string{fmt.Sprintf("could not load config to remove keys (%v) — your key files were left in place; remove keys with `%s key remove`", lerr, progname.Name())}
+		for _, p := range plan.keyPurges {
+			// Each home's keys are cleared through THAT home's config: the keystore
+			// backend is a per-home setting, so using the in-use home's config for a
+			// second home would purge a keychain-backed home through the file vault,
+			// deleting its keys.json and orphaning its keychain items.
+			cfg, lerr := clihome.Load(p.home, cx.Log)
+			if lerr != nil {
+				warn = append(warn, fmt.Sprintf("could not load %s to remove its keys (%v) — its key files were left in place; remove keys with `%s key remove`", clihome.Path(p.home), lerr, progname.Name()))
+				continue
+			}
+			r, w := purgeKeys(cx.KeyManager(p.home, cfg), p.files)
+			rm = append(rm, r...)
+			warn = append(warn, w...)
 		}
-		return purgeKeys(cx.KeyManager(home, cfg), plan.keyFiles)
+		return rm, warn
 	}
+	// Every home whose sandbox state dir is about to be removed must have its
+	// sandbox stopped first — including a home under the earlier product's
+	// directory name, which has its own state dir and can have its own live Deno
+	// server. Deleting that directory under a running server leaves it writing to
+	// a path nothing can find.
 	stopSandbox := func() error {
-		_, serr := sandbox.New(sandbox.Config{Home: home}, sandbox.Deps{Logger: cx.Log}).Stop(context.Background())
-		return serr
+		var firstErr error
+		for _, h := range plan.homes {
+			if _, serr := sandbox.New(sandbox.Config{Home: h}, sandbox.Deps{Logger: cx.Log, Doer: cx.Doer}).Stop(context.Background()); serr != nil && firstErr == nil {
+				firstErr = serr
+			}
+		}
+		return firstErr
 	}
 
 	res, err := su.Uninstall(selfupdate.UninstallOptions{
@@ -501,8 +678,28 @@ func showList(cx *clienv.Cmd, heading string, items []string) {
 
 // keyDisplayNames lists the configured keys as `API key "name" (backend)` lines
 // for the removal preview, best-effort (empty if they can't be read).
-func keyDisplayNames(cx *clienv.Cmd, home string) []string {
-	_, cfg, err := cx.LoadConfig()
+func keyDisplayNames(cx *clienv.Cmd, homes []string, oh string) []string {
+	var out []string
+	for _, home := range homes {
+		for _, s := range homeKeys(cx, home) {
+			line := fmt.Sprintf("API key %q (%s)", s.Name, s.Keystore)
+			// With two homes in play, the name alone is ambiguous — the same key
+			// name can exist in both — and the user is confirming the deletion of
+			// every one of them, so each must say which home it lives in.
+			if len(homes) > 1 {
+				line += " in " + abbrev(home, oh)
+			}
+			out = append(out, line)
+		}
+	}
+	return out
+}
+
+// homeKeys lists one home's keys through that home's OWN config, so the backend
+// each key is read from is the one it was written with. Best-effort: a home
+// whose config or registry cannot be read contributes nothing to the preview.
+func homeKeys(cx *clienv.Cmd, home string) []keys.Summary {
+	cfg, err := clihome.Load(home, cx.Log)
 	if err != nil {
 		return nil
 	}
@@ -510,11 +707,7 @@ func keyDisplayNames(cx *clienv.Cmd, home string) []string {
 	if err != nil {
 		return nil
 	}
-	var out []string
-	for _, s := range sums {
-		out = append(out, fmt.Sprintf("API key %q (%s)", s.Name, s.Keystore))
-	}
-	return out
+	return sums
 }
 
 // osHome is the OS user home used to abbreviate displayed paths to ~.
@@ -569,7 +762,7 @@ func existing(paths ...string) []string {
 func existingDirs(paths ...string) []string {
 	var out []string
 	for _, p := range paths {
-		if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+		if dirIsPresent(p) {
 			out = append(out, p)
 		}
 	}

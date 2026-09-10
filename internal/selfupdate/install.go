@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/digitalx-official/digitalx-cli/internal/fslock"
+	"github.com/digitalx-official/digitalx-cli/internal/config"
 )
 
 // InstallResult is what `self install` reports: the version installed, the
@@ -27,6 +27,9 @@ type InstallResult struct {
 	// Aliases are the extra command names now pointing at the installed binary
 	// (see alias.go). Absent on a fresh install, which creates none.
 	Aliases []string `json:"aliases,omitempty"`
+	// Next lists follow-up steps for the user — today only a variable worth
+	// renaming.
+	Next []string `json:"next,omitempty"`
 }
 
 // Install copies the running binary to the stable PATH location, wires PATH, and
@@ -36,6 +39,10 @@ type InstallResult struct {
 // is the binary side of the `curl … | sh` repair path, so it assumes nothing
 // about the prior on-disk state. Because the install script is version-pinned,
 // Install records THIS binary's version.
+//
+// It touches the COMMAND LAYOUT only: no directory is moved, renamed, replaced,
+// or pruned, and no file inside a CLI home is renamed. An existing ~/.korbit-cli
+// is simply the home (config.Home), for as long as the user leaves it there.
 func (c Config) Install() (*InstallResult, error) {
 	c.log().Debug("self install starting", "version", c.Version)
 	if err := c.requireReleaseBuild(); err != nil {
@@ -47,16 +54,6 @@ func (c Config) Install() (*InstallResult, error) {
 		return nil, fmt.Errorf("locating the running binary: %w", err)
 	}
 	l := c.Layout()
-	// Serialize against a concurrent install/update.
-	if err := os.MkdirAll(l.Home(), 0o700); err != nil {
-		return nil, err
-	}
-	unlock, err := fslock.Lock(l.LockPath())
-	if err != nil {
-		return nil, err
-	}
-	defer unlock()
-
 	res := &InstallResult{
 		Version:    c.Version,
 		Executable: l.ExecutablePath(),
@@ -68,10 +65,27 @@ func (c Config) Install() (*InstallResult, error) {
 	}
 	res.SHA256 = srcSum
 
+	if err := c.withLock(l, func() error {
+		return c.installLocked(l, src, srcSum, res)
+	}); err != nil {
+		return nil, err
+	}
+
+	if env := l.HomeEnvVar(); env == LegacyEnvHome {
+		res.Next = append(res.Next, fmt.Sprintf("rename the %s environment variable to %s — both are honored, so this is only tidiness", LegacyEnvHome, config.EnvHome))
+	}
+
+	c.log().Debug("self install complete", "version", res.Version, "executable", res.Executable, "sha256", res.SHA256, "repaired", res.Repaired, "pathAction", res.Path.Action)
+	return res, nil
+}
+
+// installLocked is the part of Install that mutates the binary, PATH, and the
+// manifest, all under the install lock.
+func (c Config) installLocked(l Layout, src, srcSum string, res *InstallResult) error {
 	// 1. Place the running binary at the stable PATH location (a copy, not a symlink).
 	repaired, err := c.reconcileExecutable(l, src, srcSum)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	res.Repaired = append(res.Repaired, repaired...)
 
@@ -82,7 +96,8 @@ func (c Config) Install() (*InstallResult, error) {
 	// is what records an alias an earlier run adopted.
 	prevManifest, _, _ := loadManifest(l.ManifestPath())
 	wanted, ownWarnings := c.aliasesToKeep(l, prevManifest, src)
-	aliases, aliasWarnings := c.syncAliases(l, wanted)
+	owned := c.managedAliasNames(l, wanted)
+	aliases, aliasWarnings := c.syncAliases(l, owned)
 	res.Aliases = aliases
 	res.Warnings = append(res.Warnings, ownWarnings...)
 	res.Warnings = append(res.Warnings, aliasWarnings...)
@@ -90,14 +105,16 @@ func (c Config) Install() (*InstallResult, error) {
 	// 3. Wire PATH (idempotent; prompts on a TTY, else prints guidance).
 	pr, err := c.wirePath(l.ExecutableDir())
 	if err != nil {
-		return nil, err
+		return err
 	}
 	res.Path = pr
 
-	// 4. Write/rebuild the manifest for this version.
-	repairedManifest, err := c.reconcileManifest(l, srcSum, aliases)
+	// 4. Write/rebuild the manifest for this version. It records the alias names
+	// this install OWNS, not only the ones written, so a failed alias write is
+	// retried by the next run instead of being forgotten (see syncAliases).
+	repairedManifest, err := c.reconcileManifest(l, srcSum, owned)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if repairedManifest != "" {
 		res.Repaired = append(res.Repaired, repairedManifest)
@@ -107,8 +124,7 @@ func (c Config) Install() (*InstallResult, error) {
 	if swept := c.sweepLeftovers(l); swept {
 		res.Repaired = append(res.Repaired, "removed leftover temp files")
 	}
-	c.log().Debug("self install complete", "version", res.Version, "executable", res.Executable, "sha256", res.SHA256, "repaired", res.Repaired, "pathAction", res.Path.Action)
-	return res, nil
+	return nil
 }
 
 // reconcileExecutable ensures the installed binary on PATH is this binary: it

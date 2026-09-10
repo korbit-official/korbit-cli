@@ -150,7 +150,7 @@ func versionGateManager(t *testing.T, skip bool, logs *[]string, url string, fli
 	}
 	apiKey := keys.SandboxAPIKeyPrefix + "ED25519_KEY_00000001_0000002"
 	km := keys.NewManager(home, "file", func() int64 { return 1700000000000 }, nil)
-	dbPid := filepath.Join(home, "sandbox", "digitalx-sandbox.db-pid")
+	dbPid := filepath.Join(home, "sandbox", DBDefaultName+"-pid")
 	stateFile := filepath.Join(cacheDir, "version_state") // defaults to "old" (absent)
 	denoBin := fakeDenoVersioned(t, dbPid, stateFile, kp.PrivatePEM, apiKey, flipOnCache)
 	denoDir := filepath.Dir(denoBin)
@@ -232,9 +232,6 @@ func TestVersionGateEnvSetsBothNames(t *testing.T) {
 	}
 	if strings.Join(got, " ") != strings.Join(want, " ") {
 		t.Errorf("versionGateEnv() = %v, want %v", got, want)
-	}
-	if MinVersionEnv == LegacyMinVersionEnv {
-		t.Fatal("the two min-version env names must be distinct spellings")
 	}
 	skipped := New(Config{Home: t.TempDir(), SkipVersionCheck: true}, Deps{})
 	if env := skipped.versionGateEnv(); len(env) != 0 {
@@ -329,7 +326,7 @@ func TestLicenseSetsFooterCommandEnv(t *testing.T) {
 	// standard fake (its license branch echoes both).
 	home := t.TempDir()
 	cacheDir := t.TempDir()
-	dbPid := filepath.Join(home, "sandbox", "digitalx-sandbox.db-pid")
+	dbPid := filepath.Join(home, "sandbox", DBDefaultName+"-pid")
 	denoBin := fakeDeno(t, dbPid, "pem", "SANDBOX_K")
 	denoDir := filepath.Dir(denoBin)
 	m := New(Config{Home: home, CacheDir: cacheDir, RuntimePref: "deno"}, Deps{

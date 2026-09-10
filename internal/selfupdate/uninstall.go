@@ -189,6 +189,11 @@ func (c Config) removeBinary(l Layout, res *UninstallResult) {
 // uses the SAME ownership rule as adoption, so uninstall never deletes a file at
 // that name that install refused to overwrite: a user's own `korbit` wrapper is
 // left in place by both.
+//
+// Every name is filtered through managedAliasNames before it becomes a path,
+// because these paths are DELETED: a manifest entry that is not the one managed
+// name — anything with a path separator in it above all — would resolve outside
+// the install dir and take an unrelated file with it.
 func (c Config) aliasPaths(l Layout, m Manifest) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -199,7 +204,7 @@ func (c Config) aliasPaths(l Layout, m Manifest) []string {
 		seen[name] = true
 		out = append(out, l.AliasPath(name))
 	}
-	for _, name := range m.Aliases {
+	for _, name := range c.managedAliasNames(l, m.Aliases) {
 		add(name)
 	}
 	exe, _ := c.runningExe()
@@ -246,8 +251,8 @@ func (c Config) removeCache(p string, l Layout, res *UninstallResult) {
 	if !dirExists(p) {
 		return
 	}
-	if pathContainsOrEquals(p, l.Home()) {
-		res.Warnings = append(res.Warnings, fmt.Sprintf("did not remove %s — it contains your CLI home, so removing it would delete your config, keys, and journal", p))
+	if held, ok := c.cacheHoldsAHome(p, l); ok {
+		res.Warnings = append(res.Warnings, fmt.Sprintf("did not remove %s — it contains your CLI home (%s), so removing it would delete your config, keys, and journal", p, held))
 		return
 	}
 	if err := os.RemoveAll(p); err == nil {
@@ -286,8 +291,25 @@ func (c Config) editPath(loc string, res *UninstallResult) {
 // deliberate keeps, not a failure the user must act on. A best-effort removal
 // that can't complete (a lock still held on Windows) is likewise left silent —
 // the leftover is just the CLI's own lock file.
+//
+// It prunes every CLI home this install could have written to, not only the one
+// in use: a machine that still carries a home under the earlier product name has
+// had its data removed from BOTH (the cli layer offers both), and leaving an
+// emptied directory behind would mean an uninstall did not finish.
 func (c Config) pruneHome(l Layout, res *UninstallResult) {
-	home := l.Home()
+	seen := map[string]bool{}
+	for _, home := range []string{l.Home(), l.LegacyHomeDir(), l.CurrentHomeDir()} {
+		if home == "" || seen[home] {
+			continue
+		}
+		seen[home] = true
+		c.pruneOneHome(home, res)
+	}
+}
+
+// pruneOneHome removes one CLI home dir when the sole things left in it are the
+// CLI's own lock files.
+func (c Config) pruneOneHome(home string, res *UninstallResult) {
 	entries, err := os.ReadDir(home)
 	if err != nil {
 		return // already gone, or unreadable — nothing to prune
@@ -302,12 +324,110 @@ func (c Config) pruneHome(l Layout, res *UninstallResult) {
 	}
 }
 
+// cacheHoldsAHome reports whether cache IS or CONTAINS any CLI home this install
+// must keep, and which one. It is the guard above every cache removal: removing
+// such a directory would carry the config, keys, and journal off with it.
+//
+// It resolves symlinks on BOTH sides, and on the home side it checks the home
+// path AND its link target. A lexical comparison is not enough here, and the case
+// it misses is the dangerous one: a home that is a SYMLINK into the cache
+// (~/.korbit-cli -> <cache>/korbit-cli/home) has a home path nowhere near the
+// cache, so a lexical test clears the cache for removal and the removal deletes
+// the user's keys through the link.
+//
+// It FAILS CLOSED. When EvalSymlinks cannot resolve a path that exists, the
+// containment question cannot be answered, and the answer this returns is the one
+// that changes nothing.
+func (c Config) cacheHoldsAHome(cache string, l Layout) (string, bool) {
+	if cache == "" {
+		return "", false
+	}
+	resolvedCache, ok := resolveExisting(cache)
+	if !ok {
+		return cache, true // cannot tell what this directory is — leave it alone
+	}
+	for _, home := range retainedHomes(l) {
+		for _, candidate := range []string{home, symlinkTargetAbs(home)} {
+			if candidate == "" {
+				continue
+			}
+			resolved, ok := resolveExisting(candidate)
+			if !ok {
+				return home, true // fail closed
+			}
+			if c.pathContainsOrEquals(resolvedCache, resolved) {
+				return home, true
+			}
+		}
+	}
+	return "", false
+}
+
+// retainedHomes are every CLI home directory an operation must not disturb: the
+// one in use (which is the pinned path when a variable pins it) and the two
+// standard locations. Neither need exist — a non-existent home contains nothing
+// and is skipped by the caller's resolve step.
+func retainedHomes(l Layout) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, h := range []string{l.Home(), l.CurrentHomeDir(), l.LegacyHomeDir()} {
+		if h == "" || seen[h] {
+			continue
+		}
+		seen[h] = true
+		out = append(out, h)
+	}
+	return out
+}
+
+// resolveExisting returns path with every symlink resolved. ok is false when the
+// path exists but cannot be resolved — the fail-closed signal. A path that does
+// not exist resolves to its cleaned self and is ok: it contains nothing, so it
+// can be compared harmlessly.
+func resolveExisting(path string) (string, bool) {
+	resolved, err := filepath.EvalSymlinks(path)
+	if err == nil {
+		return resolved, true
+	}
+	if !pathPresent(path) {
+		return filepath.Clean(path), true
+	}
+	return "", false
+}
+
+// symlinkTargetAbs returns the directory a symlinked path points at, absolute,
+// or "" when path is not a symlink. A relative link target is resolved against
+// the link's own directory, the way the OS resolves it.
+func symlinkTargetAbs(path string) string {
+	target := symlinkTarget(path)
+	if target == "" {
+		return ""
+	}
+	if filepath.IsAbs(target) {
+		return target
+	}
+	return filepath.Join(filepath.Dir(path), target)
+}
+
 // pathContainsOrEquals reports whether child is parent itself or nested under it
 // (both cleaned first), so a cache removal can refuse an artifact dir that would
 // take the CLI home down with it.
-func pathContainsOrEquals(parent, child string) bool {
+//
+// The comparison is lexical over already-resolved paths — callers resolve
+// symlinks themselves (see cacheHoldsAHome), because only they know which side
+// may legitimately not exist yet. On Windows it additionally folds case, since
+// two spellings differing only in case are the same directory there and a
+// case-sensitive test would clear a cache that does hold the home.
+func (c Config) pathContainsOrEquals(parent, child string) bool {
 	parent = filepath.Clean(parent)
 	child = filepath.Clean(child)
+	if c.os() == "windows" {
+		// A case-insensitive filesystem: fold BOTH sides before comparing, so a
+		// spelling that differs only in case is recognized as the same directory —
+		// including inside filepath.Rel, which would otherwise walk out of the
+		// parent and back down again and report the child as outside it.
+		parent, child = strings.ToLower(parent), strings.ToLower(child)
+	}
 	if parent == child {
 		return true
 	}

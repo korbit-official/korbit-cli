@@ -27,6 +27,19 @@ func (v installView) FormatText(w io.Writer) {
 		fmt.Fprintf(w, "\n  repaired: %s", r)
 	}
 	writePath(w, v.Path)
+	writeNext(w, v.Next)
+}
+
+// writeNext appends the follow-up steps a result carries, in the numbered shape
+// the key/setup commands use for theirs.
+func writeNext(w io.Writer, next []string) {
+	if len(next) == 0 {
+		return
+	}
+	fmt.Fprint(w, "\n\nNext step:")
+	for i, n := range next {
+		fmt.Fprintf(w, "\n  %d. %s", i+1, n)
+	}
 }
 
 // updateView adds a Skill follow-up alongside the embedded UpdateResult's own
@@ -58,10 +71,22 @@ func (v updateView) FormatText(w io.Writer) {
 		if v.SignatureCheck == selfupdate.SigDisabled {
 			fmt.Fprint(w, " (release signature verification disabled — verified on TLS + SHA-256 only)")
 		}
+	case v.CheckedOnly && v.PreviousVersion == v.LatestVersion:
+		fmt.Fprintf(w, "already up to date (%s) — dry run, nothing was changed", v.PreviousVersion)
 	case v.CheckedOnly:
 		fmt.Fprintf(w, "an update is available: %s → %s (run `%s self update` to install it)", v.PreviousVersion, v.LatestVersion, progname.Name())
 	default:
 		fmt.Fprintf(w, "already up to date (%s)", v.PreviousVersion)
+	}
+	// A layout repair happens with or without a new version, so it is reported on
+	// its own line rather than folded into either headline. On a dry run the same
+	// list is what a real run WOULD fix, so it must not read as done.
+	label := "repaired"
+	if v.CheckedOnly {
+		label = "would repair"
+	}
+	for _, r := range v.LayoutRepaired {
+		fmt.Fprintf(w, "\n  %s: %s", label, r)
 	}
 	if v.Skill != nil && v.Skill.Message != "" {
 		fmt.Fprintf(w, "\n%s", v.Skill.Message)
@@ -163,36 +188,49 @@ func (v doctorView) FormatText(w io.Writer) {
 	line("managed install", yesNo(r.Managed))
 	problemLine(selfupdate.FieldManaged)
 	line("binary", r.Executable)
-	if r.LegacyLayout {
-		b = append(b, "    - running as `korbit`; the next `"+progname.Name()+" self update` installs dgx-cli and keeps korbit as an alias")
-	}
 	problemLine(selfupdate.FieldBinary)
 	for _, a := range r.Aliases {
 		switch {
 		case !a.Present:
 			line("alias "+a.Name, "missing")
 		case a.Target != "":
-			line("alias "+a.Name, a.Path+" → "+a.Target)
+			line("alias "+a.Name, a.Path+" → "+a.Target+aliasMark(a))
 		default:
-			line("alias "+a.Name, a.Path)
+			line("alias "+a.Name, a.Path+aliasMark(a))
 		}
 	}
 	problemLine(selfupdate.FieldAlias)
 	line("on PATH", yesNo(r.OnPath))
 	problemLine(selfupdate.FieldPath)
+	if r.Home != "" {
+		line("CLI home", r.Home)
+	}
+	problemLine(selfupdate.FieldHome)
 	// Any problem not tied to a shown diagnosis (defensive; none today).
-	shown := map[string]bool{
-		selfupdate.FieldManaged: true,
-		selfupdate.FieldBinary:  true,
-		selfupdate.FieldAlias:   true,
-		selfupdate.FieldPath:    true,
+	shown := map[string]bool{}
+	for _, f := range selfupdate.Fields() {
+		shown[f] = true
 	}
 	for _, p := range r.Problems {
 		if !shown[p.Field] {
 			b = append(b, "    ! "+p.Message)
 		}
 	}
+	// Notes last: they are things that work as they are, so they must not read
+	// as failures above the diagnoses that can be.
+	for _, n := range r.Notes {
+		b = append(b, "    - "+n)
+	}
 	fmt.Fprint(w, strings.Join(b, "\n"))
+}
+
+// aliasMark flags an alias that exists but does not run the primary binary, so
+// the line reads as trouble rather than as a healthy path.
+func aliasMark(a selfupdate.AliasStatus) string {
+	if a.Valid {
+		return ""
+	}
+	return " (not the installed binary)"
 }
 
 // writePath appends the PATH outcome to an install summary.

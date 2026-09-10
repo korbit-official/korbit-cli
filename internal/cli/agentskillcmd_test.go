@@ -243,10 +243,7 @@ func TestAgentSkillDoctorChecksSkillCommandEvenWhenInvokedUnderAnotherName(t *te
 	home := t.TempDir()
 	path := t.TempDir()
 	t.Setenv("PATH", path)
-	// Restore whatever the process name was, rather than assuming the default:
-	// hard-coding a name here silently rewrites the default for every test that
-	// runs after this one.
-	prevProgname := progname.Name()
+	prevProgname := progname.Name() // restore, rather than assume, the default
 	progname.Set("digitalx-cli")
 	t.Cleanup(func() { progname.Set(prevProgname) })
 
@@ -292,10 +289,7 @@ func TestAgentSkillDoctorNameMismatchIsHealthyWhenSkillCommandOnPath(t *testing.
 	home := t.TempDir()
 	path := t.TempDir()
 	t.Setenv("PATH", path)
-	// Restore whatever the process name was, rather than assuming the default:
-	// hard-coding a name here silently rewrites the default for every test that
-	// runs after this one.
-	prevProgname := progname.Name()
+	prevProgname := progname.Name() // restore, rather than assume, the default
 	progname.Set("digitalx-cli")
 	t.Cleanup(func() { progname.Set(prevProgname) })
 

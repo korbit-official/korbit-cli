@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
@@ -89,9 +90,13 @@ const (
 // $KORBIT_CLI_HOME) when set; otherwise ~/.digitalx-cli, unless that does not
 // exist and ~/.korbit-cli does, in which case the existing directory is used.
 // The chosen directory need not exist — the write paths create it.
+//
+// A pinned path is normalized (see NormalizeHome), so the value the user typed
+// and the absolute path it names resolve to one home — and to ONE file-name
+// layout (LegacyLayout reads the basename).
 func Home(getenv func(string) string) string {
 	if h := envalias.Lookup(getenv, EnvHome); h != "" {
-		return h
+		return NormalizeHome(h)
 	}
 	home, _ := os.UserHomeDir()
 	current := filepath.Join(home, DirName)
@@ -102,6 +107,72 @@ func Home(getenv func(string) string) string {
 		return legacy
 	}
 	return current
+}
+
+// LegacyLayout reports whether home is a CLI home created under the earlier
+// product name — its basename is LegacyDirName. It is the ONE backwards-compat
+// predicate in the codebase: the files a home holds carry NO service name
+// (journal.db, bot.db, sandbox/sandbox.db), and this is the single condition
+// under which a consumer picks the earlier, product-named spelling instead
+// (korbit-cli.db, korbit-bot.db, sandbox/korbit-sandbox.db).
+//
+// The folder's name decides the filenames, and nothing renames a file on open,
+// so an install still sharing ~/.korbit-cli with an older `korbit` binary keeps
+// working — both binaries derive the same legacy names from the same directory.
+// Every other home, including one pinned elsewhere with DIGITALX_CLI_HOME, uses
+// the official names. No command in this CLI moves or renames a home: a user who
+// wants ~/.digitalx-cli moves the directory and renames the files inside it as
+// one step, because the two are one unit (see MIGRATION.md).
+//
+// The path is NORMALIZED before its basename is read (NormalizeHome), because
+// the rule is about the directory, not about the spelling that reached it: a home
+// pinned as `.` from inside ~/.korbit-cli is that directory, and on a
+// case-insensitive filesystem so is `~/.KORBIT-CLI`.
+func LegacyLayout(home string) bool {
+	if home == "" {
+		return false
+	}
+	base := filepath.Base(NormalizeHome(home))
+	if caseInsensitiveNames {
+		return strings.EqualFold(base, LegacyDirName)
+	}
+	return base == LegacyDirName
+}
+
+// caseInsensitiveNames marks the platforms whose filesystem treats two spellings
+// of a name as the same directory, so the basename rule must too. It is a
+// platform default rather than a per-path probe: the probe would need a home that
+// already exists, and the rule has to answer for one the write paths are about to
+// create.
+//
+// So a case-sensitive volume mounted on macOS reads `.KORBIT-CLI` as a
+// legacy-layout home when it is really a separate directory, and a
+// case-INSENSITIVE mount on Linux (ciopfs, a mounted exFAT/NTFS volume) reads it
+// as a current-layout home when it is really the same directory as
+// `.korbit-cli` — the latter needing a home spelled in a different case on such
+// a mount to happen at all.
+const caseInsensitiveNames = runtime.GOOS == "darwin" || runtime.GOOS == "windows"
+
+// NormalizeHome returns home as an absolute, lexically cleaned path — the form
+// every comparison of one home against another, and the basename rule that picks
+// the file names inside it, is made on.
+//
+// Symlinks are deliberately NOT resolved: a home that is a symlink is a layout
+// the user built on purpose, and resolving it would apply the file-name rule to
+// an arbitrarily named target instead of to the name the user pinned.
+//
+// A relative path with no working directory to resolve against (filepath.Abs
+// fails only then) falls back to the cleaned original — there is nothing better
+// available, and it is at least stable.
+func NormalizeHome(home string) string {
+	if home == "" {
+		return ""
+	}
+	abs, err := filepath.Abs(home)
+	if err != nil {
+		return filepath.Clean(home)
+	}
+	return abs
 }
 
 // isDir reports whether path exists and is a directory (a plain file by that

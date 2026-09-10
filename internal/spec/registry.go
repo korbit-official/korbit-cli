@@ -73,7 +73,7 @@ var Registry = []Command{
 			},
 			{
 				Flag: "db", API: "db", Kind: cmdmeta.KindString, Experimental: true,
-				Desc: "SQLite file behind the script's async db.exec/db.query/db.get API (default: digitalx-bot.db under the CLI home; created on first use). The bot owns the schema — strictly separate from the action journal",
+				Desc: "SQLite file behind the script's async db.exec/db.query/db.get API (default: bot.db under the CLI home; created on first use). The bot owns the schema — strictly separate from the action journal",
 			},
 			{Flag: "max-concurrency", API: "maxConcurrency", Kind: cmdmeta.KindInt, Min: intPtr(1), Max: intPtr(64), Experimental: true, Desc: "max api.*/db.* calls in flight at once (default 8) — bounds burst pressure on the API; Promise.all runs up to this many calls concurrently"},
 			{Flag: "stateful", API: "stateful", Kind: cmdmeta.KindFlag, Experimental: true, Desc: "maintain a materialized current-state read-model from the same stream and expose it as the synchronous state.* API (open orders, fills, balances, tickers, orderbooks, trades, health) for state-level alerts; without it state.* throws. Requires --where or --on; cannot combine with --jq"},
@@ -440,6 +440,7 @@ var Registry = []Command{
 		Notes: []string{
 			"Only works for an install created by the managed install script (the `curl … | sh` one-liner). A Homebrew / `go install` / hand-downloaded / dev build is refused with the right way to upgrade it instead.",
 			"Resolves the latest release, downloads the archive for your platform, verifies its SHA-256 against the release checksums, then replaces the binary in place. Pass --dry-run to only check whether a newer version exists. Trust is TLS + SHA-256.",
+			"It swaps a binary and nothing else. No command in this CLI moves or renames your CLI home, your artifact cache, or a file inside them — a home under the earlier directory name (~/.korbit-cli) keeps working indefinitely, and MIGRATION.md has the steps if you would rather move it yourself.",
 		},
 		Examples: []string{"{prog} self update", "{prog} self update --dry-run", "{prog} self update --tag v1.2.3"},
 	},
@@ -457,7 +458,7 @@ var Registry = []Command{
 		ID: []string{"self", "doctor"}, Section: cmdmeta.SectionMeta,
 		Summary: "check the install's health",
 		Notes: []string{
-			"Read-only: reports whether this is a managed install, whether the installed binary matches what was recorded, and whether the install dir is on PATH — each problem naming its fix. Distinct from `{prog} doctor`, which checks your key/API health. Exit code 0 when healthy, 4 when there's something to fix.",
+			"Read-only: reports whether this is a managed install, whether the installed binary and the `korbit` alias beside it match what was recorded, whether the install dir is on PATH, and whether a CLI home holds data this install is not reading — each problem naming its fix. Distinct from `{prog} doctor`, which checks your key/API health. Exit code 0 when healthy, 4 when there's something to fix.",
 		},
 		Examples: []string{"{prog} self doctor"},
 	},

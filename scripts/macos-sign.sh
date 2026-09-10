@@ -32,14 +32,10 @@ bin="${1:?usage: macos-sign.sh <binary-path>}"
 # filename). The macOS keychain backend binds each stored secret's ACL to this
 # binary's designated requirement, which embeds this identifier; deriving it
 # from the filename (e.g. "dgx-cli" vs "korbit") would change the requirement
-# and break the ACL match on the next build. Keep it stable across versions.
-#
-# DELIBERATELY UNCHANGED, and not to be "modernized" alongside the binary name:
-# every key a user already has in their Keychain carries an ACL bound to this
-# exact identifier. A new identifier makes every stored key look like it belongs
-# to a different program, so macOS re-prompts for authorization on each one.
-# Both the dgx-cli and korbit binaries sign under it, so a user who switches
-# between the two command names is authorizing the same designated requirement.
+# and break the ACL match on the next build. Keep it stable across versions AND
+# across the binary name: every key already in a user's Keychain carries an ACL
+# bound to this exact identifier, so a new one makes macOS re-prompt for
+# authorization on each stored key. Both binaries sign under it.
 bundle_id="kr.co.korbit.korbit-cli"
 
 # rcodesign only signs Mach-O; skip every other target.

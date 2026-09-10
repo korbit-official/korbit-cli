@@ -18,7 +18,7 @@ import (
 // line and the "action journal opened" Info milestone with the path.
 func TestOpenLogsPragmaAndMilestone(t *testing.T) {
 	var buf bytes.Buffer
-	path := filepath.Join(t.TempDir(), "digitalx-cli.db")
+	path := filepath.Join(t.TempDir(), DefaultFileName)
 	l, err := Open(path, true /*noFsync*/, logging.New(&buf, slog.LevelDebug))
 	if err != nil {
 		t.Fatalf("Open: %v", err)
@@ -42,7 +42,7 @@ func TestOpenLogsPragmaAndMilestone(t *testing.T) {
 // Debug line (no secret payload — params are pre-signing and not logged here).
 func TestWritesLogDebug(t *testing.T) {
 	var buf bytes.Buffer
-	path := filepath.Join(t.TempDir(), "digitalx-cli.db")
+	path := filepath.Join(t.TempDir(), DefaultFileName)
 	l, err := Open(path, false, logging.New(&buf, slog.LevelDebug))
 	if err != nil {
 		t.Fatalf("Open: %v", err)

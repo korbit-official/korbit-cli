@@ -33,6 +33,43 @@ const (
 	LegacyCacheDirName = "korbit-cli"
 )
 
+// CacheCandidates are the artifact-cache directories a machine may carry, and
+// which environment variable (if any) pins the choice. It exists so a caller
+// that must reason about BOTH directories — `self uninstall`, which offers to
+// remove either — sees exactly what ResolveCacheDir chooses between, instead of
+// re-deriving the names.
+//
+// When EnvPinned is true the pin is the only cache that exists as far as the
+// CLI is concerned: Current is the pinned directory and Legacy is empty. Nothing
+// may be removed under a pin — the path is the user's, not this layout's.
+type CacheCandidates struct {
+	// Current is the cache directory in use.
+	Current string
+	// Legacy is the directory an installation made under the earlier product
+	// name carries, or "" when the choice is env-pinned.
+	Legacy string
+	// EnvPinned reports whether an environment variable fixed the directory.
+	EnvPinned bool
+}
+
+// CacheDirs returns both artifact-cache candidates for this environment. It is
+// the single derivation of the two directory names; ResolveCacheDir picks one of
+// them by the same existence rule the CLI has always applied.
+// getenv reads the process environment (injectable for tests).
+func CacheDirs(getenv func(string) string) (CacheCandidates, error) {
+	if c := envalias.Lookup(getenv, EnvCacheDir); c != "" {
+		return CacheCandidates{Current: c, EnvPinned: true}, nil
+	}
+	base, err := os.UserCacheDir()
+	if err != nil {
+		return CacheCandidates{}, fmt.Errorf("cannot resolve a cache directory (%v) — set %s", err, EnvCacheDir)
+	}
+	return CacheCandidates{
+		Current: filepath.Join(base, CacheDirName),
+		Legacy:  filepath.Join(base, LegacyCacheDirName),
+	}, nil
+}
+
 // ResolveCacheDir resolves the shared artifact cache root: $DIGITALX_CLI_SANDBOX_CACHE
 // (else the legacy $KORBIT_CLI_SANDBOX_CACHE) when set; otherwise
 // os.UserCacheDir()/digitalx-cli, unless that does not exist and the legacy
@@ -42,21 +79,17 @@ const (
 // (which can remove it) share, so the two can't drift onto different directories.
 // getenv reads the process environment (injectable for tests).
 func ResolveCacheDir(getenv func(string) string) (string, error) {
-	if c := envalias.Lookup(getenv, EnvCacheDir); c != "" {
-		return c, nil
-	}
-	base, err := os.UserCacheDir()
+	cands, err := CacheDirs(getenv)
 	if err != nil {
-		return "", fmt.Errorf("cannot resolve a cache directory (%v) — set %s", err, EnvCacheDir)
+		return "", err
 	}
-	current := filepath.Join(base, CacheDirName)
-	if isDir(current) {
-		return current, nil
+	if cands.EnvPinned || isDir(cands.Current) {
+		return cands.Current, nil
 	}
-	if legacy := filepath.Join(base, LegacyCacheDirName); isDir(legacy) {
-		return legacy, nil
+	if isDir(cands.Legacy) {
+		return cands.Legacy, nil
 	}
-	return current, nil
+	return cands.Current, nil
 }
 
 // isDir reports whether path exists and is a directory.

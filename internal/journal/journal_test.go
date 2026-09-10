@@ -7,20 +7,59 @@ package journal
 import (
 	"os"
 	"path/filepath"
-	"runtime"
+	"slices"
 	"testing"
-
-	"github.com/digitalx-official/digitalx-cli/internal/logging"
 )
 
 func openTemp(t *testing.T) *Logger {
 	t.Helper()
-	l, err := Open(filepath.Join(t.TempDir(), "digitalx-cli.db"), false, nil)
+	l, err := Open(filepath.Join(t.TempDir(), DefaultFileName), false, nil)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
 	t.Cleanup(func() { l.Close() })
 	return l
+}
+
+// TestOpenResolvesTheEscapedPath: the driver reads a BARE path as
+// `<path>?<query>`, so a home whose name contains a `?` (or a `%`, which the same
+// escaping settles) would be opened at a truncated path with the rest read as
+// parameters — the journal would create and read a file beside the one it was
+// asked for, and nothing would look wrong.
+//
+// The journal opens through sqlitefile.DSN for that reason, and this asserts the
+// outcome on disk: the database is at the path Open was given, and nothing else
+// was created next to it.
+func TestOpenResolvesTheEscapedPath(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "we?ird%home")
+	path := filepath.Join(home, DefaultFileName)
+
+	l, err := Open(path, false, nil)
+	if err != nil {
+		t.Fatalf("Open under a `?`/`%%` home: %v", err)
+	}
+	if _, err := l.LogCall(CallRecord{Method: "GET", Path: "/v2/ticker"}); err != nil {
+		t.Fatalf("LogCall: %v", err)
+	}
+	if err := l.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// The escaping did not send the write somewhere else: the file is where the
+	// caller asked for it, and nothing was created at the truncated path.
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("the journal is not at the path it was opened with: %v", err)
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if e.Name() != "we?ird%home" {
+			t.Errorf("opening the journal created %q beside its home — the path was read as a DSN query", e.Name())
+		}
+	}
 }
 
 func TestOpenEnablesWAL(t *testing.T) {
@@ -47,7 +86,7 @@ func TestOpenNoFsync(t *testing.T) {
 		noFsync bool
 		want    int
 	}{{false, 2}, {true, 0}} {
-		l, err := Open(filepath.Join(t.TempDir(), "digitalx-cli.db"), tc.noFsync, nil)
+		l, err := Open(filepath.Join(t.TempDir(), DefaultFileName), tc.noFsync, nil)
 		if err != nil {
 			t.Fatalf("Open(noFsync=%v): %v", tc.noFsync, err)
 		}
@@ -77,7 +116,7 @@ func TestFreshDBStampsCurrentVersion(t *testing.T) {
 // reset (dropped + recreated) on open rather than failing — the journal is a
 // recreatable log, not a system of record.
 func TestRecreateOnVersionMismatch(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "digitalx-cli.db")
+	path := filepath.Join(t.TempDir(), DefaultFileName)
 	// Hand-build a v1-shaped database: a stale api_calls table with the old
 	// command_key column, stamped user_version=1.
 	old, err := Open(path, false, nil) // creates v2; we then forcibly downgrade it below
@@ -359,135 +398,74 @@ func TestDisabled(t *testing.T) {
 	}
 }
 
-// TestOpenAdoptsLegacyDatabase: a home created under the earlier product name
-// carries its journal under the legacy file name. Opening the default path moves
-// it — recorded history stays readable instead of being shadowed by an empty
-// database beside it.
-func TestOpenAdoptsLegacyDatabase(t *testing.T) {
-	dir := t.TempDir()
-	legacy := filepath.Join(dir, LegacyFileName)
-
-	old, err := Open(legacy, false, nil)
-	if err != nil {
-		t.Fatalf("Open(legacy): %v", err)
-	}
-	if _, err := old.db.Exec(
-		`INSERT INTO operations (started_at_ms, op_id, surface, outcome) VALUES (1, 'order place', 'cli', 'ok')`); err != nil {
-		t.Fatalf("seed row: %v", err)
-	}
-	old.Close()
-
-	l, err := Open(DefaultPath(dir), false, nil)
-	if err != nil {
-		t.Fatalf("Open(current): %v", err)
-	}
-	defer l.Close()
-
-	var n int
-	if err := l.db.QueryRow(`SELECT count(*) FROM operations`).Scan(&n); err != nil {
-		t.Fatalf("count: %v", err)
-	}
-	if n != 1 {
-		t.Fatalf("adopted journal has %d operations, want the seeded 1", n)
-	}
-	if _, err := os.Stat(legacy); !os.IsNotExist(err) {
-		t.Fatalf("legacy database still present: %v", err)
-	}
-}
-
-// TestOpenLeavesAnExplicitPathAlone: adoption is scoped to the default file name
-// under a home; an explicitly supplied path is used verbatim.
-func TestOpenLeavesAnExplicitPathAlone(t *testing.T) {
-	dir := t.TempDir()
-	legacy := filepath.Join(dir, LegacyFileName)
-	old, err := Open(legacy, false, nil)
-	if err != nil {
-		t.Fatalf("Open(legacy): %v", err)
-	}
-	old.Close()
-
-	l, err := Open(filepath.Join(dir, "custom.db"), false, nil)
-	if err != nil {
-		t.Fatalf("Open(custom): %v", err)
-	}
-	l.Close()
-	if _, err := os.Stat(legacy); err != nil {
-		t.Fatalf("legacy database was moved by an explicit-path open: %v", err)
-	}
-}
-
-// TestLegacyPathsListsTheDatabaseAndItsSidecars pins the list `self uninstall`
-// removes for a home that was never opened since the rename.
-func TestLegacyPathsListsTheDatabaseAndItsSidecars(t *testing.T) {
-	got := LegacyPaths("/home/u/.digitalx-cli")
-	want := []string{
-		filepath.Join("/home/u/.digitalx-cli", LegacyFileName),
-		filepath.Join("/home/u/.digitalx-cli", LegacyFileName) + "-wal",
-		filepath.Join("/home/u/.digitalx-cli", LegacyFileName) + "-shm",
-	}
-	if len(got) != len(want) {
-		t.Fatalf("LegacyPaths = %v, want %v", got, want)
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("LegacyPaths[%d] = %q, want %q", i, got[i], want[i])
+// TestFileNameFollowsTheHomeDirectoryName: the directory decides the filename.
+// A home under the earlier product's directory name keeps the earlier file name,
+// so an older `korbit` binary sharing that directory opens the same database;
+// every other home — including one pinned somewhere else entirely — uses the
+// service-neutral official name.
+func TestFileNameFollowsTheHomeDirectoryName(t *testing.T) {
+	for _, tc := range []struct {
+		home string
+		want string
+	}{
+		{filepath.Join("/home/u", ".digitalx-cli"), DefaultFileName},
+		{filepath.Join("/home/u", ".korbit-cli"), LegacyFileName},
+		{filepath.Join("/home/u", ".korbit-cli") + string(filepath.Separator), LegacyFileName},
+		{filepath.Join("/srv", "agent-home"), DefaultFileName},
+	} {
+		if got := FileName(tc.home); got != tc.want {
+			t.Errorf("FileName(%q) = %q, want %q", tc.home, got, tc.want)
+		}
+		if got, want := DefaultPath(tc.home), filepath.Join(tc.home, tc.want); got != want {
+			t.Errorf("DefaultPath(%q) = %q, want %q", tc.home, got, want)
 		}
 	}
 }
 
-// readOnlyDirWithLegacyJournal builds a directory holding only the legacy
-// journal database and makes it unwritable, so the adopting rename fails the way
-// it does when another process holds the file open on Windows.
-func readOnlyDirWithLegacyJournal(t *testing.T) string {
-	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("directory permissions do not gate rename on Windows")
-	}
-	if os.Geteuid() == 0 {
-		t.Skip("root ignores directory permissions")
-	}
+// TestOpenNeverRenamesAnything: nothing is adopted on open. A directory holding
+// the OTHER spelling is left exactly as it is, and the path handed to Open is the
+// path used — so the journal a home reads depends only on that home's name, never
+// on which command happened to open it first.
+func TestOpenNeverRenamesAnything(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, LegacyFileName), []byte("data"), 0o600); err != nil {
+	other := filepath.Join(dir, LegacyFileName)
+	if err := os.WriteFile(other, []byte("not-a-db-but-must-survive"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chmod(dir, 0o500); err != nil {
-		t.Skipf("cannot drop directory permissions here: %v", err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
-	return dir
-}
 
-// TestAdoptLegacyKeepsTheLegacyPathWhenTheRenameFails: a failed rename must send
-// the caller to the database that EXISTS. Returning the current path would have
-// sql.Open create an empty database there, and the next run would then see the
-// current name present and never retry — orphaning the recorded history.
-func TestAdoptLegacyKeepsTheLegacyPathWhenTheRenameFails(t *testing.T) {
-	dir := readOnlyDirWithLegacyJournal(t)
-
-	got := adoptLegacy(DefaultPath(dir), logging.Or(nil))
-	if want := filepath.Join(dir, LegacyFileName); got != want {
-		t.Fatalf("adoptLegacy = %q, want the legacy path %q", got, want)
+	l, err := Open(DefaultPath(dir), false, nil)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
 	}
-	if _, err := os.Stat(DefaultPath(dir)); !os.IsNotExist(err) {
-		t.Fatalf("nothing may be created under the current name: %v", err)
+	l.Close()
+
+	if b, err := os.ReadFile(other); err != nil || string(b) != "not-a-db-but-must-survive" {
+		t.Fatalf("the other spelling was touched: %q, %v", b, err)
+	}
+	if _, err := os.Stat(DefaultPath(dir)); err != nil {
+		t.Fatalf("Open used a path other than the one it was given: %v", err)
 	}
 }
 
-// TestAdoptLegacyRetriesOnTheNextRun: because the failed run never created a
-// file under the current name, a later run whose rename CAN succeed still
-// adopts the database.
-func TestAdoptLegacyRetriesOnTheNextRun(t *testing.T) {
-	dir := readOnlyDirWithLegacyJournal(t)
-	adoptLegacy(DefaultPath(dir), logging.Or(nil)) // fails, returns legacy
-
-	if err := os.Chmod(dir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	got, want := adoptLegacy(DefaultPath(dir), logging.Or(nil)), DefaultPath(dir)
-	if got != want {
-		t.Fatalf("adoptLegacy = %q, want %q on the retry", got, want)
-	}
-	if b, err := os.ReadFile(want); err != nil || string(b) != "data" {
-		t.Fatalf("adopted database = %q, %v", b, err)
+// TestPathsListsBothSpellingsWithTheirSidecars pins the list `self uninstall`
+// removes. Both spellings are listed, whichever name the home itself implies, so
+// a home whose directory was renamed while an interrupted run left the files
+// under their old names is still cleaned out completely.
+func TestPathsListsBothSpellingsWithTheirSidecars(t *testing.T) {
+	for _, tc := range []struct {
+		home  string
+		names [2]string
+	}{
+		{"/home/u/.digitalx-cli", [2]string{DefaultFileName, LegacyFileName}},
+		{"/home/u/.korbit-cli", [2]string{LegacyFileName, DefaultFileName}},
+	} {
+		var want []string
+		for _, name := range tc.names {
+			db := filepath.Join(tc.home, name)
+			want = append(want, db, db+"-wal", db+"-shm")
+		}
+		if got := Paths(tc.home); !slices.Equal(got, want) {
+			t.Errorf("Paths(%q) = %v, want %v", tc.home, got, want)
+		}
 	}
 }

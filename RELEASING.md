@@ -38,21 +38,20 @@ are a contract with binaries that are already on users' machines, so **neither
 may be renamed**: dropping the set, or renaming the binary inside it, strands
 every existing install with no way to update.
 
-That is also all the legacy set is for. Once a `korbit` install has updated
-through it, the new binary installs `dgx-cli` as the primary and keeps `korbit`
-as an alias beside it, and from then on it updates through the `dgx-cli` asset
-like any other install.
+An install still under the `korbit` name needs **two** `self update` runs to come
+onto `dgx-cli`: the first is run by the old binary, which downloads the legacy
+archive and swaps its own file; the second runs the new code, which installs
+`dgx-cli` as the primary and keeps `korbit` as an alias beside it. From then on
+the install updates through the `digitalx-cli` archive like any other. That
+two-step is documented for users in [`MIGRATION.md`](MIGRATION.md). Do not "fix"
+it by changing what the legacy archive contains: the old binary extracts the
+archive entry whose basename is exactly `korbit`, and it is the only code that
+will ever read that archive.
 
 One `checksums.txt` covers both sets plus the `.mcpb` bundles, so the single
 signature over it authenticates every download. The `.mcpb` Desktop Extensions
 are built from the `dgx-cli` binaries only — an extension is installed fresh
 rather than self-updated, so it needs no legacy name.
-
-> **The `korbit_*` sunset is not decided yet.** The legacy set cannot run
-> forever, but neither a cut-off release count nor a date has been fixed. Fix one
-> — and write it here — **before the first release that publishes both sets**, so
-> the compatibility window has a stated end from its first day rather than an
-> open-ended promise that is awkward to withdraw later.
 
 ## Target matrix
 
@@ -246,13 +245,12 @@ Keep `asc-key.json` and the `.p8` out of the repo.
 
 ## Publishing (separate, via `gh`)
 
-### Two release repositories, both owned for the whole compatibility window
+### Two release repositories
 
-A release is published to **two** GitHub repositories, and the reason is that a
-GitHub rename redirect is not something a shipped binary may depend on: the
-redirect from a transferred repository's old name lasts only while that name
-stays unclaimed, and claiming it — even by us — ends it. So instead of relying on
-a redirect, both names are held and both are published to.
+A release is published to **two** GitHub repositories. A shipped binary resolves
+its update URL under the org/repo name compiled into it, and a GitHub rename
+redirect lasts only while the old name stays unclaimed — so both names are held
+and both are published to.
 
 | Repository | Gets | Read by |
 | --- | --- | --- |
@@ -260,57 +258,43 @@ a redirect, both names are held and both are published to.
 | `korbit-official/korbit-cli` | `korbit_*` archives, plus the **same** `checksums.txt` and `checksums.txt.sig` | an already-installed `korbit` binary updating itself |
 
 `DefaultRepo` (`internal/selfupdate/selfupdate.go`) and `REPO` / `$Repo` in both
-installers resolve to **`digitalx-official/digitalx-cli`**, so a release built
-from this source is publishable only once that organisation and repository exist
-under that name — publish earlier and `self update`, `install.sh` and
-`install.ps1` all resolve a repository that is not there.
+installers resolve to **`digitalx-official/digitalx-cli`**. Both releases carry
+the **same** tag and the **same** `checksums.txt` + `checksums.txt.sig`: each
+side looks up its own entry, and the single signature authenticates both. The
+legacy repository carries no source, only releases.
 
-A binary already on a user's machine resolves
-`github.com/<old-org>/<old-repo>/releases/latest` under the name compiled into
-it and reads the release tag off the final URL path. That is what the legacy
-repository serves, which is why the release there must exist **under the same
-tag** — and why one `checksums.txt` listing every asset of both sets rides both
-releases: each side looks up its own entry, and the single signature
-authenticates both.
+### First release after the rename (one-off)
 
-The legacy repository is a plain repository in the kept old organisation, not a
-mirror: it carries no source, only releases. Give it one commit (a README saying
-what it is and where the project lives now) so `gh release create` has a target
-commit to tag.
+Before the first dual publish, `digitalx-official/digitalx-cli` must exist (the
+repository is transferred into it) and `korbit-official/korbit-cli` must exist
+with one commit — a README saying where the project lives now — so `gh release
+create` has a commit to tag.
 
-**Sequence — do these in order.**
+Creating the legacy repository claims the old name, which ends the rename
+redirect that had been forwarding pinned
+`…/releases/download/<tag>/korbit_<os>_<arch>` URLs, and it starts with no
+releases of its own. Until the release lands there, an installed `korbit` gets
+`no release found` (fail-closed, not a corrupt install) and old pinned URLs 404.
+So build, sign and verify `dist/` **first**, then create it, publish immediately,
+and back-fill each historical tag:
 
-1. **Transfer** the repository into the new organisation as
-   `digitalx-official/digitalx-cli`.
-2. **Create** `korbit-official/korbit-cli` in the kept old organisation, with a
-   README commit. Doing this *after* the transfer is what claims the old name
-   deliberately rather than leaving it open.
-3. **Publish** the release, which lands on both (see below).
+```sh
+gh release download <tag> --repo digitalx-official/digitalx-cli \
+  --pattern 'korbit_*' --pattern 'checksums.txt' --pattern 'checksums.txt.sig' --dir ./bf
+gh release create <tag> ./bf/* --repo korbit-official/korbit-cli \
+  --title <tag> --notes 'Legacy archives for already-installed `korbit` binaries.'
+rm -rf ./bf
+# verify one pinned URL actually serves bytes:
+curl -fsSLI https://github.com/korbit-official/korbit-cli/releases/download/<oldest-tag>/korbit_darwin_arm64.tar.gz
+```
 
-**Step 2 opens a gap — keep it short.** The transfer takes the repository's
-*entire release history* with it: every existing release, tag and asset ends up
-under `digitalx-official/digitalx-cli`, and the `korbit-official/korbit-cli` you
-then create starts with **none**. So from the moment that repo exists until the
-first publish lands in it:
+### Building and publishing
 
-- an installed `korbit` running `self update` resolves
-  `korbit-official/korbit-cli/releases/latest`, finds no release, and reports
-  `no release found` — a clean, fail-closed error, not a corrupt install, but the
-  user cannot update until step 3;
-- any old pinned URL under the previous org
-  (`…/releases/download/<tag>/korbit_<os>_<arch>.tar.gz`) now resolves to the new
-  empty repository and 404s, because creating the repo replaced the redirect that
-  had been forwarding those.
-
-Neither is recoverable by waiting, so **do step 3 immediately after step 2** —
-have the artifacts built, signed and verified *before* creating the legacy repo,
-so publishing is the only thing left to do.
-
-Building and publishing are separate steps. `make release` **never contacts
-GitHub** — it only builds, signs, and (with `make notarize`) reaches Apple. The
-artifacts are uploaded later with `make publish`, which uses the `gh` CLI, so
-the same built+signed+notarized `dist/` can go to a staging repo for review and
-then to the public repo without rebuilding.
+These are separate steps. `make release` **never contacts GitHub** — it only
+builds, signs, and (with `make notarize`) reaches Apple. The artifacts are
+uploaded later with `make publish`, which uses the `gh` CLI, so the same
+built+signed+notarized `dist/` can go to a staging repo for review and then to
+the public repo without rebuilding.
 
 ```sh
 make publish                                      # primary -> the current repo, legacy -> the default legacy repo
@@ -332,10 +316,8 @@ over, with `--clobber`) the release for that tag on **both** repositories:
   the legacy upload — which is what you want when the primary target is a staging
   repository, since the legacy repository is public.
 
-(Both maintainer variables keep the `KORBIT_` prefix, as do `KORBIT_RSA_SIGN_KEY`
-and the `KORBIT_SKIP_*` switches: the release environment is renamed in one move
-rather than one variable at a time, so a half-renamed environment never has to be
-reasoned about.)
+(The maintainer-side release variables keep the `KORBIT_` prefix — these two, as
+well as `KORBIT_RSA_SIGN_KEY` and the `KORBIT_SKIP_*` switches.)
 
 These filled installers are the release-pinned copies attached to the GitHub
 release; they embed this release's archive checksums, so they must ship in the
@@ -365,7 +347,6 @@ KORBIT_RELEASE_REPO=digitalx-official/digitalx-cli  make publish
 ```
 
 Step 3 assumes both repositories already exist under their current names — see
-[Two release repositories](#two-release-repositories-both-owned-for-the-whole-compatibility-window)
-for the transfer-then-create-then-publish order.
+[Two release repositories](#two-release-repositories).
 
 Windows binaries are shipped unsigned (Authenticode signing is not configured).

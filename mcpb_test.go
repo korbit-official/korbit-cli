@@ -33,9 +33,7 @@ func mcpbSource(t *testing.T) string {
 //   - `name` is the extension's install key. An MCPB host keys the installed
 //     extension on it, so a different value installs a SECOND extension next to
 //     one a user already has — two servers, two copies of every tool. Both it and
-//     `display_name` carry the product's name; a Desktop Extension has no
-//     self-update and no migration, so a user with an older bundle removes it by
-//     hand.
+//     `display_name` carry the product's name.
 //   - the entry point and command must name the binary the bundle actually
 //     stages, or the host launches nothing.
 //   - the injected env names must be ones the CLI reads.
@@ -51,7 +49,7 @@ func TestMCPBManifestPins(t *testing.T) {
 		`"command": "$command_path",`,
 	} {
 		if !strings.Contains(src, want) {
-			t.Errorf("%s no longer contains %s", mcpbScript, want)
+			t.Errorf("%s must contain %s", mcpbScript, want)
 		}
 	}
 

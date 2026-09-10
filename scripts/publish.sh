@@ -9,9 +9,7 @@
 # publish here.
 #
 # A release goes to TWO repositories, because two generations of installed
-# binaries look for it under two different names and neither lookup is allowed to
-# depend on a GitHub rename redirect (a redirect lasts only while the old name is
-# unclaimed, and claiming it — even ourselves — ends it):
+# binaries look for it under two different names (see RELEASING.md):
 #
 #   primary  digitalx-cli_<os>_<arch> archives, the .mcpb Desktop Extensions, the
 #            filled install.sh/install.ps1, checksums.txt, checksums.txt.sig.

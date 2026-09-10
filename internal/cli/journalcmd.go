@@ -224,8 +224,14 @@ type bundleSummary struct {
 	Keys       int    `json:"keys"`
 }
 
+// defaultBundlePath is where `debug bundle` writes when --out is not given: a
+// timestamped file in the CLI home. Like every other file under the home it
+// carries no product name — the directory already says whose it is. Nothing ever
+// reads this name back (a bundle is written once and handed to support), so
+// there is no earlier spelling to keep working; an uninstall finds old and new
+// alike by glob (see selfcmd.debugBundles).
 func defaultBundlePath(home string, nowMs int64) string {
-	return filepath.Join(home, fmt.Sprintf("digitalx-cli-debug-%d.json", nowMs))
+	return filepath.Join(home, fmt.Sprintf("debug-%d.json", nowMs))
 }
 
 // whenUTC formats a unix-ms timestamp for the human log tables.

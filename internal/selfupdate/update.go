@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 
 	"github.com/digitalx-official/digitalx-cli/internal/fslock"
@@ -45,19 +46,39 @@ type UpdateResult struct {
 	// Aliases are the extra command names now pointing at the updated binary (see
 	// alias.go). Absent on an install that carries none.
 	Aliases []string `json:"aliases,omitempty"`
+	// LayoutRepaired lists the command-name fixes this run made without an update
+	// to apply: creating the primary binary name on an install that only ever had
+	// the alias name, or recreating/repointing an alias that was missing or ran
+	// something other than the installed binary (see planLayout). Absent when the
+	// layout was already correct. Updated stays false for a run that only
+	// repaired the layout — no new version was installed.
+	//
+	// Under CheckedOnly (--dry-run) these are the fixes a real run WOULD make;
+	// nothing on disk was touched. The pair (checkedOnly, layoutRepaired) is what
+	// distinguishes the two, the same way checkedOnly governs updated.
+	LayoutRepaired []string `json:"layoutRepaired,omitempty"`
 	// Warnings are non-fatal problems with an otherwise applied update.
 	Warnings []string `json:"warnings,omitempty"`
 }
 
-// Update resolves the target release (latest, or targetVersion when set),
-// and — unless dryRun — downloads it, verifies the release checksums.txt against
-// the release signature (verify.go), verifies the archive's sha256 against that
-// checksums.txt, and replaces the installed binary in place (minio/selfupdate,
-// which re-verifies the exact bytes against the passed checksum and handles the
-// Windows running-exe swap), then updates the manifest. It refuses on a
-// non-managed or dev build (ProvenanceError).
-func (c Config) Update(ctx context.Context, targetVersion string, dryRun bool) (*UpdateResult, error) {
-	c.log().Debug("self update starting", "currentVersion", c.Version, "requestedTarget", targetVersion, "dryRun", dryRun, "repo", c.repo())
+// UpdateOptions are the choices `self update` takes from its flags.
+type UpdateOptions struct {
+	// TargetVersion pins the release to install (--tag); empty resolves the
+	// latest.
+	TargetVersion string
+	// DryRun changes nothing on disk (--dry-run).
+	DryRun bool
+}
+
+// Update resolves the target release (latest, or opts.TargetVersion when set),
+// and — unless opts.DryRun — downloads it, verifies the release checksums.txt
+// against the release signature (verify.go), verifies the archive's sha256
+// against that checksums.txt, and replaces the installed binary in place
+// (minio/selfupdate, which re-verifies the exact bytes against the passed
+// checksum and handles the Windows running-exe swap), then updates the manifest.
+// It refuses on a non-managed or dev build (ProvenanceError).
+func (c Config) Update(ctx context.Context, opts UpdateOptions) (*UpdateResult, error) {
+	c.log().Debug("self update starting", "currentVersion", c.Version, "requestedTarget", opts.TargetVersion, "dryRun", opts.DryRun, "repo", c.repo())
 	if err := c.requireReleaseBuild(); err != nil {
 		c.log().Debug("self update refused: development build", "version", c.Version)
 		return nil, &ProvenanceError{
@@ -70,7 +91,13 @@ func (c Config) Update(ctx context.Context, targetVersion string, dryRun bool) (
 		c.log().Debug("self update refused: not a managed install", "err", err.Error())
 		return nil, err
 	}
+	return c.applyUpdate(ctx, l, opts)
+}
 
+// applyUpdate is the binary half of Update: resolve the target release, apply it
+// (or report what a dry run would do), and keep the command layout correct.
+func (c Config) applyUpdate(ctx context.Context, l Layout, opts UpdateOptions) (*UpdateResult, error) {
+	targetVersion, dryRun := opts.TargetVersion, opts.DryRun
 	target := normalizeTag(targetVersion)
 	if target == "" {
 		latest, err := c.resolveLatest(ctx)
@@ -84,7 +111,30 @@ func (c Config) Update(ctx context.Context, targetVersion string, dryRun bool) (
 	res := &UpdateResult{PreviousVersion: c.Version, LatestVersion: target, Executable: l.ExecutablePath()}
 	if target == normalizeTag(c.Version) {
 		c.log().Debug("self update: already on target version", "version", target)
-		return res, nil // already on the target version
+		// Already current is not the same as already CORRECT. An install that
+		// updated itself under the alias name has no primary binary at all, an
+		// alias can go missing under a healthy primary, and an alias copy can be
+		// left behind a version; none of those states fixes itself, and waiting
+		// for the next release to fix them would leave the `dgx-cli` command
+		// absent for as long as no release ships.
+		//
+		// A dry run must still change nothing, so the fixes are PLANNED read-only
+		// and only applied when this is not a dry run.
+		plan := c.planLayout(l)
+		if dryRun {
+			c.log().Debug("self update dry-run: already current", "version", target, "wouldRepair", len(plan.descriptions(l)))
+			res.CheckedOnly = true
+			res.LayoutRepaired = plan.descriptions(l)
+			return res, nil
+		}
+		// Apply under the same lock a real update takes.
+		if err := c.withLock(l, func() error {
+			c.repairLayout(l, res)
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+		return res, nil
 	}
 	if dryRun {
 		c.log().Debug("self update dry-run: update available, not applying", "from", c.Version, "to", target)
@@ -164,7 +214,8 @@ func (c Config) Update(ctx context.Context, targetVersion string, dryRun bool) (
 	exe, _ := c.runningExe()
 	prevManifest, _, _ := loadManifest(l.ManifestPath())
 	wanted, ownWarnings := c.aliasesToKeep(l, prevManifest, exe)
-	aliases, aliasWarnings := c.syncAliases(l, wanted)
+	owned := c.managedAliasNames(l, wanted)
+	aliases, aliasWarnings := c.syncAliases(l, owned)
 	res.Aliases = aliases
 	res.Warnings = append(res.Warnings, ownWarnings...)
 	res.Warnings = append(res.Warnings, aliasWarnings...)
@@ -182,7 +233,8 @@ func (c Config) Update(ctx context.Context, targetVersion string, dryRun bool) (
 		SHA256:      newSum,
 		Repo:        c.repo(),
 		InstalledAt: strconv.FormatInt(c.now(), 10),
-		Aliases:     aliases,
+		// The names this install OWNS, not the ones written: see syncAliases.
+		Aliases: owned,
 	}
 	if err := m.save(l.ManifestPath()); err != nil {
 		return nil, err
@@ -202,16 +254,249 @@ func (c Config) Update(ctx context.Context, targetVersion string, dryRun bool) (
 	return res, nil
 }
 
-// placePrimary writes the freshly extracted binary to the primary path.
+// withLock runs fn holding the advisory lock that serializes install / update /
+// uninstall against each other, creating the home first (the lock lives in it).
+func (c Config) withLock(l Layout, fn func() error) error {
+	if err := os.MkdirAll(l.Home(), 0o700); err != nil {
+		return err
+	}
+	unlock, err := fslock.Lock(l.LockPath())
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	return fn()
+}
+
+// layoutRepair is the set of command-name fixes an install needs when there is
+// no new version to install. It is computed READ-ONLY by planLayout, so
+// `self update --dry-run` can report exactly what a real run would change
+// without touching a file, and applied by repairLayout.
+type layoutRepair struct {
+	// exe is the running binary; empty when it could not be resolved, which
+	// makes the whole repair a no-op (nothing can be proved about the layout).
+	exe string
+	// manifest is the manifest as it stands, the basis for the rewrite.
+	manifest Manifest
+	// createPrimary marks that the primary command name is absent and the running
+	// binary can supply it.
+	createPrimary bool
+	// aliases are the owned alias names that must be (re)written.
+	aliases []string
+	// owned is every alias name this install owns — what the manifest records,
+	// whether or not each one needed writing.
+	owned []string
+	// warnings are the ownership warnings the plan surfaced (a file at the alias
+	// name that this install does not own is reported, never touched).
+	warnings []string
+}
+
+// primaryIsStale reports whether the file at the primary name is NOT the binary
+// this install recorded, while the RUNNING alias-named binary is.
 //
-// When a binary is already at that path, the write goes through
-// minio/selfupdate: it renames the outgoing binary aside (which is how a RUNNING
-// executable is replaced on Windows) and rolls the old one back if the write
-// fails. It cannot create a target that is not there — it starts by renaming the
-// existing file — so the alias-only layout, where the binary on PATH carries the
-// alias name and the primary name is absent, takes the plain atomic create
-// instead. Nothing is running at the primary path in that case, so there is no
-// swap to perform and nothing to roll back to.
+// Both halves are required, and each rules out a wrong repair:
+//
+//   - The running binary must be verified against the manifest, so its bytes are
+//     known to be this install's current version. Without that check a hand-built
+//     or older `korbit` on PATH would overwrite a perfectly good `dgx-cli`.
+//   - The primary must fail the same check. A primary that matches is healthy,
+//     whatever else is on disk.
+//
+// With no recorded sha256 there is nothing to validate either side against, so
+// this reports false: an unprovable state is never repaired by overwriting a
+// binary on a guess.
+func (c Config) primaryIsStale(l Layout, m Manifest, exe string) bool {
+	if m.SHA256 == "" || !fileExists(l.ExecutablePath()) {
+		return false
+	}
+	// The alias-name file must be a real, separate binary. On unix a healthy alias
+	// is a symlink onto the primary, so both paths resolve to the same file and
+	// hash identically; isInstalledBinary tells that case apart.
+	if l.isInstalledBinary(exe) {
+		return false
+	}
+	if !fileHasSum(exe, m.SHA256) {
+		return false // the running binary is not the recorded one either
+	}
+	return !fileHasSum(l.ExecutablePath(), m.SHA256)
+}
+
+// createdPrimaryLine / pointedAliasLine are the human lines for the two fixes a
+// layout repair makes. They are shared by the plan's descriptions (what a dry
+// run WOULD do) and repairLayout's report (what it did), so the two cannot drift.
+func createdPrimaryLine(l Layout) string {
+	return fmt.Sprintf("created the `%s` command at %s from the running `%s`", l.BinName(), l.ExecutablePath(), l.LegacyBinName())
+}
+
+func pointedAliasLine(l Layout, name string) string {
+	return fmt.Sprintf("pointed the `%s` command at %s", name, l.BinName())
+}
+
+// descriptions are the human lines for this repair, in the order it applies
+// them. Empty means the layout is already correct.
+func (r layoutRepair) descriptions(l Layout) []string {
+	var out []string
+	if r.createPrimary {
+		out = append(out, createdPrimaryLine(l))
+	}
+	for _, name := range r.aliases {
+		out = append(out, pointedAliasLine(l, name))
+	}
+	return out
+}
+
+// planLayout works out what an install's command names need, changing nothing.
+//
+// Three states need a fix, and none of them is repaired by a new release:
+//
+//   - The primary name is ABSENT because an install placed under the alias name
+//     updated itself in place. The primary is the name the docs, the installers,
+//     and every example use, so the running binary's own bytes become it — which
+//     is exactly right, since they ARE the current version.
+//   - The primary name is PRESENT but STALE: the running alias-named binary's
+//     bytes are the manifest's and the file at the primary name's are not (see
+//     primaryIsStale). The `dgx-cli` command then runs something this install did
+//     not place — a copy an interrupted repair left behind, or another install's
+//     binary — and it is recreated from the running, verified bytes. It is never
+//     ADOPTED: blessing it would record the wrong hash and make every later check
+//     compare against the wrong binary.
+//   - An owned alias is GONE (deleted, or left behind by an interrupted write).
+//   - An owned alias is PRESENT but does not run the primary — a link pointing
+//     elsewhere, or a copy left a version behind. This is the state that looks
+//     like nothing at all: the command works, and silently runs the wrong
+//     binary. It is checked with the same predicate doctor reports it by
+//     (aliasRunsPrimary), so the problem doctor names and the fix this applies
+//     cannot disagree.
+//
+// A VALID alias is deliberately absent from the plan, so an already-correct
+// layout writes nothing on every update check.
+func (c Config) planLayout(l Layout) layoutRepair {
+	exe, err := c.runningExe()
+	if err != nil {
+		c.log().Debug("cannot plan a layout repair: the running binary is unresolvable", "err", err.Error())
+		return layoutRepair{}
+	}
+	m, _, _ := loadManifest(l.ManifestPath())
+	r := layoutRepair{exe: exe, manifest: m}
+	r.createPrimary = l.isLegacyBinary(exe) &&
+		(!fileExists(l.ExecutablePath()) || c.primaryIsStale(l, m, exe))
+
+	wanted, warnings := c.aliasesToKeep(l, m, exe)
+	r.owned = c.managedAliasNames(l, wanted)
+	r.warnings = warnings
+	for _, name := range r.owned {
+		p := l.AliasPath(name)
+		switch {
+		case r.createPrimary:
+			// The primary this run creates is what the alias must point at.
+			r.aliases = append(r.aliases, name)
+		case !pathPresent(p):
+			r.aliases = append(r.aliases, name)
+		case !c.aliasRunsPrimary(l, m, p, symlinkTarget(p)):
+			c.log().Debug("alias does not run the installed binary", "alias", name, "path", p)
+			r.aliases = append(r.aliases, name)
+		}
+	}
+	return r
+}
+
+// repairLayout applies planLayout's fixes, recording each in res.LayoutRepaired
+// (and leaving res.Updated false — nothing was updated). It must be called
+// under the install lock, and never on a dry run.
+func (c Config) repairLayout(l Layout, res *UpdateResult) {
+	plan := c.planLayout(l)
+	if plan.exe == "" {
+		return
+	}
+	m := plan.manifest
+	res.Warnings = append(res.Warnings, plan.warnings...)
+
+	// 1. The primary name, from the running alias-named binary's own bytes.
+	if plan.createPrimary {
+		if err := copyFileAtomic(l.ExecutablePath(), plan.exe, 0o755); err != nil {
+			c.log().Debug("could not create the primary binary during a layout repair", "path", l.ExecutablePath(), "err", err.Error())
+			res.Warnings = append(res.Warnings, fmt.Sprintf("could not create the `%s` command at %s (%v) — run the install one-liner again to repair it", l.BinName(), l.ExecutablePath(), err))
+			return
+		}
+		res.LayoutRepaired = append(res.LayoutRepaired, createdPrimaryLine(l))
+		c.log().Debug("created the primary binary from the running alias-named binary", "from", plan.exe, "to", l.ExecutablePath())
+	}
+
+	// 2. Every alias name the plan found wanting, pointed at the primary.
+	if len(plan.aliases) > 0 {
+		written, aliasWarnings := c.syncAliases(l, plan.aliases)
+		res.Warnings = append(res.Warnings, aliasWarnings...)
+		for _, name := range written {
+			res.LayoutRepaired = append(res.LayoutRepaired, pointedAliasLine(l, name))
+		}
+	}
+	if len(plan.owned) > 0 {
+		res.Aliases = c.presentAliases(l, plan.owned)
+	}
+
+	// 3. The manifest, so it describes the layout that is now on disk. Only when
+	// something changed, and only over the fields this repair is responsible for.
+	if len(res.LayoutRepaired) == 0 && slices.Equal(m.Aliases, plan.owned) {
+		return
+	}
+	owned := plan.owned
+	m.Method = MethodManagedScript
+	m.Executable = l.ExecutablePath()
+	// The names this install OWNS, so a name whose write failed is retried
+	// rather than forgotten (see syncAliases).
+	m.Aliases = owned
+	if m.Version == "" {
+		m.Version = c.Version
+	}
+	if m.OS == "" {
+		m.OS = c.os()
+	}
+	if m.Arch == "" {
+		m.Arch = c.arch()
+	}
+	if m.Repo == "" {
+		m.Repo = c.repo()
+	}
+	// Record the primary's hash only when it is TRUSTWORTHY: either this repair
+	// just wrote those bytes, or they already match what the manifest recorded, or
+	// the manifest carries no hash to contradict. A primary that hashes
+	// differently from a verified running alias is stale, and recording its hash
+	// would bless it — every later check (doctor's binary check, the alias-copy
+	// comparison, the next repair) would then compare against the wrong binary and
+	// call the stale one healthy.
+	if sum, err := sha256File(l.ExecutablePath()); err == nil && (plan.createPrimary || m.SHA256 == "" || sum == m.SHA256) {
+		m.SHA256 = sum
+		res.SHA256 = sum
+	}
+	if err := m.save(l.ManifestPath()); err != nil {
+		res.Warnings = append(res.Warnings, fmt.Sprintf("could not record the repaired layout in %s (%v)", l.ManifestPath(), err))
+		return
+	}
+	if len(res.LayoutRepaired) > 0 {
+		res.LayoutRepaired = append(res.LayoutRepaired, "recorded the layout in the install manifest")
+	}
+	if swept := c.sweepLeftovers(l); swept {
+		c.log().Debug("swept leftover temp/swap files after a layout repair", "dir", l.ExecutableDir())
+	}
+}
+
+// presentAliases returns the subset of names that are on disk now — what the
+// result reports as working command names, as against the owned names the
+// manifest records.
+func (c Config) presentAliases(l Layout, names []string) []string {
+	var out []string
+	for _, name := range names {
+		if pathPresent(l.AliasPath(name)) {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// placePrimary writes the freshly extracted binary to the primary path: through
+// minio/selfupdate when a binary is already there, and as a plain atomic create
+// when the primary name is absent (the alias-only layout) — the same split, for
+// the same reason, as applyCopy.
 func (c Config) placePrimary(l Layout, binBytes []byte) error {
 	if !fileExists(l.ExecutablePath()) {
 		if err := writeBytesAtomic(l.ExecutablePath(), binBytes, 0o755); err != nil {

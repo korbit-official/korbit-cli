@@ -1110,11 +1110,10 @@ func TestMCPHandshakeServerName(t *testing.T) {
 	defer cs.Close()
 
 	info := cs.InitializeResult().ServerInfo
-	if info.Name != mcpServerName {
-		t.Errorf("handshake ServerInfo.Name = %q, want %q", info.Name, mcpServerName)
-	}
-	if mcpServerName != "digitalx-cli" {
-		t.Errorf("the MCP server name is %q — a host has the old one stored; change it deliberately or not at all", mcpServerName)
+	// The literal, not the constant: a host has this name stored, so changing it
+	// must fail here rather than pass along with the constant.
+	if info.Name != "digitalx-cli" {
+		t.Errorf("handshake ServerInfo.Name = %q, want %q", info.Name, "digitalx-cli")
 	}
 	if info.Version != version.Version {
 		t.Errorf("handshake ServerInfo.Version = %q, want %q", info.Version, version.Version)

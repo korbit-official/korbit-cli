@@ -29,8 +29,8 @@ func TestLegacyHomeEnvIsHonored(t *testing.T) {
 }
 
 // TestCurrentHomeEnvWinsOverLegacy: with both spellings exported, the canonical
-// DIGITALX_CLI_HOME decides — a machine mid-migration must not silently read a
-// different home than the one the user set today.
+// DIGITALX_CLI_HOME decides — a machine that still exports the older spelling
+// must not silently read a different home than the one the user set today.
 func TestCurrentHomeEnvWinsOverLegacy(t *testing.T) {
 	current, legacy := t.TempDir(), t.TempDir()
 	seedBoundKey(t, current)

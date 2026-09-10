@@ -12,6 +12,12 @@ import (
 	"path/filepath"
 )
 
+// manifestFileName is the manifest's filename under the CLI home. It is named
+// here rather than inline so the home diagnosis, which must recognize a home
+// holding nothing but this file, cannot drift from where the manifest is
+// written.
+const manifestFileName = "install.json"
+
 // Manifest is the durable record of a managed install, written to
 // <home>/install.json by self install / self update. Its presence (plus the
 // running binary being the installed binary on PATH) is what gates self update to

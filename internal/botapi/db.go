@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/digitalx-official/digitalx-cli/internal/sqlitefile"
 	"github.com/dop251/goja"
 	_ "modernc.org/sqlite" // pure-Go SQLite driver, shared with the journal
 )
@@ -39,7 +40,10 @@ func (d *botDB) handle() (*sql.DB, error) {
 	if err := os.MkdirAll(filepath.Dir(d.path), 0o700); err != nil {
 		return nil, fmt.Errorf("create db directory: %w", err)
 	}
-	db, err := sql.Open("sqlite", d.path)
+	// sqlitefile.DSN for the same reason the journal uses it: a bare path is read
+	// by the driver as `<path>?<query>`, so a home containing a `?` would open a
+	// truncated path here rather than the file the caller asked for.
+	db, err := sql.Open("sqlite", sqlitefile.DSN(d.path))
 	if err != nil {
 		return nil, err
 	}

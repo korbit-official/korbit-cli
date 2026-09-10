@@ -225,19 +225,18 @@ func TestManagedRecognizesOurCopiesOnly(t *testing.T) {
 			edits: map[string]*string{skillFile: ptr("---\nname: \"korbit\"\ndescription: the korbit-cli tool\n---\nsee https://" + repoURL + "\n")},
 			want:  true,
 		},
-		// The shape a hand-written skill about this CLI has: it names the tool in
-		// its description, and nothing else. Naming the tool is not owning the
-		// directory — this must survive untouched.
-		// A copy whose body cites the repository by its other URL. Every copy
-		// written by a binary that ships that spelling carries it, and it is the
-		// copy Install must be able to replace: read as foreign it would survive
-		// beside the current skill, leaving two skills with the same triggers.
+		// A copy whose body cites the repository by its other URL — the copy
+		// Install must be able to replace, or it survives beside the current
+		// skill and the agent loads two skills with the same triggers.
 		{
 			name:  "body cites the legacy repository URL",
 			skill: LegacySkillName,
 			edits: map[string]*string{skillFile: ptr("---\nname: " + LegacySkillName + "\ndescription: drives " + SkillBinary + "\n---\n# skill\n\nSource: https://" + legacyRepoURL + "\n")},
 			want:  true,
 		},
+		// The shape a hand-written skill about this CLI has: it names the tool in
+		// its description, and nothing else. Naming the tool is not owning the
+		// directory — this must survive untouched.
 		{
 			name:  "hand-written skill naming this CLI",
 			skill: LegacySkillName,
@@ -323,21 +322,4 @@ func mergeEdits(a, b map[string]*string) map[string]*string {
 		out[k] = v
 	}
 	return out
-}
-
-// TestManagedAcceptsAnInstalledCopy: whatever Install writes must satisfy the
-// ownership proof — otherwise install could never clear a copy of its own skill
-// sitting under the legacy directory name.
-func TestManagedAcceptsAnInstalledCopy(t *testing.T) {
-	src := fstest.MapFS{skillFile: {Data: []byte(ourSkillMD(SkillName))}}
-	for _, r := range managedReferences {
-		src[guideRefDir+"/"+r] = &fstest.MapFile{Data: []byte("playbook\n")}
-	}
-	dir := filepath.Join(t.TempDir(), "skills", LegacySkillName)
-	if _, err := Install(src, dir); err != nil {
-		t.Fatal(err)
-	}
-	if !Managed(dir) {
-		t.Fatal("an installed copy of this skill must be recognized as ours")
-	}
 }

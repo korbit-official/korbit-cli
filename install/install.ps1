@@ -14,6 +14,9 @@
 # `dgx-cli self install`, which places the binary, wires the User PATH, and
 # writes the install manifest. Trust is TLS + SHA-256.
 #
+# It touches the command layout only: an existing CLI home is left exactly where
+# it is (MIGRATION.md covers moving it).
+#
 # The whole body runs inside `& { … } @args` so that a failure (a `throw`) or
 # the normal end of the script returns to the caller's prompt instead of
 # terminating it. Under `irm … | iex` the script's text executes in the CURRENT

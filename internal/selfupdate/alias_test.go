@@ -8,9 +8,11 @@ package selfupdate
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -156,7 +158,7 @@ func TestUpdateAdoptsLegacyLayout(t *testing.T) {
 	archive := makeArchive(t, c.os(), l.BinName(), "BINARY-v2")
 	c.Doer = &fakeDoer{repo: c.repo(), tag: "v2.0.0", asset: c.assetName(), archive: archive, kit: newSignerKit(t)}
 
-	res, err := c.Update(context.Background(), "", false)
+	res, err := c.Update(context.Background(), UpdateOptions{})
 	if err != nil {
 		t.Fatalf("update from the alias-only layout: %v", err)
 	}
@@ -191,7 +193,7 @@ func TestUpdateKeepsAdoptedAliasCurrent(t *testing.T) {
 
 	archive := makeArchive(t, c.os(), l.BinName(), "BINARY-v3")
 	c.Doer = &fakeDoer{repo: c.repo(), tag: "v3.0.0", asset: c.assetName(), archive: archive, kit: newSignerKit(t)}
-	res, err := c.Update(context.Background(), "", false)
+	res, err := c.Update(context.Background(), UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -510,7 +512,7 @@ func TestUpdateSweepsSwapLeftovers(t *testing.T) {
 
 	archive := makeArchive(t, c.os(), l.BinName(), "BINARY-v2")
 	c.Doer = &fakeDoer{repo: c.repo(), tag: "v2.0.0", asset: c.assetName(), archive: archive, kit: newSignerKit(t)}
-	if _, err := c.Update(context.Background(), "", false); err != nil {
+	if _, err := c.Update(context.Background(), UpdateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range leftovers {
@@ -571,4 +573,497 @@ func TestWindowsAliasIsARefreshedCopy(t *testing.T) {
 	if swap := filepath.Join(l.ExecutableDir(), "."+l.LegacyBinName()+".old"); pathPresent(swap) {
 		t.Errorf("%s was left in the install dir", swap)
 	}
+}
+
+// TestUpdateRepairsTheAliasOnlyLayoutWhenAlreadyCurrent: the install that most
+// needs the primary command name is the one that has none — an install placed
+// under the alias name that already updated itself to the latest version. It
+// must not have to wait for a release that may never come, so an already-current
+// update creates the primary from the running binary's own bytes and points the
+// alias at it, reporting a repair rather than an update.
+func TestUpdateRepairsTheAliasOnlyLayoutWhenAlreadyCurrent(t *testing.T) {
+	c, l := installLegacyOnly(t, "BINARY-v1")
+	// The release resolves to the version already running: nothing to download.
+	c.Doer = &fakeDoer{repo: c.repo(), tag: "v1.0.0", asset: c.assetName()}
+
+	res, err := c.Update(context.Background(), UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Updated {
+		t.Errorf("a layout repair must not report an update: %+v", res)
+	}
+	if len(res.LayoutRepaired) == 0 {
+		t.Fatalf("expected layoutRepaired to describe the fix, got %+v", res)
+	}
+	if got := mustContent(t, l.ExecutablePath()); got != "BINARY-v1" {
+		t.Errorf("primary binary = %q, want the running binary's bytes", got)
+	}
+	assertAlias(t, l, "BINARY-v1")
+	if !slices.Contains(res.Aliases, l.LegacyBinName()) {
+		t.Errorf("result aliases = %v, want %q", res.Aliases, l.LegacyBinName())
+	}
+	m, _, _ := loadManifest(l.ManifestPath())
+	if m.Executable != l.ExecutablePath() {
+		t.Errorf("manifest executable = %q, want the primary %q", m.Executable, l.ExecutablePath())
+	}
+	if !slices.Contains(m.Aliases, l.LegacyBinName()) {
+		t.Errorf("manifest aliases = %v, want %q", m.Aliases, l.LegacyBinName())
+	}
+	if sum, err := sha256File(l.ExecutablePath()); err != nil || m.SHA256 != sum {
+		t.Errorf("manifest sha256 = %q, want the primary's %q (%v)", m.SHA256, sum, err)
+	}
+
+	// Running it again changes nothing and reports no repair — the layout is
+	// correct, so this must be idempotent rather than rewriting on every check.
+	c.exeOverride = l.ExecutablePath()
+	again, err := c.Update(context.Background(), UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(again.LayoutRepaired) != 0 {
+		t.Errorf("a healthy layout must need no repair: %v", again.LayoutRepaired)
+	}
+}
+
+// TestUpdateRecreatesADeletedAlias: an alias deleted from under a healthy
+// install is a broken command, and no new release is needed to put it back.
+func TestUpdateRecreatesADeletedAlias(t *testing.T) {
+	c, l := installLegacyOnly(t, "BINARY-v1")
+	if _, err := c.Install(); err != nil { // adopt: primary + alias
+		t.Fatal(err)
+	}
+	c.exeOverride = l.ExecutablePath()
+	if err := os.Remove(l.LegacyExecutablePath()); err != nil {
+		t.Fatal(err)
+	}
+	c.Doer = &fakeDoer{repo: c.repo(), tag: "v1.0.0", asset: c.assetName()}
+
+	res, err := c.Update(context.Background(), UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertAlias(t, l, "BINARY-v1")
+	if len(res.LayoutRepaired) == 0 {
+		t.Errorf("expected the recreated alias to be reported: %+v", res)
+	}
+}
+
+// TestWindowsAliasIsRecreatedWhenMissing drives the windows branch: the copy
+// mechanism must be able to CREATE the alias, not only refresh one. minio's
+// Apply starts by renaming the existing target aside, so an absent alias needs
+// the plain atomic create instead — without it a deleted `korbit.exe` could
+// never come back.
+func TestWindowsAliasIsRecreatedWhenMissing(t *testing.T) {
+	c := testConfig(t.TempDir())
+	c.GOOS = "windows"
+	c.exeOverride = writeFakeBinary(t, "BINARY-v1")
+	if _, err := c.Install(); err != nil {
+		t.Fatal(err)
+	}
+	l := c.Layout()
+	// An install that owns the alias name, with the file itself gone.
+	m, _, _ := loadManifest(l.ManifestPath())
+	m.Aliases = []string{l.LegacyBinName()}
+	if err := m.save(l.ManifestPath()); err != nil {
+		t.Fatal(err)
+	}
+	if pathPresent(l.LegacyExecutablePath()) {
+		t.Fatal("the alias should not exist yet")
+	}
+
+	res, err := c.Install()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(res.Aliases, l.LegacyBinName()) {
+		t.Errorf("result aliases = %v, want the recreated %q", res.Aliases, l.LegacyBinName())
+	}
+	if got := mustContent(t, l.LegacyExecutablePath()); got != "BINARY-v1" {
+		t.Errorf("recreated alias = %q, want the primary's bytes", got)
+	}
+	if len(res.Warnings) != 0 {
+		t.Errorf("recreating an absent alias must not warn: %v", res.Warnings)
+	}
+}
+
+// TestFailedAliasWriteStaysInTheManifest: the manifest records the names this
+// install OWNS, so an alias whose write failed is retried by the next run and
+// reported as broken in the meantime. Recording only successful writes would
+// make one transient failure silently drop the command forever.
+func TestFailedAliasWriteStaysInTheManifest(t *testing.T) {
+	c, l := installLegacyOnly(t, "BINARY-v1")
+	if _, err := c.Install(); err != nil { // adopt: primary + alias
+		t.Fatal(err)
+	}
+	c.exeOverride = l.ExecutablePath()
+	// Make the alias name unwritable by putting a non-empty directory there: the
+	// rename that installs the symlink cannot replace it.
+	if err := os.Remove(l.LegacyExecutablePath()); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(l.LegacyExecutablePath(), "blocker"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := c.Install()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(res.Aliases, l.LegacyBinName()) {
+		t.Errorf("result aliases = %v, must not claim an alias that was not written", res.Aliases)
+	}
+	if !containsSubstr(res.Warnings, "could not keep the") {
+		t.Errorf("warnings = %v, want one naming the failed alias", res.Warnings)
+	}
+	m, _, _ := loadManifest(l.ManifestPath())
+	if !slices.Contains(m.Aliases, l.LegacyBinName()) {
+		t.Errorf("manifest aliases = %v, want the owned name kept for the next retry", m.Aliases)
+	}
+	// And doctor reports the command as broken rather than silently forgetting it.
+	rep, err := c.Doctor()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := rep.Problem(FieldAlias); p == "" {
+		t.Error("doctor should report the alias that could not be written")
+	}
+}
+
+// TestDoctorChecksAliasIdentity: an alias that EXISTS but does not run the
+// installed binary is the dangerous case — the command works, so nothing looks
+// wrong, and it silently runs another binary or a version behind. Presence is
+// therefore not enough; the link target and a copy's bytes are both checked.
+func TestDoctorChecksAliasIdentity(t *testing.T) {
+	t.Run("symlink to the wrong target", func(t *testing.T) {
+		c, l := installLegacyOnly(t, "BINARY-v1")
+		if _, err := c.Install(); err != nil {
+			t.Fatal(err)
+		}
+		c.exeOverride = l.ExecutablePath()
+		// Healthy first.
+		rep, err := c.Doctor()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rep.Aliases) != 1 || !rep.Aliases[0].Valid {
+			t.Fatalf("a correct alias must be valid: %+v", rep.Aliases)
+		}
+		if p := rep.Problem(FieldAlias); p != "" {
+			t.Errorf("a correct alias must not be a problem: %q", p)
+		}
+
+		// Repoint it at something else entirely.
+		other := filepath.Join(l.ExecutableDir(), "something-else")
+		if err := os.WriteFile(other, []byte("NOT-OURS"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Remove(l.LegacyExecutablePath()); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink("something-else", l.LegacyExecutablePath()); err != nil {
+			t.Fatal(err)
+		}
+		rep, err = c.Doctor()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rep.Aliases) != 1 || rep.Aliases[0].Valid {
+			t.Fatalf("an alias pointing elsewhere must not be valid: %+v", rep.Aliases)
+		}
+		p := rep.Problem(FieldAlias)
+		if !strings.Contains(p, "something-else") || !strings.Contains(p, "self update") {
+			t.Errorf("alias problem = %q, want the wrong target and the fixing verb", p)
+		}
+		if rep.OK() {
+			t.Error("an alias running the wrong binary must make doctor report needs-attention")
+		}
+
+		// And the verb the problem names actually heals it, with no new release.
+		c.Doer = &fakeDoer{repo: c.repo(), tag: "v1.0.0", asset: c.assetName()}
+		ures, err := c.Update(context.Background(), UpdateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(ures.LayoutRepaired) == 0 {
+			t.Errorf("expected the repointed alias to be reported: %+v", ures)
+		}
+		assertAlias(t, l, "BINARY-v1")
+		rep, err = c.Doctor()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rep.Aliases) != 1 || !rep.Aliases[0].Valid {
+			t.Fatalf("the alias must be valid after the repair: %+v", rep.Aliases)
+		}
+		if p := rep.Problem(FieldAlias); p != "" {
+			t.Errorf("doctor still reports an alias problem after the fix: %q", p)
+		}
+	})
+
+	t.Run("stale windows copy", func(t *testing.T) {
+		c := testConfig(t.TempDir())
+		c.GOOS = "windows"
+		c.exeOverride = writeFakeBinary(t, "BINARY-v1")
+		if _, err := c.Install(); err != nil {
+			t.Fatal(err)
+		}
+		l := c.Layout()
+		// An alias copy of an older build, recorded as ours.
+		if err := os.WriteFile(l.LegacyExecutablePath(), []byte("BINARY-OLD"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		m, _, _ := loadManifest(l.ManifestPath())
+		m.Aliases = []string{l.LegacyBinName()}
+		if err := m.save(l.ManifestPath()); err != nil {
+			t.Fatal(err)
+		}
+		c.exeOverride = l.ExecutablePath()
+
+		rep, err := c.Doctor()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rep.Aliases) != 1 || rep.Aliases[0].Valid {
+			t.Fatalf("a stale copy must not be valid: %+v", rep.Aliases)
+		}
+		if p := rep.Problem(FieldAlias); !strings.Contains(p, "stale copy") {
+			t.Errorf("alias problem = %q, want it named as a stale copy", p)
+		}
+
+		// `self update` is the verb the problem names, so it must be the verb that
+		// heals it — on an install that is already current, with no release to
+		// download. Without that, the stale copy runs an old version forever while
+		// doctor complains about it.
+		c.Doer = &fakeDoer{repo: c.repo(), tag: "v1.0.0", asset: c.assetName()}
+		ures, err := c.Update(context.Background(), UpdateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if ures.Updated {
+			t.Errorf("no version changed, so updated must stay false: %+v", ures)
+		}
+		if len(ures.LayoutRepaired) == 0 {
+			t.Errorf("expected the refreshed copy to be reported: %+v", ures)
+		}
+		if got := mustContent(t, l.LegacyExecutablePath()); got != "BINARY-v1" {
+			t.Errorf("alias copy = %q, want the primary's bytes", got)
+		}
+		rep, err = c.Doctor()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rep.Aliases) != 1 || !rep.Aliases[0].Valid {
+			t.Fatalf("a refreshed copy must be valid: %+v", rep.Aliases)
+		}
+		if p := rep.Problem(FieldAlias); p != "" {
+			t.Errorf("doctor still reports an alias problem after the fix: %q", p)
+		}
+
+		// A now-valid copy must not be re-swapped on every later check.
+		again, err := c.Update(context.Background(), UpdateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(again.LayoutRepaired) != 0 {
+			t.Errorf("a healthy alias must need no repair: %v", again.LayoutRepaired)
+		}
+	})
+}
+
+// TestManifestAliasNamesAreValidated: every alias name in the manifest becomes a
+// path that install overwrites and uninstall DELETES, and the manifest is a
+// plain file any process can rewrite. So only the one managed name is ever
+// honored — a name that escapes the install dir is ignored, not resolved.
+func TestManifestAliasNamesAreValidated(t *testing.T) {
+	c := testConfig(t.TempDir())
+	c.exeOverride = writeFakeBinary(t, "BINARY-v1")
+	if _, err := c.Install(); err != nil {
+		t.Fatal(err)
+	}
+	l := c.Layout()
+	c.exeOverride = l.ExecutablePath()
+
+	// A traversal that would resolve to the CLI home's config file, plus an
+	// unrelated command name.
+	escape := filepath.Join("..", "config.json")
+	m, _, _ := loadManifest(l.ManifestPath())
+	m.Aliases = []string{escape, "someone-elses-tool", l.LegacyBinName()}
+	if err := m.save(l.ManifestPath()); err != nil {
+		t.Fatal(err)
+	}
+	// A real file where the traversal would land, so a deletion would be visible.
+	victim := l.AliasPath(escape)
+	if err := os.WriteFile(victim, []byte("MINE"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := c.aliasPaths(l, m); len(got) != 1 || got[0] != l.LegacyExecutablePath() {
+		t.Fatalf("aliasPaths = %v, want only %q", got, l.LegacyExecutablePath())
+	}
+	for _, st := range c.aliasStatuses(l, m, c.exeOverride) {
+		if st.Name != l.LegacyBinName() {
+			t.Errorf("aliasStatuses reported an unmanaged name %q", st.Name)
+		}
+	}
+	// And an uninstall that removes the binary leaves the traversal target alone.
+	if _, err := c.Uninstall(UninstallOptions{RemoveBinary: true}); err != nil {
+		t.Fatal(err)
+	}
+	if b, err := os.ReadFile(victim); err != nil || string(b) != "MINE" {
+		t.Fatalf("the traversal target was touched: %q, %v", b, err)
+	}
+}
+
+// TestDoctorNotesAreNotProblems: the states that work but could be tidier are
+// reported as notes and leave the install healthy — an install carrying the
+// earlier product's names is supported, not broken, so `self doctor` must not
+// start failing for it.
+func TestDoctorNotesAreNotProblems(t *testing.T) {
+	t.Run("alias-only layout", func(t *testing.T) {
+		c, l := installLegacyOnly(t, "BINARY-v1")
+		rep, err := c.Doctor()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !rep.LegacyLayout {
+			t.Error("the alias-only layout was not reported")
+		}
+		if !containsSubstr(rep.Notes, "self update") {
+			t.Errorf("notes = %v, want one naming the verb that adds %q", rep.Notes, l.BinName())
+		}
+		if p := rep.Problem(FieldBinary); p != "" {
+			t.Errorf("the alias-only layout must not be a problem: %q", p)
+		}
+	})
+
+	t.Run("unmanaged file at the alias name", func(t *testing.T) {
+		c := testConfig(t.TempDir())
+		c.exeOverride = writeFakeBinary(t, "BINARY-v1")
+		if _, err := c.Install(); err != nil {
+			t.Fatal(err)
+		}
+		l := c.Layout()
+		if err := os.WriteFile(l.LegacyExecutablePath(), []byte("#!/bin/sh\nexec other\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		c.exeOverride = l.ExecutablePath()
+
+		rep, err := c.Doctor()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !containsSubstr(rep.Notes, "not a file this install manages") {
+			t.Errorf("notes = %v, want one naming the unmanaged file", rep.Notes)
+		}
+		if len(rep.Aliases) != 0 {
+			t.Errorf("an unowned file must not be reported as our alias: %+v", rep.Aliases)
+		}
+		if p := rep.Problem(FieldAlias); p != "" {
+			t.Errorf("someone else's file is not an alias problem: %q", p)
+		}
+	})
+}
+
+// TestUpdateDryRunOnACurrentInstallWritesNothing: `self update --dry-run` is a
+// read-only question, and being already current does not make it a write. It
+// reports the layout fixes a real run WOULD make, with CheckedOnly set, and
+// leaves every byte and timestamp in the install dir and the home alone.
+func TestUpdateDryRunOnACurrentInstallWritesNothing(t *testing.T) {
+	c, l := installLegacyOnly(t, "BINARY-v1")
+	c.Doer = &fakeDoer{repo: c.repo(), tag: "v1.0.0", asset: c.assetName()}
+
+	before := snapshotTree(t, l.ExecutableDir(), l.Home())
+	res, err := c.Update(context.Background(), UpdateOptions{DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.CheckedOnly {
+		t.Errorf("a dry run must report checkedOnly: %+v", res)
+	}
+	if res.Updated {
+		t.Errorf("a dry run must not report an update: %+v", res)
+	}
+	// The alias-only layout needs the primary created, so the dry run must SAY so.
+	if len(res.LayoutRepaired) == 0 {
+		t.Errorf("expected the pending fixes to be reported: %+v", res)
+	}
+	if !containsSubstr(res.LayoutRepaired, l.BinName()) {
+		t.Errorf("layoutRepaired = %v, want the missing %q named", res.LayoutRepaired, l.BinName())
+	}
+	// And nothing may have moved on disk.
+	if pathPresent(l.ExecutablePath()) {
+		t.Error("a dry run created the primary binary")
+	}
+	if diff := treeDiff(before, snapshotTree(t, l.ExecutableDir(), l.Home())); diff != "" {
+		t.Errorf("a dry run changed the install:\n%s", diff)
+	}
+
+	// The real run then does what the dry run described.
+	res, err = c.Update(context.Background(), UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.CheckedOnly {
+		t.Errorf("a real run must not report checkedOnly: %+v", res)
+	}
+	if !fileExists(l.ExecutablePath()) {
+		t.Error("the real run did not create the primary binary")
+	}
+}
+
+// snapshotTree records the name, size, mode, and content hash of every entry
+// under the given directories, so a test can assert that an operation changed
+// nothing at all rather than only checking the files it thought to name.
+func snapshotTree(t *testing.T, dirs ...string) map[string]string {
+	t.Helper()
+	out := map[string]string{}
+	for _, dir := range dirs {
+		err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return nil // an absent dir is a legitimate state to snapshot
+			}
+			fi, ierr := d.Info()
+			if ierr != nil {
+				return nil
+			}
+			desc := fmt.Sprintf("mode=%s", fi.Mode())
+			if fi.Mode().IsRegular() {
+				sum, herr := sha256File(path)
+				if herr != nil {
+					sum = "unreadable"
+				}
+				desc += fmt.Sprintf(" size=%d sha=%s", fi.Size(), sum)
+			}
+			if fi.Mode()&os.ModeSymlink != 0 {
+				desc += " -> " + symlinkTarget(path)
+			}
+			out[path] = desc
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	return out
+}
+
+// treeDiff describes how two snapshots differ, or "" when they are identical.
+func treeDiff(before, after map[string]string) string {
+	var lines []string
+	for path, was := range before {
+		switch now, ok := after[path]; {
+		case !ok:
+			lines = append(lines, "removed: "+path)
+		case now != was:
+			lines = append(lines, fmt.Sprintf("changed: %s (%s -> %s)", path, was, now))
+		}
+	}
+	for path := range after {
+		if _, ok := before[path]; !ok {
+			lines = append(lines, "created: "+path)
+		}
+	}
+	sort.Strings(lines)
+	return strings.Join(lines, "\n")
 }

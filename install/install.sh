@@ -14,6 +14,9 @@
 # SHA-256 against the value embedded below, extract it, and hand off to
 # `dgx-cli self install`, which places the binary, wires PATH, and writes the
 # install manifest. Trust is TLS + SHA-256.
+#
+# It touches the command layout only: an existing CLI home is left exactly where
+# it is (MIGRATION.md covers moving it).
 set -eu
 
 # >>> release-pin (filled at release time) >>>

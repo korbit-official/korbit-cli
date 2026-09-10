@@ -519,47 +519,87 @@ type StopResult struct {
 	Stopped bool `json:"stopped"`
 	PID     int  `json:"pid"`
 	Port    int  `json:"port"`
+	// StaleRemoved lists pidfiles this stop deleted because the process they
+	// named is gone. They are reported, not silently swept, because a leftover
+	// pidfile is what makes `start` believe a sandbox is already serving this
+	// database — a user told so, who knows nothing is, needs to see that the
+	// blocker has been cleared.
+	StaleRemoved []string `json:"staleRemoved,omitempty"`
 }
 
 // Stop reads the pidfile, SIGTERMs the process, and waits for it to exit (the
 // bundle removes its own pidfile on a clean shutdown). It is runtime-free.
+//
+// It considers BOTH database spellings (pidfileCandidates), not only the one
+// this home's layout implies. A stale pidfile beside the other spelling reads as
+// a live sandbox — a crashed run whose pid was recycled looks alive — and
+// `sandbox stop` is the command that clears it. A stop that swept only one
+// spelling would leave that unable to succeed.
 func (m *Manager) Stop(ctx context.Context) (StopResult, error) {
-	pf, err := m.readPidfile()
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return StopResult{Stopped: false}, nil // nothing running
+	candidates := m.pidfileCandidates()
+	res := StopResult{}
+	var live Pidfile
+	livePath := ""
+	for i, path := range candidates {
+		pf, err := parsePidfile(path)
+		if err != nil {
+			// A corrupt pidfile under the spelling actually in use is a real fault
+			// worth reporting; under the other one it is a leftover this command is
+			// not about, so it is logged and stepped over.
+			if errors.Is(err, os.ErrNotExist) || i > 0 {
+				if !errors.Is(err, os.ErrNotExist) {
+					m.log().Debug("ignoring an unreadable sandbox pidfile", "path", path, "err", err.Error())
+				}
+				continue
+			}
+			return StopResult{}, err
 		}
-		return StopResult{}, err
+		if !processAlive(pf.PID) {
+			if os.Remove(path) == nil {
+				m.log().Debug("removed a stale sandbox pidfile", "path", path, "pid", pf.PID)
+				res.StaleRemoved = append(res.StaleRemoved, path)
+			}
+			// Keep the pid/port for the report — the previous behavior for the
+			// single-spelling case, and still the most useful thing to say.
+			res.PID, res.Port = pf.PID, pf.Port
+			continue
+		}
+		if livePath == "" {
+			live, livePath = pf, path
+		}
 	}
-	if !processAlive(pf.PID) {
-		_ = os.Remove(m.pidfilePath()) // stale
-		return StopResult{Stopped: false, PID: pf.PID, Port: pf.Port}, nil
+	if livePath == "" {
+		return res, nil // nothing running; any stale files are cleared
 	}
+	pf := live
+	res.PID, res.Port = pf.PID, pf.Port
 	proc, err := os.FindProcess(pf.PID)
 	if err != nil {
-		return StopResult{}, err
+		return res, err
 	}
-	m.log().Debug("stopping sandbox (SIGTERM)", "pid", pf.PID, "port", pf.Port)
+	m.log().Debug("stopping sandbox (SIGTERM)", "pid", pf.PID, "port", pf.Port, "pidfile", livePath)
 	if err := signalStop(proc); err != nil {
-		return StopResult{}, err
+		return res, err
 	}
 	// Wait for the graceful exit (pidfile removed by the bundle, or the process
 	// to die).
 	if waitForExit(pf.PID, 10*time.Second) {
 		m.log().Info("sandbox stopped", "pid", pf.PID, "port", pf.Port)
-		return StopResult{Stopped: true, PID: pf.PID, Port: pf.Port}, nil
+		res.Stopped = true
+		return res, nil
 	}
 	// SIGTERM was ignored: escalate to SIGKILL (can't be caught) and give it a
 	// short final wait before giving up — so a wedged sandbox needs no manual
 	// kill -9.
 	m.log().Warn("sandbox ignored SIGTERM — escalating to SIGKILL", "pid", pf.PID)
 	if err := signalKill(proc); err != nil {
-		return StopResult{Stopped: false, PID: pf.PID, Port: pf.Port}, err
+		return res, err
 	}
 	if waitForExit(pf.PID, 2*time.Second) {
-		return StopResult{Stopped: true, PID: pf.PID, Port: pf.Port}, nil
+		res.Stopped = true
+		return res, nil
 	}
-	return StopResult{Stopped: false, PID: pf.PID, Port: pf.Port}, fmt.Errorf("sandbox PID %d did not exit even after SIGKILL", pf.PID)
+	return res, fmt.Errorf("sandbox PID %d did not exit even after SIGKILL", pf.PID)
 }
 
 // waitForExit polls until the process is gone or the timeout elapses, returning
@@ -598,6 +638,11 @@ type StatusResult struct {
 	DB           string      `json:"db"`
 	KeyName      string      `json:"keyName"`
 	KeyImported  bool        `json:"keyImported"`
+	// StalePidfiles lists pidfiles in this state dir whose process is gone, under
+	// EITHER database spelling. They are worth reporting rather than ignoring: a
+	// pidfile naming a live-looking pid reads as a sandbox in use, so a leftover
+	// here makes `start` refuse for no reason. `sandbox stop` removes them.
+	StalePidfiles []string `json:"stalePidfiles,omitempty"`
 }
 
 // resolvedRuntimeKind reports which runtime a sandbox command would use, without
@@ -674,6 +719,16 @@ func (m *Manager) Status(ctx context.Context) StatusResult {
 		if res.Server.Running && pf.Port != 0 {
 			res.Server.Reachable = m.probeReady(ctx, pf.Port)
 		}
+	}
+	// Report a pidfile whose process is gone, under either spelling. Status is
+	// read-only, so it names them rather than removing them; `sandbox stop` is the
+	// verb that clears them.
+	for _, path := range m.pidfileCandidates() {
+		pf, err := parsePidfile(path)
+		if err != nil || processAlive(pf.PID) {
+			continue
+		}
+		res.StalePidfiles = append(res.StalePidfiles, path)
 	}
 	if m.deps.KeyManager != nil {
 		if list, err := m.deps.KeyManager.List(); err == nil {

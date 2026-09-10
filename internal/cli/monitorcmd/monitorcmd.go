@@ -30,10 +30,9 @@ import (
 	"github.com/digitalx-official/digitalx-cli/internal/cli/probe"
 	"github.com/digitalx-official/digitalx-cli/internal/clock"
 	"github.com/digitalx-official/digitalx-cli/internal/cmdmeta"
-	"github.com/digitalx-official/digitalx-cli/internal/fslock"
+	"github.com/digitalx-official/digitalx-cli/internal/config"
 	"github.com/digitalx-official/digitalx-cli/internal/jqfilter"
 	"github.com/digitalx-official/digitalx-cli/internal/keys"
-	"github.com/digitalx-official/digitalx-cli/internal/legacyfile"
 	"github.com/digitalx-official/digitalx-cli/internal/logging"
 	"github.com/digitalx-official/digitalx-cli/internal/ops"
 	"github.com/digitalx-official/digitalx-cli/internal/output"
@@ -95,67 +94,52 @@ func (r *rateLimiter) allow(nowMs int64) bool {
 	return true
 }
 
-// botDBFileName is the default script-local database under the CLI home —
+// BotDBDefaultName is the script-local database's name under a CLI home —
 // deliberately separate from the action journal file (a bot script must never
-// touch the journal). legacyBotDBFileName is the name a home created under the
-// earlier product name carries; the default path adopts it (see botDBPath) so a
-// script's own tables survive.
+// touch the journal), and carrying no product name: the directory already says
+// whose data it is. LegacyBotDBFileName is the name a home created under the
+// earlier product name carries, used for exactly one home (see botDBFileName).
 const (
-	botDBFileName       = "digitalx-bot.db"
-	legacyBotDBFileName = "korbit-bot.db"
+	BotDBDefaultName    = "bot.db"
+	LegacyBotDBFileName = "korbit-bot.db"
 )
 
 // botDBSidecars are the write-ahead-log files SQLite keeps beside the bot
-// database; they move with it when the legacy name is adopted.
+// database; they belong to it and are removed with it.
 var botDBSidecars = []string{"-wal", "-shm"}
 
-// botDBPath is the default bot-database path under home, adopting a database
-// left under the earlier product name and returning the path to actually open.
-// It is called only when the JavaScript runtime needs the DEFAULT database: an
-// explicit --db is used verbatim, and a plain streaming run never touches the
-// bot database at all.
-//
-// A rename that FAILS returns the legacy path, so this run keeps using the
-// database that exists. Returning the current path instead would create an empty
-// database there, and the next run would see the current name present and never
-// retry — orphaning the script's tables for good.
-//
-// The rename is serialized against concurrent CLI processes by the database's
-// own sidecar lock (the fslock convention "<datafile>.lock") — a long-running
-// bot plus an ad-hoc command is the expected concurrency here. No other code
-// acquires it, so it has no ordering constraint; a lock that cannot be taken is
-// not fatal.
-func botDBPath(home string, log *slog.Logger) string {
-	l := logging.Or(log)
-	path := filepath.Join(home, botDBFileName)
-	legacy := filepath.Join(home, legacyBotDBFileName)
-	if unlock, err := fslock.Lock(path + ".lock"); err == nil {
-		defer unlock()
-	} else {
-		l.Debug("bot database adoption lock unavailable — proceeding unlocked", "lock", path+".lock", "err", err)
+// botDBFileName is the bot database's filename inside home: BotDBDefaultName,
+// except in a home whose own directory name is the earlier product's
+// (config.LegacyLayout), where it is LegacyBotDBFileName so an older `korbit`
+// binary still sharing that directory opens the same file.
+func botDBFileName(home string) string {
+	if config.LegacyLayout(home) {
+		return LegacyBotDBFileName
 	}
-	adopted, err := legacyfile.Adopt(path, legacy, botDBSidecars...)
-	switch {
-	case err == nil:
-		return path
-	case !adopted:
-		l.Warn("could not adopt the existing bot database — using it under its existing name",
-			"from", legacy, "to", path, "err", err)
-		return legacy
-	default:
-		l.Warn("adopted the bot database but left a sidecar behind",
-			"from", legacy, "to", path, "err", err)
-		return path
-	}
+	return BotDBDefaultName
 }
 
-// LegacyBotDBPaths returns the bot-database files a home created under the
-// earlier product name carries, for a caller removing the CLI's data.
-func LegacyBotDBPaths(home string) []string {
-	legacy := filepath.Join(home, legacyBotDBFileName)
-	paths := []string{legacy}
-	for _, sidecar := range botDBSidecars {
-		paths = append(paths, legacy+sidecar)
+// botDBPath is the default bot-database path under home. The directory decides
+// the filename (botDBFileName) and nothing is renamed on open, so this is a pure
+// path computation. It is called only when the JavaScript runtime needs the
+// DEFAULT database: an explicit --db is used verbatim, and a plain streaming run
+// never touches the bot database at all.
+func botDBPath(home string) string {
+	return filepath.Join(home, botDBFileName(home))
+}
+
+// BotDBPaths returns every bot-database file that belongs to home: the database
+// under BOTH spellings, each with its sidecars, for a caller removing the CLI's
+// data (`self uninstall`). Both are listed because a home whose directory was
+// renamed without its files still carries the other spelling.
+func BotDBPaths(home string) []string {
+	var paths []string
+	for _, name := range []string{BotDBDefaultName, LegacyBotDBFileName} {
+		db := filepath.Join(home, name)
+		paths = append(paths, db)
+		for _, sidecar := range botDBSidecars {
+			paths = append(paths, db+sidecar)
+		}
 	}
 	return paths
 }
@@ -305,8 +289,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 
 	// --db is validated here so a bad value is a usage error before any work,
 	// but the DEFAULT path is resolved only where the JavaScript runtime actually
-	// opens it (below): resolving it may rename a database left under the earlier
-	// product name, and a plain streaming run has no business touching the bot
+	// opens it (below): a plain streaming run has no business touching the bot
 	// database at all.
 	dbOverride := ""
 	if cmd.Flags().Changed("db") {
@@ -557,7 +540,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string) error {
 		api.Journal = rec
 		dbPath := dbOverride
 		if dbPath == "" {
-			dbPath = botDBPath(home, cx.Log)
+			dbPath = botDBPath(home)
 		}
 		bot, err = botapi.New(botapi.Options{
 			Where:          where,

@@ -31,6 +31,10 @@ irm https://docs.digitalx.miraeasset.com/install.ps1 | iex
 
 이후 바이너리는 스스로 관리됩니다 — `dgx-cli self update`, `dgx-cli self doctor`, `dgx-cli self uninstall`.
 
+이전 제품 이름인 `korbit`으로 설치했더라도 그대로 동작합니다. 그 설치에서 `dgx-cli`로
+넘어오는 방법과 데이터 디렉터리의 처리 방식은 [`MIGRATION.md`](MIGRATION.md)에
+정리되어 있습니다.
+
 직접 관리하고 싶다면 릴리스 바이너리를 내려받거나, 소스에서 `go install github.com/digitalx-official/digitalx-cli@latest`로 설치하세요.
 
 ## 빠른 시작

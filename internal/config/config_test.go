@@ -95,6 +95,62 @@ func mkdir(t *testing.T, path string) {
 	}
 }
 
+// TestHomeNormalizesAPinnedRelativePath: a pinned home reaches the CLI as
+// whatever the user typed, and the basename of that string is what picks the file
+// names inside it (LegacyLayout). Pinned as `.` from inside ~/.korbit-cli, the
+// raw spelling has basename `.` — which reads as a current-layout home and starts
+// a second set of databases in a directory that already holds one. So the path is
+// made absolute first.
+func TestHomeNormalizesAPinnedRelativePath(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), LegacyDirName)
+	mkdir(t, dir)
+	t.Chdir(dir)
+
+	got := Home(env(map[string]string{"KORBIT_CLI_HOME": "."}))
+	if !filepath.IsAbs(got) {
+		t.Errorf("Home = %q, want an absolute path", got)
+	}
+	if !LegacyLayout(got) {
+		t.Errorf("LegacyLayout(%q) = false; a home pinned as `.` from inside %s is that directory", got, LegacyDirName)
+	}
+	// And the raw spelling answers the same way, since LegacyLayout normalizes too.
+	if !LegacyLayout(".") {
+		t.Error(`LegacyLayout(".") = false from inside a legacy-layout home`)
+	}
+}
+
+// TestLegacyLayoutFollowsTheFilesystemsCaseRules: on a case-insensitive
+// filesystem `.KORBIT-CLI` and `.korbit-cli` are the SAME directory, so both
+// spellings must pick the same file names. Where names are case-sensitive they
+// are different directories and the exact spelling is what counts.
+func TestLegacyLayoutFollowsTheFilesystemsCaseRules(t *testing.T) {
+	upper := filepath.Join(t.TempDir(), strings.ToUpper(LegacyDirName))
+	mkdir(t, upper)
+	sameDir := sameFile(t, upper, filepath.Join(filepath.Dir(upper), LegacyDirName))
+	if !sameDir {
+		t.Skipf("%s is on a case-sensitive filesystem, where the two spellings are different directories", upper)
+	}
+	if !LegacyLayout(upper) {
+		t.Errorf("LegacyLayout(%q) = false, but it is the same directory as %s on this filesystem", upper, LegacyDirName)
+	}
+}
+
+// sameFile reports whether two paths name the same directory, which is how the
+// case-sensitivity of the filesystem under them is established rather than
+// assumed. A lowercase path that does not exist means the names are distinct.
+func sameFile(t *testing.T, a, b string) bool {
+	t.Helper()
+	fa, err := os.Stat(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fb, err := os.Stat(b)
+	if err != nil {
+		return false
+	}
+	return os.SameFile(fa, fb)
+}
+
 func TestLoadMissingFileDefaults(t *testing.T) {
 	cfg, err := Load(t.TempDir(), nil)
 	if err != nil {
