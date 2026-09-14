@@ -40,18 +40,13 @@ if [ ! -f "$ASC_API_KEY_FILE" ]; then
 fi
 
 # GoReleaser lays each build target out as dist/<id>_<os>_<arch>[...]/<binary>,
-# where <binary> is a build's `binary:` value in .goreleaser.yaml. There are TWO
-# darwin builds of the same program — dgx-cli and korbit — and BOTH ship, so both
-# names are collected here: the dgx-cli binary is what every fresh install and
-# every .mcpb carries, and the korbit binary is what an existing install updates
-# through. Missing either leaves shipped binaries unnotarized, which Gatekeeper
-# rejects on a user's first run. Keep this list in step with the `binary:` values.
-# Collected with a read loop rather than `mapfile`, which doesn't exist in macOS's
-# bash 3.2.
+# where <binary> is the build's `binary:` value in .goreleaser.yaml — so the name
+# matched here must stay in step with that value. Collected with a read loop
+# rather than `mapfile`, which doesn't exist in macOS's bash 3.2.
 bins=()
 while IFS= read -r line; do
 	bins+=("$line")
-done < <(find "$dist" -type f \( -name dgx-cli -o -name korbit \) -path '*darwin*')
+done < <(find "$dist" -type f -name dgx-cli -path '*darwin*')
 if [ ${#bins[@]} -eq 0 ]; then
 	echo "macos-notarize: ERROR no darwin binaries found under $dist (run goreleaser first)" >&2
 	exit 1
@@ -64,7 +59,7 @@ for bin in "${bins[@]}"; do
 	zip="$work/$(basename "$(dirname "$bin")").zip"
 	echo "macos-notarize: zipping $bin" >&2
 	# zip from the binary's own directory, naming the member by its own basename,
-	# so the archive holds just the binary and works for either build's name.
+	# so the archive holds just the binary and nothing else.
 	(cd "$(dirname "$bin")" && zip -q -X "$zip" "$(basename "$bin")")
 	echo "macos-notarize: submitting $zip" >&2
 	rcodesign notary-submit --api-key-file "$ASC_API_KEY_FILE" --wait "$zip"

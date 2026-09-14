@@ -57,6 +57,16 @@
 // against a compromised release) — verifies the detached RSA signature over
 // checksums.txt. See verify.go for the full policy (including the empty-cert
 // kill switch and why any fetch failure is fatal).
+//
+// # What a release names for itself
+//
+// The archive to download and the binary basename inside it come from the
+// release's own release-manifest.json rather than from constants compiled into
+// this binary, so a later release can rename either without stranding installs
+// made before it. The manifest is listed in checksums.txt, so the one signature
+// over that file authenticates it too — no second key, no second host.
+// resolveTarget in release.go holds the policy, including the fallback to the
+// compiled-in names.
 package selfupdate
 
 import (

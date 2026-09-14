@@ -5,8 +5,7 @@
 #
 # Sign one macOS (Mach-O) binary with rcodesign, for notarization eligibility.
 # Invoked by GoReleaser as a per-target post-build hook (see .goreleaser.yaml),
-# once per build — so both the dgx-cli binary and the identically built korbit
-# binary that the legacy archive set carries are signed.
+# once per build target.
 #
 # It is a no-op for non-darwin targets. The signing identity is taken from the
 # environment — macOS keychain OR a PKCS#12 (.p12/.pfx) file, so the same script
@@ -31,11 +30,11 @@ bin="${1:?usage: macos-sign.sh <binary-path>}"
 # Reverse-DNS code-signing identifier, pinned (not derived from the on-disk
 # filename). The macOS keychain backend binds each stored secret's ACL to this
 # binary's designated requirement, which embeds this identifier; deriving it
-# from the filename (e.g. "dgx-cli" vs "korbit") would change the requirement
-# and break the ACL match on the next build. Keep it stable across versions AND
-# across the binary name: every key already in a user's Keychain carries an ACL
-# bound to this exact identifier, so a new one makes macOS re-prompt for
-# authorization on each stored key. Both binaries sign under it.
+# from the filename would change the requirement whenever the binary is
+# renamed, and break the ACL match. Keep it stable across versions AND across
+# the binary name: every key already in a user's Keychain carries an ACL bound
+# to this exact identifier, so a new one makes macOS re-prompt for
+# authorization on each stored key.
 bundle_id="kr.co.korbit.korbit-cli"
 
 # rcodesign only signs Mach-O; skip every other target.

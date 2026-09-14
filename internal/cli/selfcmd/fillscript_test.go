@@ -37,11 +37,11 @@ func TestFillInstallTemplates(t *testing.T) {
 	checksums := filepath.Join(out, "checksums.txt")
 	// Archives (must be embedded) + a .mcpb and checksums.txt (must be excluded).
 	sums := strings.Join([]string{
-		"aaaa000000000000000000000000000000000000000000000000000000000001  korbit_darwin_arm64.tar.gz",
-		"aaaa000000000000000000000000000000000000000000000000000000000002  korbit_linux_amd64.tar.gz",
-		"aaaa000000000000000000000000000000000000000000000000000000000003  korbit_linux_arm64.tar.gz",
-		"aaaa000000000000000000000000000000000000000000000000000000000004  korbit_windows_amd64.zip",
-		"aaaa000000000000000000000000000000000000000000000000000000000005  korbit_windows_arm64.zip",
+		"aaaa000000000000000000000000000000000000000000000000000000000001  digitalx-cli_darwin_arm64.tar.gz",
+		"aaaa000000000000000000000000000000000000000000000000000000000002  digitalx-cli_linux_amd64.tar.gz",
+		"aaaa000000000000000000000000000000000000000000000000000000000003  digitalx-cli_linux_arm64.tar.gz",
+		"aaaa000000000000000000000000000000000000000000000000000000000004  digitalx-cli_windows_amd64.zip",
+		"aaaa000000000000000000000000000000000000000000000000000000000005  digitalx-cli_windows_arm64.zip",
 		"bbbb000000000000000000000000000000000000000000000000000000000006  digitalx_darwin_arm64.mcpb",
 		"cccc000000000000000000000000000000000000000000000000000000000007  checksums.txt",
 	}, "\n") + "\n"
@@ -65,7 +65,7 @@ func TestFillInstallTemplates(t *testing.T) {
 		t.Error("install.ps1 version not pinned")
 	}
 	// Every archive hash embedded; non-archive assets excluded.
-	for _, want := range []string{"korbit_darwin_arm64.tar.gz", "korbit_linux_amd64.tar.gz", "korbit_windows_arm64.zip"} {
+	for _, want := range []string{"digitalx-cli_darwin_arm64.tar.gz", "digitalx-cli_linux_amd64.tar.gz", "digitalx-cli_windows_arm64.zip"} {
 		if !strings.Contains(sh, want) || !strings.Contains(ps, want) {
 			t.Errorf("filled scripts missing archive %q", want)
 		}

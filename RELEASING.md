@@ -12,46 +12,20 @@ per-platform [`.mcpb` Desktop Extension](#desktop-extensions-mcpb). macOS
 **notarization** is a deliberate second step (`make notarize`) run only for a
 real, published release.
 
-## Two archive sets per release
+## What a release publishes
 
-Every release publishes the **same program twice**, under two names:
+| Asset | What it is |
+| --- | --- |
+| `digitalx-cli_<os>_<arch>.{tar.gz,zip}` | the `dgx-cli` binary, plus the licence, notice and readme files |
+| `digitalx_<os>_<arch>.mcpb` | a [Desktop Extension](#desktop-extensions-mcpb), one per platform |
+| `install.sh`, `install.ps1` | the installers, pinned to this release's checksums |
+| `release-manifest.json` | [the names this release uses](#the-release-manifest) |
+| `checksums.txt`, `checksums.txt.sig` | a sha256 of every asset above, and one signature over that |
 
-| Asset | Binary inside | Who downloads it |
-| --- | --- | --- |
-| `digitalx-cli_<os>_<arch>.{tar.gz,zip}` | `dgx-cli` | the installers, and `dgx-cli self update` |
-| `korbit_<os>_<arch>.{tar.gz,zip}` | `korbit` | an installed `korbit` binary updating itself |
-
-The primary **archive** is named for the product (`digitalx-cli`) while the
-**binary** inside it is `dgx-cli` — the two names are independent, and both
-`assetName()` in `internal/selfupdate/release.go` and the installers build the
-archive name, then extract `dgx-cli` out of it.
-
-The two sets are built from the same source with the same flags, ldflags, and
-target matrix — they differ only in the compiled binary's filename
-(`.goreleaser.yaml` carries a second `build` and a second `archives` entry for
-the legacy set).
-
-The legacy set exists because an already-installed `korbit` asks for a fixed
-asset name and then extracts the archive entry whose basename is exactly
-`korbit`. Both halves of that — the asset name and the name inside the archive —
-are a contract with binaries that are already on users' machines, so **neither
-may be renamed**: dropping the set, or renaming the binary inside it, strands
-every existing install with no way to update.
-
-An install still under the `korbit` name needs **two** `self update` runs to come
-onto `dgx-cli`: the first is run by the old binary, which downloads the legacy
-archive and swaps its own file; the second runs the new code, which installs
-`dgx-cli` as the primary and keeps `korbit` as an alias beside it. From then on
-the install updates through the `digitalx-cli` archive like any other. That
-two-step is documented for users in [`MIGRATION.md`](MIGRATION.md). Do not "fix"
-it by changing what the legacy archive contains: the old binary extracts the
-archive entry whose basename is exactly `korbit`, and it is the only code that
-will ever read that archive.
-
-One `checksums.txt` covers both sets plus the `.mcpb` bundles, so the single
-signature over it authenticates every download. The `.mcpb` Desktop Extensions
-are built from the `dgx-cli` binaries only — an extension is installed fresh
-rather than self-updated, so it needs no legacy name.
+The **archive** is named for the product (`digitalx-cli`) while the **binary**
+inside it is `dgx-cli` — the two names are independent, and both `assetName()`
+in `internal/selfupdate/release.go` and the installers build the archive name,
+then extract `dgx-cli` out of it.
 
 ## Target matrix
 
@@ -182,6 +156,80 @@ warning, a real release fails rather than ship unsigned checksums, and
 it). GoReleaser suppresses a signing command's stderr on success, so the
 skip/sign messages only show under `goreleaser ... --verbose`.
 
+## The release manifest
+
+Every release carries **`release-manifest.json`**, which maps each platform to
+the archive to download and the basename of the binary inside it (one entry per
+platform in the [target matrix](#target-matrix); `darwin/arm64` shown):
+
+```json
+{
+  "schema": 1,
+  "platforms": {
+    "darwin/arm64": { "archive": "digitalx-cli_darwin_arm64.tar.gz", "binary": "dgx-cli" }
+  }
+}
+```
+
+`dgx-cli self update` reads it in place of the names compiled into the running
+binary (`internal/selfupdate/release.go`, `resolveTarget`). That is what lets a
+later release **rename an archive or the binary inside it** without stranding
+installs made before the rename: an installed binary asks the release what it
+carries instead of assuming. A rename then costs one archive set, not a second
+one published under the earlier name for as long as those installs exist.
+
+### It needs no key and no host of its own
+
+The manifest is listed in `checksums.txt` like every other asset
+(`checksum.extra_files` in `.goreleaser.yaml`), so the one signature over that
+file authenticates it too. `self update` fetches and signature-verifies
+`checksums.txt` first, and only then reads the manifest and checks its sha256
+against it:
+
+| State | Result |
+| --- | --- |
+| Cannot be fetched (404, other non-200, transport failure) | Fall back to the compiled-in names. Not every release carries one, and suppressing one gains an attacker nothing — the fallback archive is still checked against the signed checksums. A 404 passes quietly; any other failure says so on stderr, since it carries no information about the release. |
+| Fetched, but absent from `checksums.txt` or hash mismatch | **Fatal.** A file that steers where code comes from is worth nothing unsigned. |
+| Fetched and authentic | **Authoritative.** Unparseable, or no entry for this platform, is fatal — the release has stated what it carries, and a compiled-in name it did not list would only 404 with a worse message. |
+
+### Editing it
+
+It is **checked in** (`release-manifest.json` at the repo root), not generated,
+and carries no version or hash — so it changes only when a name changes, never
+per release. Two rules:
+
+- **Additive only.** Every release is read by binaries compiled before it
+  existed, so add fields; never restructure or remove one. `schema` is
+  informational for that reason — a reader takes the fields it knows.
+- **The asset name is frozen.** An installed binary asks for
+  `release-manifest.json` by that exact name, so renaming it strands every
+  install that reads it. The same goes for `checksums.txt`, `checksums.txt.sig`,
+  and the cert URL: they are the bootstrap an installed binary must already
+  know, and the manifest exists so that everything *else* can move.
+
+Two guards catch a manifest naming an archive the release does not carry — which
+would break `self update` on that platform for every install that reads it, and
+would surface only when someone tried to update:
+
+- `TestReleaseManifestMatchesBuild` (`internal/selfupdate`) checks the file
+  against the names this build actually uses, across the whole target matrix.
+- `scripts/publish.sh` checks it against the artifacts on disk before uploading
+  anything: every archive it names must exist in `dist/`, be listed in
+  `checksums.txt`, and actually contain the binary its entry names; every
+  archive built must be named by it; and the manifest's own bytes must
+  match the hash `checksums.txt` recorded, since the updater treats a mismatch
+  as fatal with no fallback.
+
+After publishing, `dgx-cli self update --dry-run` is the end-to-end check from a
+client's point of view: it resolves the release, verifies the checksums
+signature, reads the manifest, confirms this platform's archive is published and
+listed, and reports the archive name it resolved — all without downloading it.
+
+**First installs are not covered.** The installers resolve the archive name
+themselves, so renaming one still means updating `install.sh`/`install.ps1` and
+redeploying them alongside the release. The manifest's guarantee is for binaries
+already on disk.
+
 ## Desktop Extensions (.mcpb)
 
 Each build also produces a per-platform `.mcpb` — an [MCP
@@ -222,12 +270,10 @@ the signed binaries in `dist/`:
 make notarize           # ./scripts/macos-notarize.sh dist
 ```
 
-It zips each signed macOS binary, submits it to Apple's notary service, and
-waits for the verdict — **both** darwin builds, `dgx-cli` and `korbit`, since
-both ship to users (see [Two archive sets](#two-archive-sets-per-release)). It
-does **not** staple: a stand-alone CLI binary can't
-carry a stapled ticket, so Gatekeeper verifies the notarization online the first
-time a downloaded copy runs.
+It zips the signed macOS binary, submits it to Apple's notary service, and waits
+for the verdict. It does **not** staple: a stand-alone CLI binary can't carry a
+stapled ticket, so Gatekeeper verifies the notarization online the first time a
+downloaded copy runs.
 
 ### App Store Connect API key
 
@@ -245,83 +291,37 @@ Keep `asc-key.json` and the `.p8` out of the repo.
 
 ## Publishing (separate, via `gh`)
 
-### Two release repositories
-
-A release is published to **two** GitHub repositories. A shipped binary resolves
-its update URL under the org/repo name compiled into it, and a GitHub rename
-redirect lasts only while the old name stays unclaimed — so both names are held
-and both are published to.
-
-| Repository | Gets | Read by |
-| --- | --- | --- |
-| `digitalx-official/digitalx-cli` | `digitalx-cli_*` archives, the `.mcpb` bundles, `install.sh`, `install.ps1`, `checksums.txt`, `checksums.txt.sig` | the installers and `dgx-cli self update` |
-| `korbit-official/korbit-cli` | `korbit_*` archives, plus the **same** `checksums.txt` and `checksums.txt.sig` | an already-installed `korbit` binary updating itself |
-
-`DefaultRepo` (`internal/selfupdate/selfupdate.go`) and `REPO` / `$Repo` in both
-installers resolve to **`digitalx-official/digitalx-cli`**. Both releases carry
-the **same** tag and the **same** `checksums.txt` + `checksums.txt.sig`: each
-side looks up its own entry, and the single signature authenticates both. The
-legacy repository carries no source, only releases.
-
-### First release after the rename (one-off)
-
-Before the first dual publish, `digitalx-official/digitalx-cli` must exist (the
-repository is transferred into it) and `korbit-official/korbit-cli` must exist
-with one commit — a README saying where the project lives now — so `gh release
-create` has a commit to tag.
-
-Creating the legacy repository claims the old name, which ends the rename
-redirect that had been forwarding pinned
-`…/releases/download/<tag>/korbit_<os>_<arch>` URLs, and it starts with no
-releases of its own. Until the release lands there, an installed `korbit` gets
-`no release found` (fail-closed, not a corrupt install) and old pinned URLs 404.
-So build, sign and verify `dist/` **first**, then create it, publish immediately,
-and back-fill each historical tag:
+Building and publishing are separate steps. `make release` **never contacts
+GitHub** — it only builds, signs, and (with `make notarize`) reaches Apple. The
+artifacts are uploaded later with `make publish`, which uses the `gh` CLI, so
+the same built+signed+notarized `dist/` can go to a staging repo for review and
+then to the public repo without rebuilding.
 
 ```sh
-gh release download <tag> --repo digitalx-official/digitalx-cli \
-  --pattern 'korbit_*' --pattern 'checksums.txt' --pattern 'checksums.txt.sig' --dir ./bf
-gh release create <tag> ./bf/* --repo korbit-official/korbit-cli \
-  --title <tag> --notes 'Legacy archives for already-installed `korbit` binaries.'
-rm -rf ./bf
-# verify one pinned URL actually serves bytes:
-curl -fsSLI https://github.com/korbit-official/korbit-cli/releases/download/<oldest-tag>/korbit_darwin_arm64.tar.gz
+make publish                                      # -> the repo gh detects from the git remote
+KORBIT_RELEASE_REPO=<owner>/<name> make publish   # -> a specific repo
+./scripts/publish.sh dist --dry-run               # run every gate, print the asset list, upload nothing
 ```
 
-### Building and publishing
-
-These are separate steps. `make release` **never contacts GitHub** — it only
-builds, signs, and (with `make notarize`) reaches Apple. The artifacts are
-uploaded later with `make publish`, which uses the `gh` CLI, so the same
-built+signed+notarized `dist/` can go to a staging repo for review and then to
-the public repo without rebuilding.
-
-```sh
-make publish                                      # primary -> the current repo, legacy -> the default legacy repo
-KORBIT_RELEASE_REPO=<owner>/<name> make publish   # …primary to a specific repo
-KORBIT_LEGACY_RELEASE_REPO='' make publish        # …and skip the legacy upload entirely
-```
+`--dry-run` exercises the validation gates against a real `dist/`: it reaches no
+network and tolerates an untagged checkout. Test the script that way rather than
+by editing a copy to neutralize its `gh` calls — an edit that misses a call site
+fails **open** and publishes for real.
 
 `make publish` requires HEAD to be on the release tag, and `gh` authenticated
-(`gh auth login`, or `GH_TOKEN`/`GITHUB_TOKEN` in CI). It creates (or re-uploads
-over, with `--clobber`) the release for that tag on **both** repositories:
+(`gh auth login`, or `GH_TOKEN`/`GITHUB_TOKEN` in CI). It creates the release for
+that tag — or re-uploads over an existing one, with `--clobber` — on
+`KORBIT_RELEASE_REPO`, defaulting to the repository `gh` detects from the
+checkout's git remote, and uploads everything in [What a release
+publishes](#what-a-release-publishes). The manifest is checked in rather than
+built, so it goes up from the source tree; everything else comes out of `dist/`.
 
-- **primary** — `KORBIT_RELEASE_REPO`, defaulting to the repository `gh` detects
-  from the checkout's git remote. Gets the `digitalx-cli_*` archives, the `.mcpb`
-  Desktop Extensions, the filled `install.sh`/`install.ps1`, `checksums.txt` and
-  `checksums.txt.sig`.
-- **legacy** — `KORBIT_LEGACY_RELEASE_REPO`, defaulting to
-  `korbit-official/korbit-cli`. Gets the `korbit_*` archives plus the same
-  `checksums.txt` and `checksums.txt.sig`. Set it to the **empty string** to skip
-  the legacy upload — which is what you want when the primary target is a staging
-  repository, since the legacy repository is public.
-
-(The maintainer-side release variables keep the `KORBIT_` prefix — these two, as
+(The maintainer-side release variables keep the `KORBIT_` prefix — this one, as
 well as `KORBIT_RSA_SIGN_KEY` and the `KORBIT_SKIP_*` switches.)
 
-These filled installers are the release-pinned copies attached to the GitHub
-release; they embed this release's archive checksums, so they must ship in the
-same release as those archives — `make release` fills them from this tag's
+The filled `install.sh`/`install.ps1` are the release-pinned copies attached to
+the GitHub release; they embed this release's archive checksums, so they must
+ship in the same release as those archives — `make release` fills them from this tag's
 `checksums.txt` (see the `release` target's comment). Note that the `curl … | sh`
 / `irm … | iex` one-liners the README advertises fetch the evergreen installer
 hosted at `docs.digitalx.miraeasset.com`, not these release-attached copies.
@@ -340,13 +340,10 @@ make release                    # build + sign into dist/
 make notarize                   # notarize the signed macOS binaries
 #    …verify dist/ locally…
 
-# 3. Publish — staging repo first for review (no legacy upload), then the real
-#    pair: the primary repo plus the legacy repo, same artifacts, same tag.
-KORBIT_RELEASE_REPO=<staging-owner>/<repo> KORBIT_LEGACY_RELEASE_REPO='' make publish
-KORBIT_RELEASE_REPO=digitalx-official/digitalx-cli  make publish
+# 3. Publish — a staging repo first for review, then the real one, same
+#    artifacts, same tag.
+KORBIT_RELEASE_REPO=<staging-owner>/<repo> make publish
+KORBIT_RELEASE_REPO=digitalx-official/digitalx-cli make publish
 ```
-
-Step 3 assumes both repositories already exist under their current names — see
-[Two release repositories](#two-release-repositories).
 
 Windows binaries are shipped unsigned (Authenticode signing is not configured).

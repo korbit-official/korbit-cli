@@ -7,6 +7,8 @@ package selfcmd
 import (
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -31,18 +33,81 @@ import (
 //
 // It also pins that no paragraph claims a command moves or renames anything of
 // yours.
+//
+// The token half runs over every translation. A reader follows whichever one
+// their language gives them, so a name that only the English copy got right is
+// a `mv` onto the wrong path for everyone reading the other. The prose half is
+// English-only, since it reads English verbs.
 func TestMigrationDocMatchesTheCode(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "MIGRATION.md"))
-	if err != nil {
-		t.Fatalf("reading MIGRATION.md: %v", err)
+	for _, name := range []string{"MIGRATION.md", "MIGRATION.ko.md"} {
+		checkMigrationDocTokens(t, name)
 	}
-	doc := string(raw)
+
+	doc := readMigrationDoc(t, "MIGRATION.md")
+
+	// No paragraph may say a command moves, migrates, or renames anything without
+	// saying it does NOT. The scan is by paragraph, not by line: this document is
+	// hard-wrapped, so a verb and its subject almost never share a line, and a
+	// line-by-line check would pass on prose that says exactly the wrong thing.
+	verbs := []string{"moves ", "migrates", "renames ", "relocates"}
+	negations := []string{"no directory", "no file", "moves no", "renames no", "never", "nothing", "Nothing", "no command", "No command"}
+	for _, para := range docParagraphs(doc) {
+		if !mentionsACommand(para) {
+			continue
+		}
+		for _, verb := range verbs {
+			if !strings.Contains(para, verb) {
+				continue
+			}
+			if !containsAny(para, negations) {
+				t.Errorf("a MIGRATION.md paragraph says a command %q; nothing in this CLI does:\n%s", verb, para)
+			}
+		}
+	}
+}
+
+// TestMigrationDocsAgreeOnTheReleaseVersion: both translations name the release
+// the current names start in, and a reader gets whichever one their language
+// gives them. Two different numbers there sends one of them looking for a
+// release that does not carry the rename.
+func TestMigrationDocsAgreeOnTheReleaseVersion(t *testing.T) {
+	versions := func(name string) []string {
+		return releaseVersion.FindAllString(readMigrationDoc(t, name), -1)
+	}
+	en, ko := versions("MIGRATION.md"), versions("MIGRATION.ko.md")
+	if len(en) == 0 {
+		t.Fatal("MIGRATION.md names no release version; it has to say which release the current names start in")
+	}
+	if !slices.Equal(en, ko) {
+		t.Errorf("MIGRATION.md names %v and MIGRATION.ko.md names %v; the translations must agree", en, ko)
+	}
+}
+
+// releaseVersion matches a bolded release version — the form both documents use
+// to name the release the current names start in.
+var releaseVersion = regexp.MustCompile(`\*\*v[0-9]+\.[0-9]+\.[0-9]+\*\*`)
+
+// readMigrationDoc reads one MIGRATION document from the repo root.
+func readMigrationDoc(t *testing.T, name string) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", name))
+	if err != nil {
+		t.Fatalf("reading %s: %v", name, err)
+	}
+	return string(raw)
+}
+
+// checkMigrationDocTokens asserts that one MIGRATION document names every value
+// a reader types or looks for, in the spelling the code uses.
+func checkMigrationDocTokens(t *testing.T, name string) {
+	t.Helper()
+	doc := readMigrationDoc(t, name)
 	// mustQuote requires a value to appear as a `code span`, so a token cannot be
 	// satisfied by an unrelated sentence that happens to contain the word.
 	mustQuote := func(what, value string) {
 		t.Helper()
 		if !strings.Contains(doc, "`"+value+"`") {
-			t.Errorf("MIGRATION.md does not document the %s %q", what, value)
+			t.Errorf("%s does not document the %s %q", name, what, value)
 		}
 	}
 
@@ -51,11 +116,11 @@ func TestMigrationDocMatchesTheCode(t *testing.T) {
 	}
 
 	// The variable names the home- and cache-resolution lists are written in.
-	for _, name := range []string{
+	for _, env := range []string{
 		clicfg.EnvHome, selfupdate.LegacyEnvHome,
 		sandbox.EnvCacheDir, legacyCacheEnv(t),
 	} {
-		mustQuote("environment variable", name)
+		mustQuote("environment variable", env)
 	}
 
 	// The two standard home directories, in the ~-relative form a user sees, plus
@@ -79,26 +144,6 @@ func TestMigrationDocMatchesTheCode(t *testing.T) {
 	// had not been folded into it yet — the recipe has to name each one.
 	for _, suffix := range append([]string{"-wal", "-shm"}, sandbox.DBCompanionSuffixes()...) {
 		mustQuote("database sidecar suffix", suffix)
-	}
-
-	// No paragraph may say a command moves, migrates, or renames anything without
-	// saying it does NOT. The scan is by paragraph, not by line: this document is
-	// hard-wrapped, so a verb and its subject almost never share a line, and a
-	// line-by-line check would pass on prose that says exactly the wrong thing.
-	verbs := []string{"moves ", "migrates", "renames ", "relocates"}
-	negations := []string{"no directory", "no file", "moves no", "renames no", "never", "nothing", "Nothing", "no command", "No command"}
-	for _, para := range docParagraphs(doc) {
-		if !mentionsACommand(para) {
-			continue
-		}
-		for _, verb := range verbs {
-			if !strings.Contains(para, verb) {
-				continue
-			}
-			if !containsAny(para, negations) {
-				t.Errorf("a MIGRATION.md paragraph says a command %q; nothing in this CLI does:\n%s", verb, para)
-			}
-		}
 	}
 }
 

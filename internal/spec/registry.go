@@ -439,7 +439,8 @@ var Registry = []Command{
 		},
 		Notes: []string{
 			"Only works for an install created by the managed install script (the `curl … | sh` one-liner). A Homebrew / `go install` / hand-downloaded / dev build is refused with the right way to upgrade it instead.",
-			"Resolves the latest release, downloads the archive for your platform, verifies its SHA-256 against the release checksums, then replaces the binary in place. Pass --dry-run to only check whether a newer version exists. Trust is TLS + SHA-256.",
+			"Resolves the latest release, downloads the archive for your platform, verifies its SHA-256 against the release checksums, then replaces the binary in place. The release states which archive to download and what the binary inside it is called, so a renamed release still reaches an install made before the rename. Trust is TLS + SHA-256 plus a signature over the checksums.",
+			"--dry-run changes nothing on disk but performs the full check short of the download — it resolves the release, verifies the checksums signature, and confirms the archive this platform needs is published and listed. So it answers whether an update would SUCCEED, not merely whether a newer version exists, and reports the archive it resolved.",
 			"It swaps a binary and nothing else. No command in this CLI moves or renames your CLI home, your artifact cache, or a file inside them. Upgrading from an earlier release? See MIGRATION.md in the repository.",
 		},
 		Examples: []string{"{prog} self update", "{prog} self update --dry-run", "{prog} self update --tag v1.2.3"},

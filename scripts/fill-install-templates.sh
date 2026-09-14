@@ -24,10 +24,9 @@ outdir="${4:-dist}"
 [ -f "$checksums" ] || { echo "fill-install: no checksums file at $checksums" >&2; exit 1; }
 
 # The installers download only the platform ARCHIVES (tar.gz / zip); the .mcpb
-# Desktop Extensions and checksums.txt itself are not embedded. A release
-# publishes two archive sets (digitalx-cli_<os>_<arch> and the legacy
-# korbit_<os>_<arch>); both sets' lines go into the pin block, and the installer
-# looks up the digitalx-cli_<os>_<arch> name it downloads.
+# Desktop Extensions and checksums.txt itself are not embedded. Every archive
+# line goes into the pin block, and the installer looks up the
+# digitalx-cli_<os>_<arch> name it downloads.
 shafile="$(mktemp)"
 trap 'rm -f "$shafile"' EXIT
 grep -E '\.(tar\.gz|zip)$' "$checksums" > "$shafile" || true

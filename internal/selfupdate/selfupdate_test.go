@@ -17,6 +17,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/hex"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"io"
@@ -606,6 +607,311 @@ func TestUpdateRotatesCert(t *testing.T) {
 	}
 }
 
+// ---- the release manifest ----
+
+// manifestFor builds a release-manifest.json body naming archive and binary for
+// c's platform — the shape a release publishes.
+func manifestFor(t *testing.T, c Config, archive, binary string) []byte {
+	t.Helper()
+	// A literal, not a marshalled releaseManifest: the parser deliberately omits
+	// `schema`, so round-tripping the Go type would serve a body no release has.
+	m := map[string]any{
+		"schema":    1,
+		"platforms": map[string]any{c.os() + "/" + c.arch(): map[string]string{"archive": archive, "binary": binary}},
+	}
+	body, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return body
+}
+
+// TestUpdateFollowsRenamedRelease is the whole point of the manifest: a release
+// whose archive AND inner binary are both named something this build knows
+// nothing about still updates it. Nothing here serves the compiled-in names, so
+// a fallback would fail.
+func TestUpdateFollowsRenamedRelease(t *testing.T) {
+	c, l := managedForUpdate(t)
+	renamedArchive := "renamed-cli_" + c.os() + "_" + c.arch() + ".tar.gz"
+	if c.os() == "windows" {
+		renamedArchive = "renamed-cli_" + c.os() + "_" + c.arch() + ".zip"
+	}
+	renamedBin := "rn-cli"
+	if c.os() == "windows" {
+		renamedBin += ".exe"
+	}
+	newBin := "BINARY-v2"
+	c.Doer = &fakeDoer{
+		repo: c.repo(), tag: "v2.0.0",
+		asset:    renamedArchive,
+		archive:  makeArchive(t, c.os(), renamedBin, newBin),
+		kit:      newSignerKit(t),
+		manifest: manifestFor(t, c, renamedArchive, renamedBin),
+	}
+
+	res, err := c.Update(context.Background(), UpdateOptions{})
+	if err != nil {
+		t.Fatalf("update against a renamed release failed: %v", err)
+	}
+	if !res.Updated || res.LatestVersion != "v2.0.0" {
+		t.Fatalf("update result = %+v", res)
+	}
+	// The bytes land at this install's own path under its own name: the manifest
+	// says what to download, never where to put it.
+	if got := mustContent(t, l.ExecutablePath()); got != newBin {
+		t.Errorf("binary after update = %q (want %q)", got, newBin)
+	}
+}
+
+// TestUpdateRejectsUnlistedManifest: a manifest the signed checksums.txt does
+// not cover may not steer where code comes from.
+func TestUpdateRejectsUnlistedManifest(t *testing.T) {
+	c, l := managedForUpdate(t)
+	c.Doer = &fakeDoer{
+		repo: c.repo(), tag: "v2.0.0", asset: c.assetName(),
+		archive:          makeArchive(t, c.os(), l.BinName(), "BINARY-v2"),
+		kit:              newSignerKit(t),
+		manifest:         manifestFor(t, c, c.assetName(), l.BinName()),
+		manifestUnlisted: true,
+	}
+	if _, err := c.Update(context.Background(), UpdateOptions{}); err == nil || !strings.Contains(err.Error(), "not listed in checksums.txt") {
+		t.Fatalf("expected an unauthenticated-manifest error, got %v", err)
+	}
+	if got := mustContent(t, l.ExecutablePath()); got != "BINARY-v1" {
+		t.Errorf("binary changed on a rejected update: %q", got)
+	}
+}
+
+// TestUpdateRejectsTamperedManifest: the manifest is listed, but the body served
+// is not the body the signed checksums cover.
+func TestUpdateRejectsTamperedManifest(t *testing.T) {
+	c, l := managedForUpdate(t)
+	c.Doer = &fakeDoer{
+		repo: c.repo(), tag: "v2.0.0", asset: c.assetName(),
+		archive:        makeArchive(t, c.os(), l.BinName(), "BINARY-v2"),
+		kit:            newSignerKit(t),
+		manifest:       manifestFor(t, c, c.assetName(), l.BinName()),
+		manifestBadSum: true,
+	}
+	if _, err := c.Update(context.Background(), UpdateOptions{}); err == nil || !strings.Contains(err.Error(), "checksum mismatch for "+releaseManifestName) {
+		t.Fatalf("expected a manifest checksum mismatch, got %v", err)
+	}
+	if got := mustContent(t, l.ExecutablePath()); got != "BINARY-v1" {
+		t.Errorf("binary changed on a rejected update: %q", got)
+	}
+}
+
+// TestUpdateRejectsManifestWithoutThisPlatform: an authentic manifest is
+// authoritative, so a platform it does not list is a release with no build for
+// it — not a reason to guess the compiled-in name.
+func TestUpdateRejectsManifestWithoutThisPlatform(t *testing.T) {
+	c, l := managedForUpdate(t)
+	other := []byte(`{"schema":1,"platforms":{"plan9/mips":{"archive":"x.tar.gz","binary":"x"}}}`)
+	c.Doer = &fakeDoer{
+		repo: c.repo(), tag: "v2.0.0", asset: c.assetName(),
+		archive:  makeArchive(t, c.os(), l.BinName(), "BINARY-v2"),
+		kit:      newSignerKit(t),
+		manifest: other,
+	}
+	if _, err := c.Update(context.Background(), UpdateOptions{}); err == nil || !strings.Contains(err.Error(), "has no build for "+c.os()+"/"+c.arch()) {
+		t.Fatalf("expected a missing-platform error, got %v", err)
+	}
+}
+
+// TestUpdateRejectsManifestPathEscape: an entry naming anything but a plain
+// filename is refused, so a wrong-but-authentic manifest still cannot reach
+// outside the release the signature covers.
+func TestUpdateRejectsManifestPathEscape(t *testing.T) {
+	c, l := managedForUpdate(t)
+	c.Doer = &fakeDoer{
+		repo: c.repo(), tag: "v2.0.0", asset: c.assetName(),
+		archive:  makeArchive(t, c.os(), l.BinName(), "BINARY-v2"),
+		kit:      newSignerKit(t),
+		manifest: manifestFor(t, c, "../../../other/repo/releases/download/v1/x.tar.gz", l.BinName()),
+	}
+	if _, err := c.Update(context.Background(), UpdateOptions{}); err == nil || !strings.Contains(err.Error(), "unusable") {
+		t.Fatalf("expected an unusable-entry error, got %v", err)
+	}
+}
+
+// TestUpdateFallsBackWhenManifestUnobtainable covers the fallback outcome across
+// all three ways it is reached — a 404 (the release publishes none), any other
+// non-200, and a transport failure. Each must land on the compiled-in names and
+// update normally, so withholding the manifest cannot block an update.
+func TestUpdateFallsBackWhenManifestUnobtainable(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		status int
+		fail   bool
+	}{
+		{"404", 404, false},
+		{"503", 503, false},
+		{"transport failure", 0, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, l := managedForUpdate(t)
+			newBin := "BINARY-v2"
+			d := &fakeDoer{
+				repo: c.repo(), tag: "v2.0.0", asset: c.assetName(),
+				archive: makeArchive(t, c.os(), l.BinName(), newBin),
+				kit:     newSignerKit(t),
+			}
+			d.manifestStatus, d.manifestErr = tc.status, tc.fail
+			c.Doer = d
+			res, err := c.Update(context.Background(), UpdateOptions{})
+			if err != nil {
+				t.Fatalf("update should fall back to the compiled-in names, got %v", err)
+			}
+			if !res.Updated || mustContent(t, l.ExecutablePath()) != newBin {
+				t.Fatalf("update result = %+v", res)
+			}
+		})
+	}
+}
+
+// TestUpdateRejectsUnparseableManifest: an authentic manifest that does not
+// parse is fatal — the release stated something this binary cannot read, and
+// guessing is what the manifest exists to avoid.
+func TestUpdateRejectsUnparseableManifest(t *testing.T) {
+	c, l := managedForUpdate(t)
+	c.Doer = &fakeDoer{
+		repo: c.repo(), tag: "v2.0.0", asset: c.assetName(),
+		archive:  makeArchive(t, c.os(), l.BinName(), "BINARY-v2"),
+		kit:      newSignerKit(t),
+		manifest: []byte("{not json"),
+	}
+	if _, err := c.Update(context.Background(), UpdateOptions{}); err == nil || !strings.Contains(err.Error(), "reading "+releaseManifestName) {
+		t.Fatalf("expected an unparseable-manifest error, got %v", err)
+	}
+	if got := mustContent(t, l.ExecutablePath()); got != "BINARY-v1" {
+		t.Errorf("binary changed on a rejected update: %q", got)
+	}
+}
+
+// TestUpdateIgnoresUnknownManifestFields pins the additive-schema rule: a later
+// release may add fields, including a `schema` of an unanticipated shape, and an
+// older binary must still read the platforms it understands rather than failing
+// the parse and stranding itself.
+func TestUpdateIgnoresUnknownManifestFields(t *testing.T) {
+	c, l := managedForUpdate(t)
+	newBin := "BINARY-v2"
+	body := []byte(`{"schema":{"major":9},"addedLater":["x"],"platforms":{"` +
+		c.os() + "/" + c.arch() + `":{"archive":"` + c.assetName() + `","binary":"` + l.BinName() + `","note":"ignored"}}}`)
+	c.Doer = &fakeDoer{
+		repo: c.repo(), tag: "v2.0.0", asset: c.assetName(),
+		archive:  makeArchive(t, c.os(), l.BinName(), newBin),
+		kit:      newSignerKit(t),
+		manifest: body,
+	}
+	res, err := c.Update(context.Background(), UpdateOptions{})
+	if err != nil {
+		t.Fatalf("a manifest with unknown fields must still resolve, got %v", err)
+	}
+	if !res.Updated || mustContent(t, l.ExecutablePath()) != newBin {
+		t.Fatalf("update result = %+v", res)
+	}
+}
+
+// TestUpdateNeverReadsManifestBeforeSignature pins the ORDERING that makes the
+// manifest safe to act on: every other manifest test serves a valid signature,
+// so moving resolveTarget above verifyChecksumsSignature would leave them green
+// while making the manifest an unauthenticated input.
+func TestUpdateNeverReadsManifestBeforeSignature(t *testing.T) {
+	c, l := managedForUpdate(t)
+	d := &fakeDoer{
+		repo: c.repo(), tag: "v2.0.0", asset: c.assetName(),
+		archive:  makeArchive(t, c.os(), l.BinName(), "BINARY-v2"),
+		kit:      newSignerKit(t),
+		manifest: manifestFor(t, c, c.assetName(), l.BinName()),
+		omitSig:  true, // a cert is published but the release is unsigned: fatal
+	}
+	c.Doer = d
+	if _, err := c.Update(context.Background(), UpdateOptions{}); err == nil {
+		t.Fatal("expected the update to fail on the missing signature")
+	}
+	if d.manifestRequested {
+		t.Error("the release manifest was fetched before the signature was verified")
+	}
+}
+
+// TestUpdateRejectsEmptyArchiveEntry: the manifest names the entry to extract,
+// so a release-side mistake can select a directory or an empty file — and zero
+// bytes written over the installed binary leaves an install that can neither run
+// nor update itself.
+func TestUpdateRejectsEmptyArchiveEntry(t *testing.T) {
+	c, l := managedForUpdate(t)
+	c.Doer = &fakeDoer{
+		repo: c.repo(), tag: "v2.0.0", asset: c.assetName(),
+		archive: makeArchive(t, c.os(), l.BinName(), ""),
+		kit:     newSignerKit(t),
+	}
+	if _, err := c.Update(context.Background(), UpdateOptions{}); err == nil || !strings.Contains(err.Error(), "is empty") {
+		t.Fatalf("expected an empty-entry error, got %v", err)
+	}
+	if got := mustContent(t, l.ExecutablePath()); got != "BINARY-v1" {
+		t.Errorf("binary changed on a rejected update: %q", got)
+	}
+}
+
+func TestIsPlainFilename(t *testing.T) {
+	for _, ok := range []string{"digitalx-cli_linux_amd64.tar.gz", "dgx-cli", "dgx-cli.exe", "a"} {
+		if !isPlainFilename(ok) {
+			t.Errorf("isPlainFilename(%q) = false (want true)", ok)
+		}
+	}
+	for _, bad := range []string{"", ".", "..", "a/b", `a\b`, "../x", "/abs"} {
+		if isPlainFilename(bad) {
+			t.Errorf("isPlainFilename(%q) = true (want false)", bad)
+		}
+	}
+}
+
+// releaseMatrix is the platform set .goreleaser.yaml builds — Intel macOS
+// (darwin/amd64) is deliberately absent. Keep the two in sync.
+var releaseMatrix = []string{"darwin/arm64", "linux/amd64", "linux/arm64", "windows/amd64", "windows/arm64"}
+
+// TestReleaseManifestMatchesBuild guards the checked-in release-manifest.json
+// against drifting from what the release produces: an entry naming an archive
+// the build does not carry breaks self update on that platform for every install
+// that reads it, and would only surface after publish.
+func TestReleaseManifestMatchesBuild(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", releaseManifestName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A LOCAL type carrying schema, because the production parser deliberately
+	// omits it (see releaseManifest); the published file still declares it for a
+	// human reader.
+	var m struct {
+		Schema    int                      `json:"schema"`
+		Platforms map[string]releaseTarget `json:"platforms"`
+	}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatalf("parsing %s: %v", releaseManifestName, err)
+	}
+	if m.Schema != 1 {
+		t.Errorf("schema = %d (want 1)", m.Schema)
+	}
+	if len(m.Platforms) != len(releaseMatrix) {
+		t.Errorf("manifest covers %d platforms (want %d: %v)", len(m.Platforms), len(releaseMatrix), releaseMatrix)
+	}
+	for _, platform := range releaseMatrix {
+		entry, ok := m.Platforms[platform]
+		if !ok {
+			t.Errorf("manifest has no entry for %s", platform)
+			continue
+		}
+		goos, goarch, _ := strings.Cut(platform, "/")
+		c := Config{GOOS: goos, GOARCH: goarch}
+		if want := c.assetName(); entry.Archive != want {
+			t.Errorf("%s archive = %q (want %q)", platform, entry.Archive, want)
+		}
+		if want := c.Layout().BinName(); entry.Binary != want {
+			t.Errorf("%s binary = %q (want %q)", platform, entry.Binary, want)
+		}
+	}
+}
+
 // TestParseReleaseKeys covers the bundle parser: multiple certs, a skipped
 // non-cert block, and the empty/garbage cases.
 func TestParseReleaseKeys(t *testing.T) {
@@ -631,7 +937,9 @@ func TestUpdateDryRun(t *testing.T) {
 	}
 	l := c.Layout()
 	c.exeOverride = l.ExecutablePath()
-	c.Doer = &fakeDoer{repo: c.repo(), tag: "v2.0.0", asset: c.assetName(), archive: makeArchive(t, c.os(), l.BinName(), "BINARY-v2")}
+	// A dry run runs the full verification chain short of the download, so the
+	// release has to be signed for it to succeed.
+	c.Doer = &fakeDoer{repo: c.repo(), tag: "v2.0.0", asset: c.assetName(), archive: makeArchive(t, c.os(), l.BinName(), "BINARY-v2"), kit: newSignerKit(t)}
 
 	res, err := c.Update(context.Background(), UpdateOptions{DryRun: true})
 	if err != nil {
@@ -639,6 +947,59 @@ func TestUpdateDryRun(t *testing.T) {
 	}
 	if res.Updated || !res.CheckedOnly || res.LatestVersion != "v2.0.0" {
 		t.Fatalf("dry-run result = %+v", res)
+	}
+	if got := mustContent(t, l.ExecutablePath()); got != "BINARY-v1" {
+		t.Errorf("dry-run changed the binary: %q", got)
+	}
+	// The dry run reports what it resolved, so --json says which asset a real run
+	// would fetch and whether the release was signature-verified.
+	if res.Archive != c.assetName() {
+		t.Errorf("dry-run archive = %q (want %q)", res.Archive, c.assetName())
+	}
+	if res.SignatureCheck != SigVerified {
+		t.Errorf("dry-run SignatureCheck = %q (want %q)", res.SignatureCheck, SigVerified)
+	}
+}
+
+// TestUpdateDryRunResolvesRenamedRelease: a dry run reports the archive the
+// RELEASE names, not the one this build was compiled with, so it answers what
+// would actually be fetched — the question during a rename.
+func TestUpdateDryRunResolvesRenamedRelease(t *testing.T) {
+	c, l := managedForUpdate(t)
+	renamed := "renamed-cli_" + c.os() + "_" + c.arch() + ".tar.gz"
+	if c.os() == "windows" {
+		renamed = "renamed-cli_" + c.os() + "_" + c.arch() + ".zip"
+	}
+	c.Doer = &fakeDoer{
+		repo: c.repo(), tag: "v2.0.0", asset: renamed,
+		archive:  makeArchive(t, c.os(), l.BinName(), "BINARY-v2"),
+		kit:      newSignerKit(t),
+		manifest: manifestFor(t, c, renamed, l.BinName()),
+	}
+	res, err := c.Update(context.Background(), UpdateOptions{DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Archive != renamed {
+		t.Errorf("dry-run archive = %q (want %q)", res.Archive, renamed)
+	}
+}
+
+// TestUpdateDryRunCatchesUnusableRelease is why the dry run verifies at all: a
+// release whose manifest the signed checksums do not cover is uninstallable, and
+// reporting "an update is available" for it would send the operator away
+// believing the release is fine.
+func TestUpdateDryRunCatchesUnusableRelease(t *testing.T) {
+	c, l := managedForUpdate(t)
+	c.Doer = &fakeDoer{
+		repo: c.repo(), tag: "v2.0.0", asset: c.assetName(),
+		archive:          makeArchive(t, c.os(), l.BinName(), "BINARY-v2"),
+		kit:              newSignerKit(t),
+		manifest:         manifestFor(t, c, c.assetName(), l.BinName()),
+		manifestUnlisted: true,
+	}
+	if _, err := c.Update(context.Background(), UpdateOptions{DryRun: true}); err == nil || !strings.Contains(err.Error(), "not listed in checksums.txt") {
+		t.Fatalf("a dry run must surface an unusable release, got %v", err)
 	}
 	if got := mustContent(t, l.ExecutablePath()); got != "BINARY-v1" {
 		t.Errorf("dry-run changed the binary: %q", got)
@@ -1383,17 +1744,46 @@ type fakeDoer struct {
 	// certErr makes the cert endpoint fail at the transport level (DNS/TLS/conn),
 	// so the Doer returns an error rather than any HTTP response.
 	certErr bool
+
+	// manifest, when non-nil, is the release-manifest.json body served; nil
+	// serves a 404 there, the no-manifest release every other test in this file
+	// exercises.
+	manifest []byte
+	// manifestUnlisted serves the manifest without listing it in checksums.txt,
+	// so it arrives unauthenticated.
+	manifestUnlisted bool
+	// manifestBadSum lists the manifest in checksums.txt under a hash that does
+	// not match the body served.
+	manifestBadSum bool
+	// manifestStatus overrides the manifest endpoint's status (0 = the default
+	// 404-when-absent / 200-when-present); manifestErr makes it fail at the
+	// transport level — the two non-404 ways the manifest can be unobtainable.
+	manifestStatus int
+	manifestErr    bool
+	// manifestRequested records whether the manifest endpoint was hit at all, so
+	// a test can assert it is NOT reached before the signature is verified.
+	manifestRequested bool
 }
 
 // checksumsBody is the exact checksums.txt served (and, unless signWrong,
-// signed), so the signature covers the same bytes the verifier reads back.
+// signed), so the signature covers the same bytes the verifier reads back. The
+// manifest is listed alongside the archive, which is what authenticates it.
 func (d *fakeDoer) checksumsBody() []byte {
 	h := sha256.Sum256(d.archive)
 	hexsum := hex.EncodeToString(h[:])
 	if d.tamperChecksum {
 		hexsum = strings.Repeat("0", 64)
 	}
-	return []byte(hexsum + "  " + d.asset + "\n")
+	body := hexsum + "  " + d.asset + "\n"
+	if d.manifest != nil && !d.manifestUnlisted {
+		mh := sha256.Sum256(d.manifest)
+		msum := hex.EncodeToString(mh[:])
+		if d.manifestBadSum {
+			msum = strings.Repeat("1", 64)
+		}
+		body += msum + "  " + releaseManifestName + "\n"
+	}
+	return []byte(body)
 }
 
 func (d *fakeDoer) Do(req *http.Request) (*http.Response, error) {
@@ -1420,6 +1810,18 @@ func (d *fakeDoer) Do(req *http.Request) (*http.Response, error) {
 			return resp(200, d.kit.certPEM, req), nil
 		}
 		return resp(404, []byte("not found"), req), nil
+	case strings.HasSuffix(u, "/"+releaseManifestName):
+		d.manifestRequested = true
+		if d.manifestErr {
+			return nil, errors.New("dial tcp: connection refused")
+		}
+		if d.manifestStatus != 0 && d.manifestStatus != 200 {
+			return resp(d.manifestStatus, []byte("unavailable"), req), nil
+		}
+		if d.manifest == nil {
+			return resp(404, []byte("not found"), req), nil
+		}
+		return resp(200, d.manifest, req), nil
 	case strings.HasSuffix(u, "/checksums.txt.sig"):
 		if d.kit == nil || d.omitSig {
 			return resp(404, []byte("not found"), req), nil

@@ -42,13 +42,10 @@ func key(targets []target) string {
 // it in front of every contributor). The scan is deliberately strict — an
 // unexpected shape fails the test rather than silently matching less.
 //
-// The file declares MORE THAN ONE build (the same program compiled under two
-// binary names, so a release carries both archive sets). They are required to
-// share one matrix: they are the same program on the same platforms, and one
-// notices file ships in every archive. So each build's matrix is read
-// separately and they must agree — a build that quietly targets a different set
-// fails here rather than shipping an archive whose notices file was computed for
-// other platforms.
+// Each build's matrix is read separately, and if the file ever declares more
+// than one they must agree: one notices file ships in every archive, so a build
+// that quietly targets a different set of platforms fails here rather than
+// shipping an archive whose notices were computed for other ones.
 func goreleaserTargets(t *testing.T, src string) []target {
 	var perBuild [][]target
 	var goos, goarch []string

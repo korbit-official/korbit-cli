@@ -87,10 +87,9 @@ func TestLayoutNames(t *testing.T) {
 	}
 }
 
-// TestAssetNameIsPrimary pins the release asset self update asks for. The
-// legacy korbit_<os>_<arch> set exists on the release for older updaters; this
-// code must never request it.
-func TestAssetNameIsPrimary(t *testing.T) {
+// TestAssetNameFallback pins the archive name self update asks for when the
+// release publishes no manifest to name its own (see resolveTarget).
+func TestAssetNameFallback(t *testing.T) {
 	c := Config{GOOS: "linux", GOARCH: "arm64"}
 	if got := c.assetName(); got != "digitalx-cli_linux_arm64.tar.gz" {
 		t.Errorf("assetName = %q", got)

@@ -5,7 +5,7 @@
 # GoReleaser configuration — the release build for digitalx-cli: the target
 # matrix, -trimpath and release ldflags, version injection from the git tag, and
 # macOS code signing. See RELEASING.md for the full workflow (signing creds,
-# notarization) and for the dual-named archive sets this file produces.
+# notarization, publishing).
 #
 # Local smoke test (no publish, no notarization; signing is skipped when no
 # signing identity is configured):  goreleaser release --snapshot --clean
@@ -24,8 +24,8 @@ before:
     - ./scripts/check-licenses.sh
 
 builds:
-  # The primary build. Its binary is what a release installs and what
-  # `self update` extracts from the archive, by exact basename.
+  # Its binary is what a release installs and what `self update` extracts from
+  # the archive, by exact basename.
   - id: dgx-cli
     binary: dgx-cli
     main: .
@@ -72,50 +72,10 @@ builds:
             - GOARCH={{ .Arch }}
             - VERSION={{ .Version }}
 
-  # The legacy-named build. Byte-for-byte the same program as the primary — same
-  # main, flags, ldflags, and target matrix — compiled under the binary name
-  # `korbit`. It exists for updaters that download korbit_<os>_<arch> and extract
-  # the archive entry whose basename is exactly `korbit`: both the asset name and
-  # the name INSIDE it are part of that contract, so neither may change.
-  #
-  # It runs the macOS signing hook (these binaries ship, so they must be signed
-  # and notarizable) but NOT the .mcpb hook: a Desktop Extension is installed
-  # fresh rather than self-updated, so one bundle per platform — built from the
-  # primary — is the whole set.
-  - id: korbit
-    binary: korbit
-    main: .
-    env:
-      - CGO_ENABLED=0
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w
-      - -X github.com/digitalx-official/digitalx-cli/internal/version.Version={{ .Version }}
-    goos:
-      - darwin
-      - linux
-      - windows
-    goarch:
-      - amd64
-      - arm64
-    ignore:
-      - goos: darwin
-        goarch: amd64
-    hooks:
-      post:
-        - cmd: ./scripts/macos-sign.sh "{{ .Path }}"
-          env:
-            - GOOS={{ .Os }}
-            - IS_SNAPSHOT={{ .IsSnapshot }}
-
-# Two archive sets, same contents, different names — see the korbit build above
-# for why the legacy set exists. Both are listed in the one checksums.txt below,
-# so a single signature authenticates every download.
+# The ARCHIVE is named after the product (digitalx-cli); the BINARY inside it is
+# dgx-cli. internal/selfupdate/release.go's assetName() builds this same name —
+# keep the two in sync.
 archives:
-  # The primary set. The ARCHIVE is named after the product (digitalx-cli); the
-  # BINARY inside it is dgx-cli. internal/selfupdate/release.go's assetName()
-  # builds this same name — keep the two in sync.
   - id: digitalx-cli
     ids:
       - dgx-cli
@@ -126,7 +86,7 @@ archives:
       - goos: windows
         formats:
           - zip
-    files: &archiveFiles
+    files:
       - LICENSE
       - NOTICE
       - THIRD_PARTY_LICENSES.txt
@@ -135,30 +95,29 @@ archives:
       - README.md
       - README.ko.md
       - MIGRATION.md
+      - MIGRATION.ko.md
 
-  # The legacy asset set. The archive name AND the binary inside it are both
-  # fixed by what an older updater looks for, so neither may be renamed.
-  - id: korbit
-    ids:
-      - korbit
-    name_template: "korbit_{{ .Os }}_{{ .Arch }}"
-    formats:
-      - tar.gz
-    format_overrides:
-      - goos: windows
-        formats:
-          - zip
-    files: *archiveFiles
-
-# One checksums.txt over everything a release publishes: both archive sets and
-# the .mcpb bundles.
+# One checksums.txt over everything a release publishes: the archives and the
+# .mcpb bundles.
 checksum:
   name_template: "checksums.txt"
   # Fold the per-platform .mcpb bundles (built by the build-mcpb.sh post hook)
   # into the same checksums file, so the one signed checksums.txt below
   # authenticates every download — archives and Desktop Extensions alike.
+  #
+  # release-manifest.json rides along for the same reason: it maps
+  # <goos>/<goarch> to the archive to download and the binary basename inside
+  # it, which `dgx-cli self update` reads in place of the names compiled into it
+  # (internal/selfupdate/release.go, resolveTarget), and being listed here is
+  # what authenticates it — no key and no host of its own.
+  #
+  # It is CHECKED IN, not built, so the glob points at the source file and
+  # scripts/publish.sh uploads it from there. A `before` hook cannot stage it in
+  # dist/ instead: the clean runs before those hooks and the "ensure
+  # distribution directory" step after them refuses a non-empty dist/.
   extra_files:
     - glob: ./dist/*.mcpb
+    - glob: ./release-manifest.json
 
 # Sign the checksums file — verifying the signature plus the hashes it lists
 # authenticates every artifact. A raw RSA/SHA-256 (PKCS#1 v1.5) detached

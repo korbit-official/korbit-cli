@@ -37,12 +37,19 @@ type UpdateResult struct {
 	CheckedOnly     bool   `json:"checkedOnly"`
 	Executable      string `json:"executable,omitempty"`
 	SHA256          string `json:"sha256,omitempty"`
-	// SignatureCheck records how the release signature was handled for an applied
-	// update: SigVerified (verified against the published cert) or SigDisabled
-	// (the docs host served an empty cert — the kill switch). Empty when no update
-	// was applied (dry-run / already-latest), so an agent can audit from --json
-	// output whether the binary it now runs was signature-verified.
+	// SignatureCheck records how the release signature was handled: SigVerified
+	// (verified against the published cert) or SigDisabled (the docs host served
+	// an empty cert — the kill switch). Set for an applied update and for a dry
+	// run, which verifies the same way; empty when there was no release to check
+	// (already-latest), so an agent can audit from --json output whether the
+	// binary it runs was signature-verified.
 	SignatureCheck string `json:"signatureCheck,omitempty"`
+	// Archive is the release asset this platform's binary came from, or — under
+	// CheckedOnly — would come from. The release declares it
+	// (release-manifest.json), so it need not be the name this binary was
+	// compiled with and a caller cannot infer it. Empty when no release was
+	// resolved.
+	Archive string `json:"archive,omitempty"`
 	// Aliases are the extra command names now pointing at the updated binary (see
 	// alias.go). Absent on an install that carries none.
 	Aliases []string `json:"aliases,omitempty"`
@@ -94,6 +101,45 @@ func (c Config) Update(ctx context.Context, opts UpdateOptions) (*UpdateResult, 
 	return c.applyUpdate(ctx, l, opts)
 }
 
+// resolveDownload fetches and authenticates everything needed to NAME this
+// platform's download for tag, stopping short of transferring it: the release
+// checksums and their signature, the release manifest, and the archive's
+// expected sha256. Being the verification chain minus the download is what lets
+// a dry run prove a release is installable — every way a published release can
+// be uninstallable is decided here.
+//
+// Checksums are signature-verified BEFORE anything else is trusted: the
+// archive's sha256 and the manifest's are only as good as the file they are read
+// from, so the cheap gate runs first. Fail-closed — see
+// verifyChecksumsSignature.
+func (c Config) resolveDownload(ctx context.Context, tag string, l Layout) (asset releaseTarget, wantSum, sigCheck string, err error) {
+	sumsRaw, err := c.fetch(ctx, c.checksumsURL(tag))
+	if err != nil {
+		return releaseTarget{}, "", "", fmt.Errorf("fetching checksums: %w", err)
+	}
+	sigCheck, err = c.verifyChecksumsSignature(ctx, tag, sumsRaw)
+	if err != nil {
+		c.log().Debug("release signature verification failed", "target", tag, "err", err.Error())
+		return releaseTarget{}, "", "", err
+	}
+	c.log().Debug("checksums authenticated", "target", tag, "signatureCheck", sigCheck)
+
+	// Ask the release which archive this platform downloads and what the binary
+	// inside it is called, rather than assuming the compiled-in names. The answer
+	// is authenticated by the checksums just verified; a release that publishes
+	// no manifest yields the compiled-in names. See resolveTarget.
+	sums := parseChecksums(sumsRaw)
+	asset, err = c.resolveTarget(ctx, tag, sums, l)
+	if err != nil {
+		return releaseTarget{}, "", "", err
+	}
+	wantSum = sums[asset.Archive]
+	if wantSum == "" {
+		return releaseTarget{}, "", "", fmt.Errorf("checksums.txt has no entry for %s", asset.Archive)
+	}
+	return asset, wantSum, sigCheck, nil
+}
+
 // applyUpdate is the binary half of Update: resolve the target release, apply it
 // (or report what a dry run would do), and keep the command layout correct.
 func (c Config) applyUpdate(ctx context.Context, l Layout, opts UpdateOptions) (*UpdateResult, error) {
@@ -137,8 +183,18 @@ func (c Config) applyUpdate(ctx context.Context, l Layout, opts UpdateOptions) (
 		return res, nil
 	}
 	if dryRun {
-		c.log().Debug("self update dry-run: update available, not applying", "from", c.Version, "to", target)
+		// Authenticate the whole download — signature, manifest, archive hash —
+		// and stop before the transfer, so a dry run cannot answer "an update is
+		// available" for a release nobody can install. No lock is taken: nothing
+		// is written.
+		asset, _, sigCheck, err := c.resolveDownload(ctx, target, l)
+		if err != nil {
+			return nil, err
+		}
+		c.log().Debug("self update dry-run: update available, not applying", "from", c.Version, "to", target, "archive", asset.Archive)
 		res.CheckedOnly = true
+		res.Archive = asset.Archive
+		res.SignatureCheck = sigCheck
 		return res, nil
 	}
 
@@ -152,43 +208,30 @@ func (c Config) applyUpdate(ctx context.Context, l Layout, opts UpdateOptions) (
 	}
 	defer unlock()
 
-	// Fetch checksums.txt and authenticate it with the release signature BEFORE
-	// downloading the (large, attacker-influenceable) archive — the archive's
-	// sha256 is only as good as the file it's read from, so the cheap signature
-	// gate runs first. Fail-closed: see verifyChecksumsSignature.
-	sumsRaw, err := c.fetch(ctx, c.checksumsURL(target))
+	asset, want, sigCheck, err := c.resolveDownload(ctx, target, l)
 	if err != nil {
-		return nil, fmt.Errorf("fetching checksums: %w", err)
-	}
-	sigCheck, err := c.verifyChecksumsSignature(ctx, target, sumsRaw)
-	if err != nil {
-		c.log().Debug("release signature verification failed", "target", target, "err", err.Error())
 		return nil, err
 	}
-	c.log().Debug("checksums authenticated", "target", target, "signatureCheck", sigCheck)
-	want := parseChecksums(sumsRaw)[c.assetName()]
-	if want == "" {
-		return nil, fmt.Errorf("checksums.txt has no entry for %s", c.assetName())
-	}
+	res.Archive = asset.Archive
 
 	// Download the archive and verify it against the authenticated checksum, then
 	// extract the binary.
 	c.progressf("downloading %s %s…", c.repo(), target)
-	archive, err := c.fetch(ctx, c.downloadURL(target))
+	archive, err := c.fetch(ctx, c.downloadURL(target, asset.Archive))
 	if err != nil {
 		return nil, err
 	}
 	if got := sha256Bytes(archive); got != want {
-		c.log().Debug("archive checksum mismatch", "asset", c.assetName(), "expected", want, "got", got)
-		return nil, fmt.Errorf("checksum mismatch for %s: expected %s, got %s", c.assetName(), want, got)
+		c.log().Debug("archive checksum mismatch", "asset", asset.Archive, "expected", want, "got", got)
+		return nil, fmt.Errorf("checksum mismatch for %s: expected %s, got %s", asset.Archive, want, got)
 	}
-	c.log().Debug("archive checksum verified", "asset", c.assetName(), "bytes", len(archive))
-	binBytes, err := extractBinary(archive, c.os(), l.BinName())
+	c.log().Debug("archive checksum verified", "asset", asset.Archive, "bytes", len(archive))
+	binBytes, err := extractBinary(archive, c.os(), asset.Binary)
 	if err != nil {
 		return nil, err
 	}
 	newSum := sha256Bytes(binBytes)
-	c.log().Debug("binary extracted from archive", "binary", l.BinName(), "bytes", len(binBytes), "sha256", newSum)
+	c.log().Debug("binary extracted from archive", "binary", asset.Binary, "bytes", len(binBytes), "sha256", newSum)
 
 	// Replace the installed binary in place, BEFORE any alias is touched. On the
 	// layout where the running binary is the alias name and the primary name is not

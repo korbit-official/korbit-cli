@@ -90,7 +90,7 @@ cp "$root/assets/digitalx.png" "$stage/icon.png"
 # bundle root alongside manifest.json; the MCPB spec only requires manifest.json
 # there, so extra top-level files are fine. MIGRATION.md rides along for the same
 # reason it is in the release archives: the README links to it.
-for doc in LICENSE NOTICE THIRD_PARTY_LICENSES.txt DISCLAIMER.md DISCLAIMER.ko.md README.md README.ko.md MIGRATION.md; do
+for doc in LICENSE NOTICE THIRD_PARTY_LICENSES.txt DISCLAIMER.md DISCLAIMER.ko.md README.md README.ko.md MIGRATION.md MIGRATION.ko.md; do
 	cp "$root/$doc" "$stage/$doc"
 done
 

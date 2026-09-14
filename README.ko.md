@@ -31,7 +31,7 @@ irm https://docs.digitalx.miraeasset.com/install.ps1 | iex
 
 이후 바이너리는 스스로 관리됩니다 — `dgx-cli self update`, `dgx-cli self doctor`, `dgx-cli self uninstall`.
 
-이전 릴리스에서 업그레이드하나요? [`MIGRATION.md`](MIGRATION.md)를 참고하세요.
+이전 릴리스에서 업그레이드하나요? [`MIGRATION.ko.md`](MIGRATION.ko.md)를 참고하세요.
 
 직접 관리하고 싶다면 릴리스 바이너리를 내려받거나, 소스에서 `go install github.com/digitalx-official/digitalx-cli@latest`로 설치하세요.
 

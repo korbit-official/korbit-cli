@@ -127,7 +127,13 @@ internal/
   sandbox/     local API-sandbox lifecycle manager (+ sandbox/deno managed runtime) — see the package doc in sandbox/sandbox.go
   tui/         interactive trading terminal (Bubble Tea v2)             — see tui/README.md
   agentskill/  install/inspect the bundled Agent Skill from an embedded fs.FS — see the package doc in agentskill/agentskill.go
-  selfupdate/  on-disk install layout + self-update mechanics (install/update/uninstall/doctor, PATH wiring, manifest) — see the package doc in selfupdate/selfupdate.go. It moves and renames NOTHING: no command relocates a CLI home, an artifact cache, or a file inside them. Home resolution, a home's file names, and the by-hand move are the user-facing contract in MIGRATION.md; the two states `self doctor` reports about it live in selfupdate/doctor.go
+  selfupdate/  on-disk install layout + self-update mechanics (install/update/
+               uninstall/doctor, PATH wiring, the install manifest) — see the
+               package doc in selfupdate/selfupdate.go: the two generations of
+               names, why nothing on disk is ever moved or renamed, and how a
+               release names the archive an update downloads. MIGRATION.md is
+               the user-facing half; self doctor's two reports on it are in
+               selfupdate/doctor.go
   cli/         cobra tree built from the unified surface; dispatch; help; the
                error->exit-code wrapper. Subpackages behind the clienv seam:
                  clienv/    the per-invocation Env + Backend/Console contracts

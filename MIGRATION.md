@@ -1,73 +1,85 @@
-# Names, directories, and what the CLI does with them
+# Upgrading from `korbit` to `dgx-cli`
 
-`digitalx-cli` ships as the binary `dgx-cli` and keeps its data under
-`~/.digitalx-cli`. An installation made under the earlier product name carries
-different names — the command `korbit`, the home `~/.korbit-cli`, the artifact
-cache `<user cache dir>/korbit-cli`, and the databases inside that home — and
-**all of them keep working, indefinitely**.
+**English** · [한국어](MIGRATION.ko.md)
 
-**Nothing on disk is ever moved or renamed for you.** No command in this CLI
-relocates a home, relocates a cache, or renames a file inside either — not
-`self install`, not `self update`, not `self doctor`, and there is no flag that
-asks for it. A home under the earlier name is simply the home, for as long as you
-leave it there.
+**v1.2.0** renames the CLI: command `korbit` → `dgx-cli`, home `~/.korbit-cli` →
+`~/.digitalx-cli`, variables `KORBIT_CLI_*` → `DIGITALX_CLI_*`. **Nothing breaks,
+nothing moves, everything keeps working:** every earlier name stays honored for
+good, and no command in this CLI ever moves or renames anything on your disk.
 
-This document is the contract for how the two generations coexist: what the
-rename changes for an install you already have, where the CLI looks for its data,
-and — if you would rather use the current directory name — how to move it
-yourself.
+## Does this affect me?
 
-## Names
+| You… | Do this |
+|---|---|
+| installed `dgx-cli` fresh | Nothing. This document is not for you. |
+| have a `korbit` install | Run `korbit self update` **twice** ([why twice](#run-self-update-twice)). Your data stays where it is and keeps working. |
+| set `KORBIT_CLI_*` variables | Nothing. They stay honored; `DIGITALX_CLI_*` wins when both are set. |
+| installed the `.mcpb` Desktop Extension | Remove the earlier extension by hand — the new one [installs beside it](#the-mcpb-bundle-appears-as-a-second-extension). |
+| want `~/.digitalx-cli` as your home | Optional, and by hand — [two ways](#moving-to-the-new-directory-name-optional). |
 
-| Thing | Current | Earlier | Status of the earlier name |
+## What changed
+
+| Thing | Current | Earlier | The earlier name is… |
 |---|---|---|---|
-| Command | `dgx-cli` | `korbit` | Kept as an **alias** on any install that has it — it runs the same binary, forever. Fresh installs get `dgx-cli` only. |
-| CLI home | `~/.digitalx-cli` | `~/.korbit-cli` | Used as-is, indefinitely. Nothing moves it. |
-| Home variable | `DIGITALX_CLI_HOME` | `KORBIT_CLI_HOME` | Honored. The canonical name wins when both are set. |
-| Artifact cache | `<user cache dir>/digitalx-cli` | `<user cache dir>/korbit-cli` | Used as-is, indefinitely. Nothing moves it. |
-| Cache variable | `DIGITALX_CLI_SANDBOX_CACHE` | `KORBIT_CLI_SANDBOX_CACHE` | Honored, same rule. |
-| Every other variable | `DIGITALX_CLI_*` | `KORBIT_CLI_*` | Honored, same rule. |
-| Release archive | `digitalx-cli_<os>_<arch>` | `korbit_<os>_<arch>` | Both are published; `self update` downloads the current one. |
+| Command | `dgx-cli` | `korbit` | Kept forever, as an alias of the same binary, on any install that has it. Fresh installs: `dgx-cli` only. |
+| CLI home | `~/.digitalx-cli` | `~/.korbit-cli` | Used as-is, forever. Never moved. |
+| Home variable | `DIGITALX_CLI_HOME` | `KORBIT_CLI_HOME` | Honored. Current name wins when both are set. |
+| Artifact cache | `<user cache dir>/digitalx-cli` | `<user cache dir>/korbit-cli` | Used as-is, forever. Never moved. |
+| Cache variable | `DIGITALX_CLI_SANDBOX_CACHE` | `KORBIT_CLI_SANDBOX_CACHE` | Honored. Same rule. |
+| Every other variable | `DIGITALX_CLI_*` | `KORBIT_CLI_*` | Honored. Same rule. |
+| Release archive | `digitalx-cli_<os>_<arch>` | `korbit_<os>_<arch>` | Published once — in the release a `korbit` install updates through. Later releases: current name only. |
 
-## 1. What the rename changes for an install you already have
+## Upgrading a `korbit` install
 
-### Upgrading from a `korbit` install takes two `self update` runs
+### Run `self update` twice
 
 ```sh
 korbit self update    # 1. installs the current release, still under the `korbit` name
 korbit self update    # 2. adds the `dgx-cli` command, pointing `korbit` at it
 ```
 
-**The first update leaves you current but still `korbit`-only, because the code
-that creates the `dgx-cli` command ships inside the release it is downloading.**
-The second run is the new code, and it adds `dgx-cli`, reporting what it fixed
-under `layoutRepaired` with `updated: false` — nothing was updated, only
+**Why twice:** the code that creates the `dgx-cli` command ships inside the
+release the first run downloads. So the first run leaves you current but still
+`korbit`-only; the second run is that new code, and it adds `dgx-cli`, reporting
+the fix under `layoutRepaired` with `updated: false` — nothing updated, only
 repaired.
 
-From then on **both command names stay current**: every install and update
-places `dgx-cli` as the real binary and keeps `korbit` beside it as an alias
-pointing at the same bytes. Either name runs the same CLI.
+From then on **both names stay current**: every install and update places
+`dgx-cli` as the real binary and keeps `korbit` beside it as an alias pointing at
+the same bytes. Either name runs the same CLI.
 
 ### The Agent Skill is renamed on install
 
 `dgx-cli agent skill install` writes the skill under its current directory name
-and removes a copy left under the earlier one, so an agent sees one skill rather
-than two. That is a skill-directory rename inside the agent's own skills folder;
-it does not touch your CLI home.
+and removes a copy left under the earlier one, so an agent sees one skill, not
+two. That rename happens inside the agent's own skills folder; your CLI home is
+not touched.
 
 ### The `.mcpb` bundle appears as a second extension
 
 A Desktop Extension is keyed on the name in its manifest, so a bundle built under
-the current name installs **beside** one you already have rather than replacing
-it — two entries, two servers, two copies of every tool. Extensions have no
-self-update path, so remove the older one by hand from your host's extension
-list.
+the current name installs **beside** the one you have rather than replacing it —
+two entries, two servers, two copies of every tool. Extensions have no
+self-update path: remove the earlier one by hand from your host's extension list.
 
-## 2. Where the CLI looks for its home and its cache
+## No command moves your data
+
+**Nothing on disk is ever moved or renamed for you** — not a home, not a cache,
+not a file inside either — and no flag asks for it. A home under the earlier name
+is simply the home, for as long as you leave it there.
+
+| Command | Does | Never |
+|---|---|---|
+| `self install` (what the install one-liner runs) | places the binary, wires `PATH`, writes the manifest; a re-run repairs a broken install, nothing else | a directory move, a file rename in your home, a deletion of anything of yours |
+| `self update` | downloads a release, swaps the binary in place, keeps the command layout right (`dgx-cli` real, `korbit` pointing at it) | a directory move, a file rename |
+| `self doctor` | reports — read-only by contract | any change at all |
+| `self uninstall` | deletes only what you confirm ([details](#option-a--start-fresh-uninstall-then-reinstall)) | a rename, a relocation |
+
+## Where the CLI looks for its home and its cache
 
 ### The CLI home
 
-In order, first match wins:
+In order — first match wins:
 
 1. `$DIGITALX_CLI_HOME`, when set
 2. `$KORBIT_CLI_HOME`, when set
@@ -75,34 +87,38 @@ In order, first match wins:
 4. `~/.korbit-cli`, when that directory exists
 5. `~/.digitalx-cli` — created on first write
 
-Note steps 3 and 4: with **both** directories present, the CLI reads
-`~/.digitalx-cli` and the other one is invisible to it. `self doctor` reports
-that (see [section 5](#5-what-self-doctor-reports)).
+Steps 3 and 4 mean that with **both** directories present, the CLI reads
+`~/.digitalx-cli` and the other one is invisible to it. `self doctor`
+[reports that](#what-self-doctor-reports).
 
 ### The artifact cache
 
-The same shape: `$DIGITALX_CLI_SANDBOX_CACHE`, then
-`$KORBIT_CLI_SANDBOX_CACHE`, then `<user cache dir>/digitalx-cli` if it exists,
-then `<user cache dir>/korbit-cli` if it exists, else
-`<user cache dir>/digitalx-cli`. The cache holds only regenerable downloads (the
-managed Deno runtime and its module cache), so which one is in use costs nothing
-either way.
+Same shape — first match wins:
+
+1. `$DIGITALX_CLI_SANDBOX_CACHE`, when set
+2. `$KORBIT_CLI_SANDBOX_CACHE`, when set
+3. `<user cache dir>/digitalx-cli`, when it exists
+4. `<user cache dir>/korbit-cli`, when it exists
+5. `<user cache dir>/digitalx-cli`
+
+The cache holds only regenerable downloads (the managed Deno runtime and its
+module cache), so which one is in use costs nothing either way.
 
 ### Files inside the CLI home
 
-The files under the home carry **no product name at all** — the directory
-already says whose data they are:
+The files carry **no product name** — the directory already says whose data they
+are:
 
-| Home-relative path | What it is | Files that belong beside it |
+| Home-relative path | What it is | Sidecars |
 |---|---|---|
 | `journal.db` | the action journal | `-wal`, `-shm` |
 | `bot.db` | the `monitor` bot runtime's script-local database | `-wal`, `-shm` |
 | `sandbox/sandbox.db` | the local API sandbox's database | `-wal`, `-shm`, `-pid`, `.market-snapshot.json` |
-| `debug-<timestamp>.json` | a diagnostic bundle `debug bundle` wrote for you | — |
-| `config.json`, `keys.json`, `keystore.json`, `install.json`, `self.lock`, `sandbox/run.log` | config, keys, and bookkeeping | — |
+| `debug-<timestamp>.json` | a diagnostic bundle written by `debug bundle` | — |
+| `config.json`, `keys.json`, `keystore.json`, `install.json`, `self.lock`, `sandbox/run.log` | config, keys, bookkeeping | — |
 
-There is exactly **one** exception, and it is one rule: **in a home whose own
-directory name is `.korbit-cli`, each of those databases keeps its earlier name.**
+**One exception, one rule: in a home whose own directory name is `.korbit-cli`,
+each database keeps its earlier name.**
 
 | In a home named `.korbit-cli` | In every other home |
 |---|---|
@@ -110,48 +126,30 @@ directory name is `.korbit-cli`, each of those databases keeps its earlier name.
 | `korbit-bot.db` (+ `-wal`, `-shm`) | `bot.db` (+ `-wal`, `-shm`) |
 | `sandbox/korbit-sandbox.db` (+ `-wal`, `-shm`, `-pid`, `.market-snapshot.json`) | `sandbox/sandbox.db` (+ `-wal`, `-shm`, `-pid`, `.market-snapshot.json`) |
 
-Nothing else in the CLI consults the earlier names. That single rule is what lets
-an older `korbit` binary still sharing `~/.korbit-cli` read and write the same
-files as a current one: both derive the same names from the same directory.
+- **Why:** an earlier `korbit` binary still sharing `~/.korbit-cli` reads and
+  writes the same files as a current one — both derive the same names from the
+  same directory. Nothing else in the CLI consults the earlier names.
+- **What counts as the name:** the directory's **own** basename, after resolving
+  to an absolute path. A home reached by a relative path, or spelled
+  `~/.KORBIT-CLI` on a case-insensitive filesystem, is the same home with the
+  same file names — not a second layout in the same directory.
+- **A pinned home follows it too.** Pinned with `DIGITALX_CLI_HOME` or
+  `KORBIT_CLI_HOME` at a directory named `.korbit-cli`, it uses the earlier
+  names; pinned anywhere else, the current ones.
+- **Directory name and file names are one unit.** A directory renamed without
+  its files is a full home the CLI reads as empty: it opens fresh, empty
+  databases beside your real ones. The [manual recipe](#option-b--move-it-by-hand)
+  therefore does both in one go, and `self doctor` reports the half-done state
+  as a problem.
 
-The rule reads the directory's **own name**, resolved to an absolute path first —
-so a home reached by a relative path, or (on a filesystem that ignores case)
-spelled `~/.KORBIT-CLI`, is the same home with the same file names, not a second
-layout in the same directory. A home you pin with `DIGITALX_CLI_HOME` or
-`KORBIT_CLI_HOME` follows it too: pinned at a directory named `.korbit-cli` it
-uses the earlier names, pinned anywhere else it uses the current ones.
-
-**The directory name and the file names are one unit.** Renaming the directory
-without renaming the files inside it produces a full home the CLI reads as empty:
-it would open fresh, empty databases beside your real ones. That is why the
-manual recipe below does both, in one go, and why `self doctor` reports the
-half-done state as a problem.
-
-## 3. Nothing is moved for you
-
-- **`self install`** (what the install one-liner runs) places the binary, wires
-  `PATH`, and writes the manifest. It moves no directory, renames no file in your
-  home, and deletes nothing of yours. Re-running it repairs a broken install and
-  nothing else.
-- **`self update`** downloads a release, replaces the binary in place, and keeps
-  the command layout correct (`dgx-cli` real, `korbit` pointing at it). It moves
-  no directory and renames no file.
-- **`self doctor`** is read-only by contract. It changes nothing, ever.
-- **`self uninstall`** removes; it never renames or relocates. See
-  [section 4](#4-moving-to-the-new-directory-name-optional).
-
-An install left on `~/.korbit-cli`, with its earlier database names and its
-earlier-named artifact cache, is a **fully supported state with no deadline on
-it**. Both directory names are read for good.
-
-## 4. Moving to the new directory name (optional)
+## Moving to the new directory name (optional)
 
 You never have to do this. Two ways, if you want to.
 
 ### Option A — start fresh: uninstall, then reinstall
 
-This throws your data away and sets the CLI up again from scratch. Choose it when
-you have nothing in the home worth keeping (or have exported what you need).
+Throws your data away and sets the CLI up again from scratch. Choose it when
+nothing in the home is worth keeping (or you have exported what you need).
 
 ```sh
 dgx-cli self uninstall     # interactive; see exactly what it does below
@@ -159,44 +157,41 @@ dgx-cli self uninstall     # interactive; see exactly what it does below
 dgx-cli setup
 ```
 
-`self uninstall` is **interactive only**: it needs a terminal, and refuses to run
-piped, redirected, from an agent, or with `--json` / `--compact`. It takes no
-flags of its own; the global `--dry-run` runs the same questions and changes
-nothing, reporting only what your answers would have done.
+`self uninstall` is **interactive only**: it needs a terminal and refuses to run
+piped, redirected, from an agent, or with `--json` / `--compact`. It has no flags
+of its own; the global `--dry-run` asks the same questions, changes nothing, and
+reports what your answers would have done.
 
-It asks **three separate questions**, and nothing is touched until you answer.
-Answer them independently — this is exactly what each one covers:
+It asks **three separate questions**. Nothing is touched until you have
+answered, and **no** keeps everything in that row.
 
-| Question | Default | Removes | Keeps |
+| Question | Default | Yes removes | Kept regardless |
 |---|---|---|---|
-| the `dgx-cli` binary and install manifest | **yes** | the installed binary, every alias command name it owns (including `korbit`), `install.json`, and leftover swap files | a file at the `korbit` name it cannot prove is its own |
-| config, API keys, and action journal | **no** | `config.json`, `journal.db`/`korbit-cli.db`, `bot.db`/`korbit-bot.db` (with their `-wal`/`-shm`), `debug-*.json` bundles, and — after clearing each key from its backend, OS keychain included — `keys.json` and `keystore.json` | everything, if you answer no |
-| regenerable caches | **no** | the `sandbox/` state directory in each home and the shared Deno/module cache under **both** cache names, stopping a running sandbox first | everything, if you answer no |
+| `dgx-cli` binary and install manifest | **yes** | the binary; every alias it owns, `korbit` included; `install.json`; leftover swap files | a `korbit` file it cannot prove is its own |
+| config, API keys, and action journal | **no** | `config.json`; `journal.db`/`korbit-cli.db` and `bot.db`/`korbit-bot.db` with their `-wal`/`-shm`; `debug-*.json`; `keys.json` and `keystore.json`, each key first cleared from its backend, OS keychain included | — |
+| regenerable caches | **no** | `sandbox/` in each home; the shared Deno/module cache under **both** cache names (a running sandbox is stopped first) | — |
 
 Then, for each shell startup file carrying the installer's `PATH` block, it shows
-a diff and asks (default **no**) whether to remove **just that block** — it never
-deletes the file. On Windows it removes only the digitalx-cli entry from your User
-`PATH`. A file you decline is reported so you can edit it yourself.
+a diff and asks (default **no**) whether to remove **just that block** — never the
+file. On Windows it removes only the digitalx-cli entry from your User `PATH`. A
+file you decline is reported so you can edit it yourself.
 
-Three things worth knowing:
+Worth knowing:
 
-- **Every home is offered**, not just the one in use: `~/.digitalx-cli` and
-  `~/.korbit-cli` whenever they exist, plus a pinned one. Within each home, every
-  database is listed under **both** spellings, so a home renamed without its files
-  is cleaned out completely.
-- **The home directory itself is removed only once it is empty.** If you keep the
-  data, or keep the caches, or a removal failed, the directory stays — those are
-  deliberate keeps, not failures.
-- **Removing keys cannot be undone.** Keys are cleared from their backend
-  (including the OS keychain) before any key file is deleted, so nothing is
-  orphaned — but they are gone.
-
-On Windows the running `.exe` is locked and cannot delete itself; it is reported
-for you to delete manually.
+- **Every home is offered** — `~/.digitalx-cli` and `~/.korbit-cli` whenever they
+  exist, plus a pinned one — and every database under **both** spellings, so a
+  home renamed without its files is cleaned out completely.
+- **The home directory itself goes only once it is empty.** Kept data, kept
+  caches, or a failed removal leave it in place — deliberately.
+- **Removing keys cannot be undone.** Each key is cleared from its backend (OS
+  keychain included) before its file is deleted, so nothing is orphaned — but it
+  is gone.
+- **On Windows the running `.exe` is locked** and cannot delete itself; it is
+  reported for you to delete by hand.
 
 ### Option B — move it by hand
 
-This keeps everything. Do the four steps in order.
+Keeps everything. Four steps, in order.
 
 **1. Stop every process using that home**, under both command names — a running
 sandbox, `monitor`, `tui`, or `mcp serve` holds the databases open, and renaming
@@ -224,8 +219,8 @@ Test-Path ~\.digitalx-cli    # must be False
 Move-Item ~\.korbit-cli ~\.digitalx-cli
 ```
 
-**3. Rename the three databases and their sidecars**, because the new directory
-name means the CLI now looks for the current filenames. A file you skip here is a
+**3. Rename the three databases and their sidecars.** The new directory name
+means the CLI now looks for the current file names; a file you skip here is a
 file the CLI will not open.
 
 ```sh
@@ -259,10 +254,10 @@ skips what is not there. `-wal` and `-shm` are SQLite's write-ahead log and its
 shared-memory index — a database moved without its `-wal` loses whatever had not
 been folded into it yet.)
 
-**4. Delete the old artifact cache.** It holds only regenerable downloads, and
-the new location refills itself on the next sandbox run:
+**4. Delete the earlier artifact cache.** It holds only regenerable downloads,
+and the new location refills itself on the next sandbox run:
 
-| OS | Old cache |
+| OS | Earlier cache |
 |---|---|
 | Linux | `~/.cache/korbit-cli` |
 | macOS | `~/Library/Caches/korbit-cli` |
@@ -276,12 +271,12 @@ rm -rf ~/.cache/korbit-cli          # or ~/Library/Caches/korbit-cli on macOS
 Remove-Item -Recurse -Force $env:LOCALAPPDATA\korbit-cli
 ```
 
-**A pinned home overrides all of this.** If `DIGITALX_CLI_HOME` or
-`KORBIT_CLI_HOME` is set, that path is the home whatever is in `~`, and moving
-`~/.korbit-cli` changes nothing for you until you change the variable. Note also
-that a pinned directory follows the same file-name rule by its **own basename**:
-pinned at a directory named `.korbit-cli` it keeps the earlier filenames, which is
-the right layout if a pre-rename `korbit` is still sharing it.
+**A pinned home overrides all of this.** With `DIGITALX_CLI_HOME` or
+`KORBIT_CLI_HOME` set, that path is the home whatever is in `~`, and moving
+`~/.korbit-cli` changes nothing for you until you change the variable. A pinned
+directory also follows the file-name rule by its **own basename**: pinned at a
+directory named `.korbit-cli` it keeps the earlier file names — the right layout
+if an earlier `korbit` binary is still sharing it.
 
 Finally, verify:
 
@@ -289,78 +284,74 @@ Finally, verify:
 dgx-cli self doctor
 ```
 
-## 5. What `self doctor` reports
+## What `self doctor` reports
 
-`self doctor` reports a **problem** for something broken (it exits non-zero) and
-a **note** for something that works but that a command would tidy up (it stays
-exit 0). Every problem carries a stable `field` tag:
+A **problem** is something broken (exit non-zero); a **note** is something that
+works but a command would tidy up (exit 0). Every problem carries a stable
+`field` tag:
 
-| `field` | Reports | Fixed by |
+| `field` | Problem | Fix |
 |---|---|---|
-| `managed` | no install manifest, or a corrupt one | the install one-liner |
-| `binary` | the installed binary is missing, or does not match the manifest — including the case where the running `korbit` **does** match it and the `dgx-cli` beside it does not, so the documented command name runs bytes this install never placed | the install one-liner, or `self update` for the mismatched-`dgx-cli` case |
-| `alias` | the `korbit` command is missing, points at something other than `dgx-cli`, or is a stale copy of another version | `self update` |
-| `path` | the install directory is not on your `PATH` | the install one-liner |
+| `managed` | install manifest missing or corrupt | the install one-liner |
+| `binary` | installed binary missing, or not matching the manifest — including a `korbit` that matches while the `dgx-cli` beside it does not (the documented name would run bytes this install never placed) | the install one-liner; `self update` when only `dgx-cli` mismatches |
+| `alias` | `korbit` missing, pointing at something other than `dgx-cli`, or a stale copy of another version | `self update` |
+| `path` | install directory not on `PATH` | the install one-liner |
 | `home` | one of the two states below | you, by hand |
 
-Only **two** states about the two generations of directory names are ever
-reported, and both mean you have data the CLI is not reading:
+Only **two** states about the two directory names are ever reported, and both
+mean you have data the CLI is not reading:
 
-- **Two CLI homes exist and the one not in use holds data.** The report names
-  which one is in use, so you know which half is invisible. When the home in use
-  holds no keys, config, or journal at all while the other one does, it says so
-  explicitly — that is not ambiguity but a certainty. **Remedy:** move what you
-  need across, or remove the directory you do not want, following
-  [option B](#option-b--move-it-by-hand).
-- **The home in use holds databases under the earlier file names** while its own
+- **Two CLI homes exist, and the one not in use holds data.** The report names
+  the one in use, so you know which half is invisible; when the home in use holds
+  no keys, config, or journal at all while the other does, it says so outright —
+  a certainty, not an ambiguity. **Remedy:** move what you need across, or remove
+  the directory you do not want, following [option B](#option-b--move-it-by-hand).
+- **The home in use holds databases under the earlier file names**, and its
   directory is not named `.korbit-cli` — a directory renamed without its files.
-  The report names the files and the rename each one needs. **Remedy:** step 3 of
+  The report names each file and the rename it needs. **Remedy:** step 3 of
   [option B](#option-b--move-it-by-hand); or, for a pinned home, point the
   variable at a directory named `.korbit-cli` instead, which keeps the earlier
   layout with nothing to rename.
 
-Everything else about the earlier names is **silent**. A home at `~/.korbit-cli`
-holding its earlier-named databases is correct, not a finding; so is an artifact
-cache under the earlier name; so is a `.korbit-cli` home that happens to hold a
-stray `journal.db`, since the earlier names are the right ones there.
+Everything else about the earlier names is **silent** — correct, not a finding:
+`~/.korbit-cli` holding its earlier-named databases; an artifact cache under the
+earlier name; a `.korbit-cli` home that happens to hold a stray `journal.db`,
+since the earlier names are the right ones there.
 
 ## What never changes
 
-- **The `korbit` command name.** An install that has it keeps it, permanently.
-  It is refreshed on every install and update so it never falls behind.
-- **A file at the `korbit` name that this install did not place.** Ownership
-  must be proved (the manifest records it, it is the manifest's own executable,
-  it is the running binary, or its bytes hash to the manifest's SHA-256) before
-  anything overwrites or deletes it. Your own wrapper script at that name is
-  reported and left exactly as it is.
-- **An install left on the earlier directory names.** `~/.korbit-cli`, its
-  earlier database names, and the artifact cache under the earlier name are read
-  for good. Using the current names is a choice you make and carry out, not
-  something that eventually happens to you.
+- **The `korbit` command name.** An install that has it keeps it, permanently,
+  refreshed on every install and update so it never falls behind.
+- **A `korbit` file this install did not place.** Ownership must be proved — the
+  manifest records it, it is the manifest's own executable, it is the running
+  binary, or its bytes hash to the manifest's SHA-256 — before anything overwrites
+  or deletes it. Your own wrapper script at that name is reported and left exactly
+  as it is.
+- **An install left on the earlier names.** `~/.korbit-cli`, its earlier database
+  names, and the artifact cache under the earlier name are read for good — a fully
+  supported state with no deadline. Using the current names is a choice you make
+  and carry out, never something that happens to you.
 - **Key compatibility.** Nothing about how keys are stored, encrypted, or read
   changes: a keystore written by either generation is read by both, and an OS
   keychain item is never re-created or re-encrypted.
-- **Environment variables.** Both spellings are honored indefinitely; the
-  canonical `DIGITALX_CLI_*` name wins when both are set — and only when its
-  value is non-empty. Exporting the canonical name as an empty string reads as
-  unset and falls through to the legacy one, so to turn a setting off, unset the
-  legacy name too.
-- **A pinned home, directory and contents.** A home fixed with
-  `DIGITALX_CLI_HOME` or `KORBIT_CLI_HOME` keeps whatever
-  [file-name layout](#files-inside-the-cli-home) its own basename implies,
-  permanently.
-- **The legacy release archive and bundle URLs**, which already-installed
-  versions fetch by name. Every historical tag's `korbit_*` archives stay
-  downloadable at the URLs they always had.
+- **Environment variables.** Both spellings are honored indefinitely;
+  `DIGITALX_CLI_*` wins when both are set — and only when its value is non-empty.
+  An empty `DIGITALX_CLI_*` reads as unset and falls through to `KORBIT_CLI_*`, so
+  to turn a setting off, unset both.
+- **A pinned home, directory and contents.** A home fixed with `DIGITALX_CLI_HOME`
+  or `KORBIT_CLI_HOME` keeps whatever [file-name layout](#files-inside-the-cli-home)
+  its own basename implies, permanently.
+- **The earlier release archive and bundle URLs.** Already-installed versions
+  fetch them by name; every earlier tag's `korbit_*` archives stay downloadable at
+  the URLs they always had.
 
 ## Reading the result as JSON
 
 Every outcome above is a field, not prose, so `--json` is enough to act on:
 
-- `self update` → `layoutRepaired` (the command-name fixes this run made, with
-  `checkedOnly` telling you whether they were applied or merely planned) and
-  `next` (follow-up steps). There is no migration field, because there is no
-  migration.
+- `self update` → `layoutRepaired` (the command-name fixes this run made;
+  `checkedOnly` says whether they were applied or only planned) and `next`
+  (follow-up steps). There is no migration field, because there is no migration.
 - `self install` → `repaired`, `path`, and `next`.
 - `self doctor` → `problems[].field` for anything broken, `notes` for the
   healthy-but-tidiable states, plus `home` and `legacyHome` so the directories
@@ -368,7 +359,10 @@ Every outcome above is a field, not prose, so `--json` is enough to act on:
 
 ## For maintainers
 
-Every release is published to **both** release repositories, each with its own
-archive set and both with the same signed `checksums.txt`, which is what lets an
-installed CLI of either generation update itself and verify what it fetched:
+An ordinary release publishes **one** archive set, listed in a signed
+`checksums.txt` alongside a `release-manifest.json` that names the archive each
+platform downloads and the binary inside it. An install reads those names out of
+the release rather than assuming the ones compiled into it, which is what lets a
+rename cost one archive set instead of a second one published under the earlier
+name for as long as installs made under it exist:
 [`RELEASING.md`](https://github.com/digitalx-official/digitalx-cli/blob/master/RELEASING.md).
