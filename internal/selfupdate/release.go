@@ -28,7 +28,7 @@ const maxArchiveBytes = 256 << 20 // 256 MiB
 // assetName is the release archive filename for this platform, matching the
 // GoReleaser archive name_template (digitalx-cli_{{.Os}}_{{.Arch}}) and the
 // per-OS format override (tar.gz everywhere, zip on Windows). The archive is
-// named for the product; the binary inside it is dgx-cli. Keep in sync with
+// named for the product; the binary inside it is digitalx. Keep in sync with
 // .goreleaser.yaml.
 //
 // It is the FALLBACK: a release that publishes a manifest names its own
@@ -273,7 +273,7 @@ func parseChecksums(data []byte) map[string]string {
 }
 
 // extractBinary returns the CLI binary's bytes from a release archive: the
-// entry named binName (dgx-cli / dgx-cli.exe) inside a tar.gz (darwin/linux) or
+// entry named binName (digitalx / digitalx.exe) inside a tar.gz (darwin/linux) or
 // a zip (windows).
 //
 // An empty result is refused: binName comes from the release's own manifest, so
@@ -328,7 +328,7 @@ func extractFromZip(archive []byte, binName string) ([]byte, error) {
 		return nil, fmt.Errorf("reading the archive: %w", err)
 	}
 	for _, f := range zr.File {
-		// IsDir mirrors the tar reader's TypeReg check: "dgx-cli/" has the same
+		// IsDir mirrors the tar reader's TypeReg check: "digitalx/" has the same
 		// path.Base as the file, and opens as zero bytes rather than failing.
 		if path.Base(f.Name) != binName || f.FileInfo().IsDir() {
 			continue

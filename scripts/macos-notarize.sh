@@ -46,7 +46,7 @@ fi
 bins=()
 while IFS= read -r line; do
 	bins+=("$line")
-done < <(find "$dist" -type f -name dgx-cli -path '*darwin*')
+done < <(find "$dist" -type f -name digitalx -path '*darwin*')
 if [ ${#bins[@]} -eq 0 ]; then
 	echo "macos-notarize: ERROR no darwin binaries found under $dist (run goreleaser first)" >&2
 	exit 1

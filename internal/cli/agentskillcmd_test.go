@@ -20,7 +20,7 @@ import (
 
 func skillFixture() fstest.MapFS {
 	return fstest.MapFS{
-		"SKILL.md":                 {Data: []byte("---\nname: digitalx-cli\ndescription: drives dgx-cli\n---\n# skill\n")},
+		"SKILL.md":                 {Data: []byte("---\nname: digitalx-cli\ndescription: drives digitalx\n---\n# skill\n")},
 		"references/monitoring.md": {Data: []byte("monitoring\n")},
 	}
 }
@@ -268,22 +268,22 @@ func TestAgentSkillDoctorChecksSkillCommandEvenWhenInvokedUnderAnotherName(t *te
 	if err := json.Unmarshal([]byte(out), &rep); err != nil {
 		t.Fatalf("json: %v\n%s", err, out)
 	}
-	if rep.Binary != "dgx-cli" || rep.OnPath || !strings.Contains(rep.PathFix, `"dgx-cli"`) {
+	if rep.Binary != "digitalx" || rep.OnPath || !strings.Contains(rep.PathFix, `"digitalx"`) {
 		t.Fatalf("doctor checked wrong binary: %+v", rep)
 	}
 	// The executable's own invoked name is checked and flagged: it's "digitalx-cli",
-	// not the "dgx-cli" the skill shells out to, and the fix names both.
+	// not the "digitalx" the skill shells out to, and the fix names both.
 	if rep.InvokedAs != "digitalx-cli" || rep.NameMatches {
 		t.Fatalf("name check wrong: invokedAs=%q nameMatches=%v", rep.InvokedAs, rep.NameMatches)
 	}
-	if !strings.Contains(rep.NameFix, "ln -s") || !strings.Contains(rep.NameFix, "/dgx-cli") {
-		t.Fatalf("nameFix should suggest symlinking a %q onto PATH: %q", "dgx-cli", rep.NameFix)
+	if !strings.Contains(rep.NameFix, "ln -s") || !strings.Contains(rep.NameFix, "/digitalx") {
+		t.Fatalf("nameFix should suggest symlinking a %q onto PATH: %q", "digitalx", rep.NameFix)
 	}
 }
 
 // A binary invoked under a different name is only a real problem when the
-// "dgx-cli" command the skill calls isn't reachable. If a correctly-named
-// "dgx-cli" IS on PATH, the skill works: doctor reports the name mismatch
+// "digitalx" command the skill calls isn't reachable. If a correctly-named
+// "digitalx" IS on PATH, the skill works: doctor reports the name mismatch
 // informationally (nameMatches=false) but exits 0.
 func TestAgentSkillDoctorNameMismatchIsHealthyWhenSkillCommandOnPath(t *testing.T) {
 	home := t.TempDir()
@@ -293,8 +293,8 @@ func TestAgentSkillDoctorNameMismatchIsHealthyWhenSkillCommandOnPath(t *testing.
 	progname.Set("digitalx-cli")
 	t.Cleanup(func() { progname.Set(prevProgname) })
 
-	// A proper "dgx-cli" command exists on PATH.
-	if err := os.WriteFile(filepath.Join(path, "dgx-cli"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+	// A proper "digitalx" command exists on PATH.
+	if err := os.WriteFile(filepath.Join(path, "digitalx"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, code := runSkillCLI([]string{"agent", "skill", "install", "--claude"}, home, skillFixture()); code != 0 {
@@ -406,7 +406,7 @@ func TestAgentSkillInstallLeavesForeignSkillAlone(t *testing.T) {
 func TestAgentSkillDoctorReportsLegacyNamedCopy(t *testing.T) {
 	path := t.TempDir()
 	t.Setenv("PATH", path)
-	if err := os.WriteFile(filepath.Join(path, "dgx-cli"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(path, "digitalx"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 

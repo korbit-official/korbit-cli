@@ -13,7 +13,7 @@ import (
 
 func sampleSkill() fstest.MapFS {
 	return fstest.MapFS{
-		"SKILL.md":                 {Data: []byte("---\nname: digitalx-cli\ndescription: drives dgx-cli\n---\n# skill\n")},
+		"SKILL.md":                 {Data: []byte("---\nname: digitalx-cli\ndescription: drives digitalx\n---\n# skill\n")},
 		"references/monitoring.md": {Data: []byte("monitoring\n")},
 		"references/funding.md":    {Data: []byte("funding\n")},
 	}

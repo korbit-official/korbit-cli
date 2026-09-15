@@ -125,7 +125,7 @@ func TestEmbeddedSkillDescriptionFitsTheLimit(t *testing.T) {
 	// job. These are the names a user can call the exchange and the tool by — the
 	// exchange's earlier name included, because a user still types it and the
 	// trigger has to match what they type, not what the product is called now.
-	for _, trigger := range []string{"Digital X", "디지털엑스", "Korbit", "코빗", "dgx-cli", agentskill.SkillName} {
+	for _, trigger := range []string{"Digital X", "디지털엑스", "Korbit", "코빗", "digitalx", agentskill.SkillName} {
 		if !strings.Contains(desc, trigger) {
 			t.Errorf("the description must still trigger on %q", trigger)
 		}

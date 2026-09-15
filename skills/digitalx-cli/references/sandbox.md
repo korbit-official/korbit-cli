@@ -12,42 +12,42 @@ order placement and any untested strategy logic) before running it live.
 ```sh
 export DIGITALX_CLI_HOME=$(mktemp -d)    # isolate this run (also lets parallel agents not collide)
 
-dgx-cli sandbox start --fresh           # run the mock detached on a CLEAN database, import a seeded key
+digitalx sandbox start --fresh           # run the mock detached on a CLEAN database, import a seeded key
                                         # (drop --fresh to keep an existing sandbox's balances/orders)
-dgx-cli whoami --key sandbox --json     # verify the imported key works
-dgx-cli balance --key sandbox --json
+digitalx whoami --key sandbox --json     # verify the imported key works
+digitalx balance --key sandbox --json
 
 # Shape scenario state via the bundle's own subcommands (forwarded verbatim):
-dgx-cli sandbox exec set-balance --user 1 --currency krw --available 100000000
+digitalx sandbox exec set-balance --user 1 --currency krw --available 100000000
 
 # Run test trades — you MUST pass --key sandbox explicitly (see safety note):
-dgx-cli order place --key sandbox --symbol btc_krw --side buy --type limit --price 10000000 --qty 0.001 --json
-dgx-cli logs --orders --json            # inspect what landed (journaled exactly like production)
+digitalx order place --key sandbox --symbol btc_krw --side buy --type limit --price 10000000 --qty 0.001 --json
+digitalx logs --orders --json            # inspect what landed (journaled exactly like production)
 
-dgx-cli sandbox stop                    # graceful shutdown
+digitalx sandbox stop                    # graceful shutdown
 ```
 
-Other lifecycle commands: `dgx-cli sandbox status` (source, runtime, server state, imported key),
-`dgx-cli sandbox update` (refresh the mock bundle), `dgx-cli sandbox license` (print the bundle's own
+Other lifecycle commands: `digitalx sandbox status` (source, runtime, server state, imported key),
+`digitalx sandbox update` (refresh the mock bundle), `digitalx sandbox license` (print the bundle's own
 terms). On first run, `sandbox start` downloads a small managed runtime into a shared cache — that's
 expected; subsequent starts are fast.
 
 ## Paper trading (real market data, simulated fills)
 
-`dgx-cli sandbox start --paper --fresh` starts a clean database mirroring **live production market
+`digitalx sandbox start --paper --fresh` starts a clean database mirroring **live production market
 data** — real prices, order book, and trades — while order fills stay locally simulated (no real
 money; needs network). Pairs production lists as not launched stay on the simulated walk; the start
 result names them in `walkPairs`. Use it to test a strategy against real market dynamics instead of
 the default simulated walk. By default only the bundle's built-in fixture pairs are seeded; add
-`--all-pairs` (`dgx-cli sandbox start --paper --all-pairs --fresh`) to seed every LAUNCHED production
+`--all-pairs` (`digitalx sandbox start --paper --all-pairs --fresh`) to seed every LAUNCHED production
 pair from a live snapshot, so the sandbox carries production's tradable pair set. The first such
 start fetches a tick-size policy per pair (a few seconds); the snapshot is then cached beside the
 database, so repeated starts (including `--fresh`) reseed in well under a second. The mode is set at database creation, so `--fresh` IS the mode switch
-(in either direction — `dgx-cli sandbox start --fresh` alone returns to the simulated walk). To
+(in either direction — `digitalx sandbox start --fresh` alone returns to the simulated walk). To
 **restart** an existing paper sandbox keeping its balances and orders, run
-`dgx-cli sandbox start --paper` without `--fresh`; to switch modes without wiping data, flip one pair
-with `dgx-cli sandbox exec set-market --symbol btc_krw --source live`. Full detail lives in the
-sandbox's own help (`dgx-cli sandbox exec help`); `dgx-cli sandbox exec status` shows each pair's
+`digitalx sandbox start --paper` without `--fresh`; to switch modes without wiping data, flip one pair
+with `digitalx sandbox exec set-market --symbol btc_krw --source live`. Full detail lives in the
+sandbox's own help (`digitalx sandbox exec help`); `digitalx sandbox exec status` shows each pair's
 market mode and paper-trading health (mirror age, live-feed state). Fills are approximations — they
 consume only the sandbox's local view of the book (each displayed quantity fills at most once until
 the next book update; the real market is untouched) and queue position is not modeled — so paper

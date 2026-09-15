@@ -158,7 +158,7 @@ The sandbox runs under Deno, which fetches the bundle from the Official Source
 
 Terms: the bundle (digitalx-sandbox.mjs) is proprietary software of Digital X Co., Ltd. under its
 OWN terms — it is NOT covered by digitalx-cli's open-source license. Read those
-terms with ` + "`dgx-cli sandbox license`" + `, obtain the bundle only from the
+terms with ` + "`digitalx sandbox license`" + `, obtain the bundle only from the
 Official Source, and keep use conformant (local development and testing only).
 
 Your sandbox database, keys, and logs are NOT here — they live under your

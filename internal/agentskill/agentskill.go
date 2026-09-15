@@ -42,9 +42,9 @@ const LegacySkillName = "korbit"
 // SkillBinary is the command name the bundled skill tells agents to run. It is
 // intentionally separate from the running executable name: the binary can be
 // invoked through another filename such as "digitalx-cli", while the installed
-// skill contains literal `dgx-cli ...` commands. Doctor and command metadata
+// skill contains literal `digitalx ...` commands. Doctor and command metadata
 // must describe the command the skill actually executes.
-const SkillBinary = "dgx-cli"
+const SkillBinary = "digitalx"
 
 // Agent is a target agent runtime whose skills directory we install into.
 // SkillRel is the path of its skills directory relative to a root (the user's

@@ -1,6 +1,6 @@
 # Monitoring, alerting & data capture with `monitor`
 
-`dgx-cli monitor` is the one **streaming** command — a resilient WebSocket client (auto-reconnect,
+`digitalx monitor` is the one **streaming** command — a resilient WebSocket client (auto-reconnect,
 re-subscribe, REST backfill of gaps) that emits one event per line. It's the right tool whenever the
 user needs to **wait for**, **continuously observe**, **alert on**, or **capture** something, instead
 of taking a single snapshot. Reach for it before writing any poll loop.
@@ -70,7 +70,7 @@ advance order state by lifecycle — never assume one event per change.
 ## `--jq`: the stable filter/transform path
 
 `--jq '<program>'` runs a built-in jq program (no external `jq` needed) over **every** emitted line —
-data events *and* notices — exactly like `dgx-cli monitor --json | jq`. It **implies `--json`**, and
+data events *and* notices — exactly like `digitalx monitor --json | jq`. It **implies `--json`**, and
 `--max-events` then counts matching output lines. A line is emitted only if the program produces
 output: use `select(…)` to filter, any other expression to reshape.
 
@@ -96,7 +96,7 @@ price crosses Y":
 
 ```sh
 # Exit as soon as BTC trades above 100,000,000 KRW:
-dgx-cli monitor --symbols btc_krw --ticker --max-events 1 --stream-log-level warn \
+digitalx monitor --symbols btc_krw --ticker --max-events 1 --stream-log-level warn \
   --jq 'select(.type=="data" and (.payload.data.close|tonumber) > 100000000)'
 # ... then place/cancel an order, notify the user, etc.
 ```
@@ -105,7 +105,7 @@ dgx-cli monitor --symbols btc_krw --ticker --max-events 1 --stream-log-level war
 Stream and surface only the lines that matter, for as long as the user wants to watch:
 
 ```sh
-dgx-cli monitor --symbols btc_krw,eth_krw --ticker --duration 1h --stream-log-level warn \
+digitalx monitor --symbols btc_krw,eth_krw --ticker --duration 1h --stream-log-level warn \
   --jq 'select(.type=="data") | {sym:.symbol, px:.payload.data.close, t:.serverTime}'
 ```
 
@@ -113,7 +113,7 @@ dgx-cli monitor --symbols btc_krw,eth_krw --ticker --duration 1h --stream-log-le
 Order/fill/balance changes in real time (signed — needs a key):
 
 ```sh
-dgx-cli monitor --symbols btc_krw --my-orders --my-trades --my-assets --json
+digitalx monitor --symbols btc_krw --my-orders --my-trades --my-assets --json
 ```
 
 If you came from an MCP session, pass `--key` matching the MCP server (`list_keys` → the entry with
@@ -124,7 +124,7 @@ account.
 Collect a fixed window of live data to a file, then analyze it:
 
 ```sh
-dgx-cli monitor --symbols btc_krw --trades --orderbook --duration 2m --json > /tmp/btc_stream.ndjson
+digitalx monitor --symbols btc_krw --trades --orderbook --duration 2m --json > /tmp/btc_stream.ndjson
 # Each line is one event; parse with any NDJSON reader.
 ```
 
@@ -132,14 +132,14 @@ dgx-cli monitor --symbols btc_krw --trades --orderbook --duration 2m --json > /t
 React to gaps without caring about the data itself:
 
 ```sh
-dgx-cli monitor --symbols btc_krw --my-orders --jq 'select(.type=="notice" and (.code=="DATA_GAP" or .code=="DISCONNECTED"))'
+digitalx monitor --symbols btc_krw --my-orders --jq 'select(.type=="notice" and (.code=="DATA_GAP" or .code=="DISCONNECTED"))'
 ```
 
 ### 6. Multi-symbol watch
 List several pairs in `--symbols`; each event carries its own `symbol`:
 
 ```sh
-dgx-cli monitor --symbols btc_krw,eth_krw,xrp_krw --ticker --duration 10m --json
+digitalx monitor --symbols btc_krw,eth_krw,xrp_krw --ticker --duration 10m --json
 ```
 
 ### 7. Real-time candles for indicator logic
@@ -147,7 +147,7 @@ Stream closed 1m bars (with warm-up history) and act on each bar close — the r
 EMA/RSI/MACD-style rule, instead of approximating candles from tickers:
 
 ```sh
-dgx-cli monitor --symbols btc_krw --candles 1 --candle-history 100 --stream-log-level warn \
+digitalx monitor --symbols btc_krw --candles 1 --candle-history 100 --stream-log-level warn \
   --jq 'select(.type=="data" and .channel=="candle" and .payload.final)'
 # Each line is one closed OHLCV bar; pipe into your indicator computation.
 ```

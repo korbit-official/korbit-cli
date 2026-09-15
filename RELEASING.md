@@ -16,16 +16,16 @@ real, published release.
 
 | Asset | What it is |
 | --- | --- |
-| `digitalx-cli_<os>_<arch>.{tar.gz,zip}` | the `dgx-cli` binary, plus the licence, notice and readme files |
+| `digitalx-cli_<os>_<arch>.{tar.gz,zip}` | the `digitalx` binary, plus the licence, notice and readme files |
 | `digitalx_<os>_<arch>.mcpb` | a [Desktop Extension](#desktop-extensions-mcpb), one per platform |
 | `install.sh`, `install.ps1` | the installers, pinned to this release's checksums |
 | `release-manifest.json` | [the names this release uses](#the-release-manifest) |
 | `checksums.txt`, `checksums.txt.sig` | a sha256 of every asset above, and one signature over that |
 
 The **archive** is named for the product (`digitalx-cli`) while the **binary**
-inside it is `dgx-cli` — the two names are independent, and both `assetName()`
+inside it is `digitalx` — the two names are independent, and both `assetName()`
 in `internal/selfupdate/release.go` and the installers build the archive name,
-then extract `dgx-cli` out of it.
+then extract `digitalx` out of it.
 
 ## Target matrix
 
@@ -39,7 +39,7 @@ Intel macOS (`darwin/amd64`) is intentionally not built.
 
 ## Versioning
 
-The version reported by `dgx-cli --version` (and embedded in the User-Agent
+The version reported by `digitalx --version` (and embedded in the User-Agent
 header and the `commands` catalog) is injected at build time from the git tag:
 
 ```
@@ -120,7 +120,7 @@ signs hook), keyed from the environment:
   (`scripts/openssl-sign.sh`); verify with openssl. Only the **private** key is
   referenced here; its public half is held by the verifier and can be rotated
   there without touching this repo. The verifiers are the evergreen installers
-  (which embed the cert) and `dgx-cli self update`, which fetches the cert from
+  (which embed the cert) and `digitalx self update`, which fetches the cert from
   `https://docs.digitalx.miraeasset.com/release-signing-cert.pem` — a managed host separate
   from the GitHub release, so the pin defends against a compromised release.
   Publishing an empty cert there disables the self-updater's signature check.
@@ -166,12 +166,12 @@ platform in the [target matrix](#target-matrix); `darwin/arm64` shown):
 {
   "schema": 1,
   "platforms": {
-    "darwin/arm64": { "archive": "digitalx-cli_darwin_arm64.tar.gz", "binary": "dgx-cli" }
+    "darwin/arm64": { "archive": "digitalx-cli_darwin_arm64.tar.gz", "binary": "digitalx" }
   }
 }
 ```
 
-`dgx-cli self update` reads it in place of the names compiled into the running
+`digitalx self update` reads it in place of the names compiled into the running
 binary (`internal/selfupdate/release.go`, `resolveTarget`). That is what lets a
 later release **rename an archive or the binary inside it** without stranding
 installs made before the rename: an installed binary asks the release what it
@@ -220,7 +220,7 @@ would surface only when someone tried to update:
   match the hash `checksums.txt` recorded, since the updater treats a mismatch
   as fatal with no fallback.
 
-After publishing, `dgx-cli self update --dry-run` is the end-to-end check from a
+After publishing, `digitalx self update --dry-run` is the end-to-end check from a
 client's point of view: it resolves the release, verifies the checksums
 signature, reads the manifest, confirms this platform's archive is published and
 listed, and reports the archive name it resolved — all without downloading it.
@@ -234,7 +234,7 @@ already on disk.
 
 Each build also produces a per-platform `.mcpb` — an [MCP
 Bundle](https://github.com/anthropics/mcpb) ("Desktop Extension"): a single file
-a user drags into Claude Desktop to install `dgx-cli mcp serve` with no terminal
+a user drags into Claude Desktop to install `digitalx mcp serve` with no terminal
 step. It is the zero-terminal path that lets the Claude Desktop chat reach the
 local, key-holding binary; users comfortable with a shell can instead wire up
 the server with `claude mcp add …` (see the README).

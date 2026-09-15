@@ -10,8 +10,8 @@
 // formatting lives here.
 //
 // The model is a single installed binary on PATH plus a manifest. The binary
-// sits at a stable name on PATH (~/.local/bin/dgx-cli on unix,
-// %LOCALAPPDATA%\bin\dgx-cli.exe on windows) — a real file, not a symlink
+// sits at a stable name on PATH (~/.local/bin/digitalx on unix,
+// %LOCALAPPDATA%\bin\digitalx.exe on windows) — a real file, not a symlink
 // (Windows file symlinks need admin/Developer Mode). <home>/install.json records
 // what was installed (version, sha256, provenance, aliases) and is what gates
 // self update. self update replaces the binary in place with
@@ -32,11 +32,11 @@
 // names are implemented in alias.go. Three invariants split the work between the
 // verbs, and every one of them is load bearing:
 //
-//   - self update leaves the COMMAND LAYOUT correct — dgx-cli is the real file
+//   - self update leaves the COMMAND LAYOUT correct — digitalx is the real file
 //     with the current bytes, and an owned korbit name points at it — including
 //     on a run that finds nothing to update (repairLayout). repairLayout ships
 //     inside the release being downloaded, so an install still running the
-//     korbit-era binary gains dgx-cli on its SECOND update run; MIGRATION.md
+//     korbit-era binary gains digitalx on its SECOND update run; MIGRATION.md
 //     documents that two-run upgrade.
 //   - NOTHING here moves or renames a directory, or a file inside one. No verb
 //     does, and no flag asks for it: install (and therefore the install
@@ -309,14 +309,14 @@ func (l Layout) ManifestPath() string { return filepath.Join(l.Home(), manifestF
 // concurrent digitalx-cli process mutating the same store.
 func (l Layout) LockPath() string { return filepath.Join(l.Home(), "self.lock") }
 
-// BinName is the installed binary/stored binary's filename: dgx-cli, or
-// dgx-cli.exe on Windows. It is the fixed canonical name (not the
+// BinName is the installed binary/stored binary's filename: digitalx, or
+// digitalx.exe on Windows. It is the fixed canonical name (not the
 // possibly-renamed program basename) so the installed binary is predictable.
 func (l Layout) BinName() string {
 	if l.goos == "windows" {
-		return "dgx-cli.exe"
+		return "digitalx.exe"
 	}
-	return "dgx-cli"
+	return "digitalx"
 }
 
 // LegacyBinName is the alias command name an install may carry alongside the
@@ -386,7 +386,7 @@ func orGetenv(getenv func(string) string) func(string) string {
 // is a hidden name in the destination directory so the write + rename stays
 // atomic on one filesystem, and sweepLeftovers can recognize and clear one an
 // interrupted run left behind.
-const tmpPattern = ".dgx-cli-*.tmp"
+const tmpPattern = ".digitalx-*.tmp"
 
 // fileExists reports whether path exists and is a regular file.
 func fileExists(path string) bool {
@@ -503,14 +503,14 @@ func resolveExecutable() (string, error) {
 // resolveOrClean returns an absolute, symlink-resolved form of path for use as a
 // comparison key: two paths run through it are equal when they point at the same
 // real file even if a component is a symlink — e.g. $HOME is a symlink onto
-// another volume, so ~/.local/bin/dgx-cli and its resolved /mnt/.../dgx-cli form
+// another volume, so ~/.local/bin/digitalx and its resolved /mnt/.../digitalx form
 // are the same binary. os.Executable already resolves the running binary, so a
 // raw filepath.Clean of a layout path would spuriously differ from it.
 //
 // It absolutizes before resolving because filepath.EvalSymlinks preserves a
 // relative input as a relative result (and only makes it absolute if a component
 // is an absolute symlink); a relative-vs-absolute comparison would then never
-// match. Relative symlink *targets* within the tree (e.g. korbit -> dgx-cli)
+// match. Relative symlink *targets* within the tree (e.g. korbit -> digitalx)
 // are resolved correctly by EvalSymlinks regardless, once the input is absolute.
 //
 // The two fallbacks are best-effort and, in practice, unreachable for the callers

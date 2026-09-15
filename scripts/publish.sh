@@ -10,7 +10,7 @@
 #
 # A release carries the digitalx-cli_<os>_<arch> archives, the .mcpb Desktop
 # Extensions, the filled install.sh/install.ps1, release-manifest.json,
-# checksums.txt and checksums.txt.sig — everything the installers and `dgx-cli
+# checksums.txt and checksums.txt.sig — everything the installers and `digitalx
 # self update` fetch. The one checksums file lists every asset, so the single
 # signature over it authenticates all of them.
 #

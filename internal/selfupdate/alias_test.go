@@ -73,9 +73,9 @@ func assertAlias(t *testing.T, l Layout, want string) {
 // extraction (extractBinary by exact basename) and the installers agree on them.
 func TestLayoutNames(t *testing.T) {
 	for _, tc := range []struct{ goos, bin, legacy string }{
-		{"linux", "dgx-cli", "korbit"},
-		{"darwin", "dgx-cli", "korbit"},
-		{"windows", "dgx-cli.exe", "korbit.exe"},
+		{"linux", "digitalx", "korbit"},
+		{"darwin", "digitalx", "korbit"},
+		{"windows", "digitalx.exe", "korbit.exe"},
 	} {
 		l := Layout{getenv: func(string) string { return "" }, goos: tc.goos}
 		if got := l.BinName(); got != tc.bin {
@@ -336,7 +336,7 @@ func TestSweepLeftoversClearsBothSwapNames(t *testing.T) {
 		"." + l.LegacyBinName() + ".new",
 		"." + l.LegacyBinName() + ".old",
 		".korbit-abc.tmp",
-		".dgx-cli-abc.tmp",
+		".digitalx-abc.tmp",
 	}
 	for _, name := range leftovers {
 		if err := os.WriteFile(filepath.Join(l.ExecutableDir(), name), []byte("x"), 0o644); err != nil {
@@ -501,7 +501,7 @@ func TestUpdateSweepsSwapLeftovers(t *testing.T) {
 	leftovers := []string{
 		"." + l.BinName() + ".old",
 		"." + l.LegacyBinName() + ".old",
-		".dgx-cli-stale.tmp",
+		".digitalx-stale.tmp",
 	}
 	for _, name := range leftovers {
 		if err := os.WriteFile(filepath.Join(l.ExecutableDir(), name), []byte("x"), 0o644); err != nil {
@@ -540,7 +540,7 @@ func TestWindowsAliasIsARefreshedCopy(t *testing.T) {
 		t.Fatal(err)
 	}
 	l := c.Layout()
-	if l.BinName() != "dgx-cli.exe" || l.LegacyBinName() != "korbit.exe" {
+	if l.BinName() != "digitalx.exe" || l.LegacyBinName() != "korbit.exe" {
 		t.Fatalf("windows layout not in effect: %q / %q", l.BinName(), l.LegacyBinName())
 	}
 

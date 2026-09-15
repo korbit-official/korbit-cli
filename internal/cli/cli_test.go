@@ -287,7 +287,7 @@ func TestLogLevelControlsLevelSeparately(t *testing.T) {
 func TestLogFileRedirectsOperationalLogs(t *testing.T) {
 	home := t.TempDir()
 	seedBoundKey(t, home)
-	logPath := filepath.Join(t.TempDir(), "dgx-cli.log")
+	logPath := filepath.Join(t.TempDir(), "digitalx.log")
 	doer := &stubDoer{resp: resp(200, `{"success":true,"data":{"krw":{"available":"1000"}}}`, nil)}
 
 	_, stderr, code := runCLI(
@@ -642,7 +642,7 @@ func TestPlaceDryRunHumanRender(t *testing.T) {
 // market-data reads follow the normal journaling policy: a normal dry-run opens
 // no journal (so it works on a read-only home / before key setup), while a
 // --debug dry-run journals them so they're available for troubleshooting via
-// `dgx-cli logs`.
+// `digitalx logs`.
 func TestPlaceDryRunJournalsPreflightOnlyInDebug(t *testing.T) {
 	book := `{"success":true,"data":{"timestamp":1,"bids":[{"price":"99000000","qty":"1"}],` +
 		`"asks":[{"price":"100000000","qty":"1"}]}}`

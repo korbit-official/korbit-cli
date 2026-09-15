@@ -28,7 +28,7 @@ import (
 // careless backups) — not from an attacker who has both the keystore file and
 // this CLI, because the encryption key below intentionally ships inside the
 // CLI. For OS-enforced at-rest protection, switch to the keychain backend with
-// `dgx-cli keystore migrate keychain` (which moves existing keys for you).
+// `digitalx keystore migrate keychain` (which moves existing keys for you).
 //
 // The seed string is an OPAQUE v1 domain constant, not a name to keep in step
 // with the product: it derives the AES key every existing keystore.json was

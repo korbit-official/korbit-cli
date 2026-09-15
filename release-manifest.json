@@ -3,23 +3,23 @@
   "platforms": {
     "darwin/arm64": {
       "archive": "digitalx-cli_darwin_arm64.tar.gz",
-      "binary": "dgx-cli"
+      "binary": "digitalx"
     },
     "linux/amd64": {
       "archive": "digitalx-cli_linux_amd64.tar.gz",
-      "binary": "dgx-cli"
+      "binary": "digitalx"
     },
     "linux/arm64": {
       "archive": "digitalx-cli_linux_arm64.tar.gz",
-      "binary": "dgx-cli"
+      "binary": "digitalx"
     },
     "windows/amd64": {
       "archive": "digitalx-cli_windows_amd64.zip",
-      "binary": "dgx-cli.exe"
+      "binary": "digitalx.exe"
     },
     "windows/arm64": {
       "archive": "digitalx-cli_windows_arm64.zip",
-      "binary": "dgx-cli.exe"
+      "binary": "digitalx.exe"
     }
   }
 }

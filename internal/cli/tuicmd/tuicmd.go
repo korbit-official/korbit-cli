@@ -168,7 +168,7 @@ func Run(cx *clienv.Cmd, cmd *cobra.Command, args []string, tuiRun func(tui.Conf
 
 	// The TUI's public market-data reads — the launched-pairs list and the candle
 	// chart — journal through one shared recorder under DefaultPolicy, so they show
-	// up in `dgx-cli logs` under --debug like every other surface's public reads
+	// up in `digitalx logs` under --debug like every other surface's public reads
 	// (the call site no longer decides journaling). Its log-only sink keeps a
 	// journal hiccup off the order toast, and it is safe for the chart goroutine to
 	// share (callrec mints a per-call recorder). The trader's order calls use a

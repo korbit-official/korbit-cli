@@ -19,7 +19,7 @@ const (
 	ExitInternal = 1 // network failure or internal error
 	ExitUsage    = 2 // usage error — the caller can fix the invocation
 	ExitAPI      = 3 // the Digital X API rejected the request (see error.code)
-	ExitConfig   = 4 // key/keystore/config problem — fix with `dgx-cli key ...`
+	ExitConfig   = 4 // key/keystore/config problem — fix with `digitalx key ...`
 )
 
 // The error taxonomy maps each failure class to a process exit code and the

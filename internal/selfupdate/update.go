@@ -161,7 +161,7 @@ func (c Config) applyUpdate(ctx context.Context, l Layout, opts UpdateOptions) (
 		// updated itself under the alias name has no primary binary at all, an
 		// alias can go missing under a healthy primary, and an alias copy can be
 		// left behind a version; none of those states fixes itself, and waiting
-		// for the next release to fix them would leave the `dgx-cli` command
+		// for the next release to fix them would leave the `digitalx` command
 		// absent for as long as no release ships.
 		//
 		// A dry run must still change nothing, so the fixes are PLANNED read-only
@@ -341,7 +341,7 @@ type layoutRepair struct {
 //
 //   - The running binary must be verified against the manifest, so its bytes are
 //     known to be this install's current version. Without that check a hand-built
-//     or older `korbit` on PATH would overwrite a perfectly good `dgx-cli`.
+//     or older `korbit` on PATH would overwrite a perfectly good `digitalx`.
 //   - The primary must fail the same check. A primary that matches is healthy,
 //     whatever else is on disk.
 //
@@ -398,7 +398,7 @@ func (r layoutRepair) descriptions(l Layout) []string {
 //     is exactly right, since they ARE the current version.
 //   - The primary name is PRESENT but STALE: the running alias-named binary's
 //     bytes are the manifest's and the file at the primary name's are not (see
-//     primaryIsStale). The `dgx-cli` command then runs something this install did
+//     primaryIsStale). The `digitalx` command then runs something this install did
 //     not place — a copy an interrupted repair left behind, or another install's
 //     binary — and it is recreated from the running, verified bytes. It is never
 //     ADOPTED: blessing it would record the wrong hash and make every later check

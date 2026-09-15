@@ -1,8 +1,8 @@
-# Upgrading from `korbit` to `dgx-cli`
+# Upgrading from `korbit` to `digitalx`
 
 **English** · [한국어](MIGRATION.ko.md)
 
-**v1.2.0** renames the CLI: command `korbit` → `dgx-cli`, home `~/.korbit-cli` →
+**v1.2.0** renames the CLI: command `korbit` → `digitalx`, home `~/.korbit-cli` →
 `~/.digitalx-cli`, variables `KORBIT_CLI_*` → `DIGITALX_CLI_*`. **Nothing breaks,
 nothing moves, everything keeps working:** every earlier name stays honored for
 good, and no command in this CLI ever moves or renames anything on your disk.
@@ -11,7 +11,7 @@ good, and no command in this CLI ever moves or renames anything on your disk.
 
 | You… | Do this |
 |---|---|
-| installed `dgx-cli` fresh | Nothing. This document is not for you. |
+| installed `digitalx` fresh | Nothing. This document is not for you. |
 | have a `korbit` install | Run `korbit self update` **twice** ([why twice](#run-self-update-twice)). Your data stays where it is and keeps working. |
 | set `KORBIT_CLI_*` variables | Nothing. They stay honored; `DIGITALX_CLI_*` wins when both are set. |
 | installed the `.mcpb` Desktop Extension | Remove the earlier extension by hand — the new one [installs beside it](#the-mcpb-bundle-appears-as-a-second-extension). |
@@ -21,7 +21,7 @@ good, and no command in this CLI ever moves or renames anything on your disk.
 
 | Thing | Current | Earlier | The earlier name is… |
 |---|---|---|---|
-| Command | `dgx-cli` | `korbit` | Kept forever, as an alias of the same binary, on any install that has it. Fresh installs: `dgx-cli` only. |
+| Command | `digitalx` | `korbit` | Kept forever, as an alias of the same binary, on any install that has it. Fresh installs: `digitalx` only. |
 | CLI home | `~/.digitalx-cli` | `~/.korbit-cli` | Used as-is, forever. Never moved. |
 | Home variable | `DIGITALX_CLI_HOME` | `KORBIT_CLI_HOME` | Honored. Current name wins when both are set. |
 | Artifact cache | `<user cache dir>/digitalx-cli` | `<user cache dir>/korbit-cli` | Used as-is, forever. Never moved. |
@@ -35,22 +35,22 @@ good, and no command in this CLI ever moves or renames anything on your disk.
 
 ```sh
 korbit self update    # 1. installs the current release, still under the `korbit` name
-korbit self update    # 2. adds the `dgx-cli` command, pointing `korbit` at it
+korbit self update    # 2. adds the `digitalx` command, pointing `korbit` at it
 ```
 
-**Why twice:** the code that creates the `dgx-cli` command ships inside the
+**Why twice:** the code that creates the `digitalx` command ships inside the
 release the first run downloads. So the first run leaves you current but still
-`korbit`-only; the second run is that new code, and it adds `dgx-cli`, reporting
+`korbit`-only; the second run is that new code, and it adds `digitalx`, reporting
 the fix under `layoutRepaired` with `updated: false` — nothing updated, only
 repaired.
 
 From then on **both names stay current**: every install and update places
-`dgx-cli` as the real binary and keeps `korbit` beside it as an alias pointing at
+`digitalx` as the real binary and keeps `korbit` beside it as an alias pointing at
 the same bytes. Either name runs the same CLI.
 
 ### The Agent Skill is renamed on install
 
-`dgx-cli agent skill install` writes the skill under its current directory name
+`digitalx agent skill install` writes the skill under its current directory name
 and removes a copy left under the earlier one, so an agent sees one skill, not
 two. That rename happens inside the agent's own skills folder; your CLI home is
 not touched.
@@ -71,7 +71,7 @@ is simply the home, for as long as you leave it there.
 | Command | Does | Never |
 |---|---|---|
 | `self install` (what the install one-liner runs) | places the binary, wires `PATH`, writes the manifest; a re-run repairs a broken install, nothing else | a directory move, a file rename in your home, a deletion of anything of yours |
-| `self update` | downloads a release, swaps the binary in place, keeps the command layout right (`dgx-cli` real, `korbit` pointing at it) | a directory move, a file rename |
+| `self update` | downloads a release, swaps the binary in place, keeps the command layout right (`digitalx` real, `korbit` pointing at it) | a directory move, a file rename |
 | `self doctor` | reports — read-only by contract | any change at all |
 | `self uninstall` | deletes only what you confirm ([details](#option-a--start-fresh-uninstall-then-reinstall)) | a rename, a relocation |
 
@@ -152,9 +152,9 @@ Throws your data away and sets the CLI up again from scratch. Choose it when
 nothing in the home is worth keeping (or you have exported what you need).
 
 ```sh
-dgx-cli self uninstall     # interactive; see exactly what it does below
+digitalx self uninstall     # interactive; see exactly what it does below
 # then re-run the install one-liner, and:
-dgx-cli setup
+digitalx setup
 ```
 
 `self uninstall` is **interactive only**: it needs a terminal and refuses to run
@@ -167,7 +167,7 @@ answered, and **no** keeps everything in that row.
 
 | Question | Default | Yes removes | Kept regardless |
 |---|---|---|---|
-| `dgx-cli` binary and install manifest | **yes** | the binary; every alias it owns, `korbit` included; `install.json`; leftover swap files | a `korbit` file it cannot prove is its own |
+| `digitalx` binary and install manifest | **yes** | the binary; every alias it owns, `korbit` included; `install.json`; leftover swap files | a `korbit` file it cannot prove is its own |
 | config, API keys, and action journal | **no** | `config.json`; `journal.db`/`korbit-cli.db` and `bot.db`/`korbit-bot.db` with their `-wal`/`-shm`; `debug-*.json`; `keys.json` and `keystore.json`, each key first cleared from its backend, OS keychain included | — |
 | regenerable caches | **no** | `sandbox/` in each home; the shared Deno/module cache under **both** cache names (a running sandbox is stopped first) | — |
 
@@ -198,7 +198,7 @@ sandbox, `monitor`, `tui`, or `mcp serve` holds the databases open, and renaming
 a file out from under a live process corrupts what it was doing:
 
 ```sh
-dgx-cli sandbox stop      # and `korbit sandbox stop` if that command exists
+digitalx sandbox stop      # and `korbit sandbox stop` if that command exists
 # then quit any running `monitor`, `tui`, or `mcp serve`
 ```
 
@@ -281,7 +281,7 @@ if an earlier `korbit` binary is still sharing it.
 Finally, verify:
 
 ```sh
-dgx-cli self doctor
+digitalx self doctor
 ```
 
 ## What `self doctor` reports
@@ -293,8 +293,8 @@ works but a command would tidy up (exit 0). Every problem carries a stable
 | `field` | Problem | Fix |
 |---|---|---|
 | `managed` | install manifest missing or corrupt | the install one-liner |
-| `binary` | installed binary missing, or not matching the manifest — including a `korbit` that matches while the `dgx-cli` beside it does not (the documented name would run bytes this install never placed) | the install one-liner; `self update` when only `dgx-cli` mismatches |
-| `alias` | `korbit` missing, pointing at something other than `dgx-cli`, or a stale copy of another version | `self update` |
+| `binary` | installed binary missing, or not matching the manifest — including a `korbit` that matches while the `digitalx` beside it does not (the documented name would run bytes this install never placed) | the install one-liner; `self update` when only `digitalx` mismatches |
+| `alias` | `korbit` missing, pointing at something other than `digitalx`, or a stale copy of another version | `self update` |
 | `path` | install directory not on `PATH` | the install one-liner |
 | `home` | one of the two states below | you, by hand |
 

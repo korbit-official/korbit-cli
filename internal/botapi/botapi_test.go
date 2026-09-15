@@ -391,7 +391,7 @@ func TestCredsMissingThrowsClearly(t *testing.T) {
 	ft := newFakeTransport()
 	err := runOn(t, Options{
 		API:      ft.api(apiExtra{}),
-		CredsErr: `no key configured; add one with "dgx-cli key add"`,
+		CredsErr: `no key configured; add one with "digitalx key add"`,
 		On:       "await api.balance()",
 	}, dataEvent(`{}`))
 	if err == nil || !strings.Contains(err.Error(), "needs a signing key") || !strings.Contains(err.Error(), "no key configured") {

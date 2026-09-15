@@ -8,7 +8,7 @@
 // permissive licenses (MIT / BSD / ISC / Apache-2.0) require their copyright and
 // permission notices to travel with every copy we distribute. The generated file
 // is shipped inside each release archive (see the archive `files` list in
-// .goreleaser.yaml) and `dgx-cli license` points at it in the source repository.
+// .goreleaser.yaml) and `digitalx license` points at it in the source repository.
 //
 // Run from the module root:
 //

@@ -258,7 +258,7 @@ func (rt *runtime) logFormatSetting() string {
 // logStyle resolves the operational logger's presentation (see logging.Style):
 // --log-format json selects JSON for every sink; otherwise text, timestamped
 // (and untagged) only when logs are diverted to a file, where a wall-clock
-// anchor is wanted and the terminal-scoped "dgx-cli:" tag is not. setupLogging
+// anchor is wanted and the terminal-scoped "digitalx:" tag is not. setupLogging
 // validates the format word up front, so an unrecognized value here falls back
 // to text.
 func (rt *runtime) logStyle() logging.Style {

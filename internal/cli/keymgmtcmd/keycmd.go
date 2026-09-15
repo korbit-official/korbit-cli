@@ -51,7 +51,7 @@ const (
 // deep link. It namespaces the key in the developers portal so a CLI-issued key
 // is recognizable at a glance among any others on the account.
 func registrationLabel(name string) string {
-	return "dgx-cli: " + name
+	return "digitalx: " + name
 }
 
 // registrationLink builds the developers-portal create-form deep link that

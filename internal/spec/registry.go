@@ -510,7 +510,7 @@ var Registry = []Command{
 			"Contains no secrets: keys are listed by name/binding only (private keys are never read), and the request params/api-key-ids are the same non-secret values already in the journal.",
 			"Send the resulting file to Digital X support when reporting a problem.",
 		},
-		Examples: []string{"{prog} debug bundle", "{prog} debug bundle --out ./dgx-cli-debug.json"},
+		Examples: []string{"{prog} debug bundle", "{prog} debug bundle --out ./digitalx-debug.json"},
 	},
 	{
 		ID: []string{"sandbox", "start"}, Section: cmdmeta.SectionMeta,

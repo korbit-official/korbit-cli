@@ -12,7 +12,7 @@
 #
 # What it does: detect your platform, download that release's archive, verify its
 # SHA-256 against the value embedded below, extract it, and hand off to
-# `dgx-cli self install`, which places the binary, wires PATH, and writes the
+# `digitalx self install`, which places the binary, wires PATH, and writes the
 # install manifest. Trust is TLS + SHA-256.
 #
 # It touches the command layout only: an existing CLI home is left exactly where
@@ -64,7 +64,7 @@ expected=$(printf '%s\n' "$PIN_SHA256" | awk -v a="$asset" '$2==a {print $1}' | 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 url="https://github.com/$REPO/releases/download/$PIN_VERSION/$asset"
-echo "install: downloading dgx-cli $PIN_VERSION ($os/$arch)…" >&2
+echo "install: downloading digitalx $PIN_VERSION ($os/$arch)…" >&2
 if command -v curl >/dev/null 2>&1; then
   curl -fsSL "$url" -o "$tmp/$asset" || err "download failed: $url"
 elif command -v wget >/dev/null 2>&1; then
@@ -87,12 +87,12 @@ fi
 
 # --- extract and hand off to the binary ---
 tar -xzf "$tmp/$asset" -C "$tmp" || err "failed to extract $asset"
-[ -f "$tmp/dgx-cli" ] || err "archive did not contain the dgx-cli binary"
-chmod +x "$tmp/dgx-cli"
+[ -f "$tmp/digitalx" ] || err "archive did not contain the digitalx binary"
+chmod +x "$tmp/digitalx"
 
 # The binary owns install policy (PATH location, PATH entry, manifest) and is
 # reconciling, so this both installs fresh and repairs a broken install. It
 # copies itself to its PATH location before returning, so the temp dir (cleaned
 # by the EXIT trap) is no longer needed afterward. Run it rather than exec so
 # cleanup still fires.
-"$tmp/dgx-cli" self install "$@"
+"$tmp/digitalx" self install "$@"

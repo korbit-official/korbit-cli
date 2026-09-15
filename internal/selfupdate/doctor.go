@@ -182,7 +182,7 @@ func (c Config) Doctor() (*DoctorReport, error) {
 	}
 
 	// The running binary carries the ALIAS name and matches the manifest, while a
-	// file at the PRIMARY name does not (primaryIsStale). The `dgx-cli` command —
+	// file at the PRIMARY name does not (primaryIsStale). The `digitalx` command —
 	// the name the docs, the installers, and every example use — then runs
 	// something this install did not place, and nothing about it looks wrong from
 	// outside. `self update` recreates it from the running verified bytes rather

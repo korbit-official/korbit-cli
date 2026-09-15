@@ -20,7 +20,7 @@ import (
 // The two platforms need different mechanisms, and both are exact about what a
 // caller can rely on:
 //
-//   - unix: a RELATIVE symlink (korbit -> dgx-cli). Relative so the pair still
+//   - unix: a RELATIVE symlink (korbit -> digitalx). Relative so the pair still
 //     resolves if the bin dir is moved or reached through a symlinked home, and
 //     so an update of the primary is instantly an update of the alias — there is
 //     nothing to refresh. It is written under a temp name and renamed into place,

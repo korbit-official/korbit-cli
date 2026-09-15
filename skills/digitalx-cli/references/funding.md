@@ -14,16 +14,16 @@ never complete or bypass the confirmation.
 ## Reads — use freely (no special permission)
 
 ```sh
-dgx-cli deposit addresses --json                       # your crypto deposit addresses
-dgx-cli deposit address btc --network bitcoin --json   # address for one asset/network
-dgx-cli deposit history btc --json                     # recent crypto deposits
-dgx-cli deposit status btc --id <n> --json             # one deposit by id
-dgx-cli withdraw addresses --json                      # addresses registered for API withdrawal
-dgx-cli withdraw amount [btc] --json                   # withdrawable + in-use per asset
-dgx-cli withdraw history btc --json                    # recent crypto withdrawals
-dgx-cli withdraw status btc --id <n> --json            # one withdrawal by id
-dgx-cli krw deposit history --json                     # recent KRW deposits
-dgx-cli krw withdraw history --json                    # recent KRW withdrawals
+digitalx deposit addresses --json                       # your crypto deposit addresses
+digitalx deposit address btc --network bitcoin --json   # address for one asset/network
+digitalx deposit history btc --json                     # recent crypto deposits
+digitalx deposit status btc --id <n> --json             # one deposit by id
+digitalx withdraw addresses --json                      # addresses registered for API withdrawal
+digitalx withdraw amount [btc] --json                   # withdrawable + in-use per asset
+digitalx withdraw history btc --json                    # recent crypto withdrawals
+digitalx withdraw status btc --id <n> --json            # one withdrawal by id
+digitalx krw deposit history --json                     # recent KRW deposits
+digitalx krw withdraw history --json                    # recent KRW withdrawals
 ```
 
 Use these to reconcile funding state, confirm an address is registered, or check whether a transfer
@@ -33,16 +33,16 @@ in SKILL.md).
 ## Writes — gated, only when the user explicitly asks
 
 Fund-moving writes need a key provisioned with the transfer permissions (request them at setup with
-`dgx-cli setup --with-transfers …`; a plain trading key gets a permission error → exit 3/4). **Always
+`digitalx setup --with-transfers …`; a plain trading key gets a permission error → exit 3/4). **Always
 `--dry-run` first** (or, over MCP, confirm the exact parameters with the user — there's no per-call
 dry-run there).
 
 ```sh
-dgx-cli deposit generate btc --network bitcoin --json              # create/return a deposit address (no funds move)
-dgx-cli withdraw request btc --amount 0.01 --address <ADDR> --network bitcoin --json
-dgx-cli withdraw cancel --id <coinWithdrawalId> --json             # only while actionRequired/reviewing
-dgx-cli krw deposit request 100000 --json                          # sends an app push; user confirms in the Digital X app
-dgx-cli krw withdraw request 100000 --json                         # sends an app push; user confirms in the Digital X app
+digitalx deposit generate btc --network bitcoin --json              # create/return a deposit address (no funds move)
+digitalx withdraw request btc --amount 0.01 --address <ADDR> --network bitcoin --json
+digitalx withdraw cancel --id <coinWithdrawalId> --json             # only while actionRequired/reviewing
+digitalx krw deposit request 100000 --json                          # sends an app push; user confirms in the Digital X app
+digitalx krw withdraw request 100000 --json                         # sends an app push; user confirms in the Digital X app
 ```
 
 ## The gates you must respect

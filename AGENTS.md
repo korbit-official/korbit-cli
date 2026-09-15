@@ -65,7 +65,7 @@ reasoning is the part worth keeping). Almost every choice is in service of
 ## Build & commands
 
 ```sh
-go build -o dgx-cli .   # build the binary
+go build -o digitalx .  # build the binary
 go test ./...          # run the suite (fast; run after every change)
 go vet ./...           # static checks
 gofmt -l .             # must print nothing
@@ -474,9 +474,9 @@ pointer-present/body-absent.
 
 `skills/digitalx-cli/` is the Agent Skill that consumes this CLI (`SKILL.md` plus
 `references/`). It is mode-agnostic (CLI or `mcp serve`), organized around use
-cases, defers the exhaustive flag/enum surface to `dgx-cli commands` / `--help`,
+cases, defers the exhaustive flag/enum surface to `digitalx commands` / `--help`,
 and deliberately **excludes** the experimental JS bot runtime. Shipping is via
-`dgx-cli agent skill install`/`doctor` (embedded in the binary, idempotent,
+`digitalx agent skill install`/`doctor` (embedded in the binary, idempotent,
 self-cleaning, drift-checked by content hash) — see `cli/agentskillcmd` and
 `internal/agentskill`. A copy of this same skill sitting at the legacy directory
 name (`skills/korbit`) is removed by `agent skill install` once the current one
@@ -520,7 +520,7 @@ new file; `TestEveryGoFileHasSPDXHeader` fails the build if a Go file is missing
 The binary statically links open-source Go modules whose permissive licenses
 require their notices to accompany every copy. `THIRD_PARTY_LICENSES.txt` (repo
 root) carries them; it ships inside every release archive (the archive `files`
-list in `.goreleaser.yaml`) and `dgx-cli license` links to it in the source repo.
+list in `.goreleaser.yaml`) and `digitalx license` links to it in the source repo.
 The file is **generated** — regenerate with `make licenses` (see
 `tools/licensegen`) after any dependency change and commit it;
 `make licenses-check` fails on drift.

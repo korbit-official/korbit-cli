@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Pack one built binary into an MCP Bundle (.mcpb) — a Desktop Extension that
-# installs `dgx-cli mcp serve` into Claude Desktop (and other MCPB hosts) with a
+# installs `digitalx mcp serve` into Claude Desktop (and other MCPB hosts) with a
 # drag-and-drop, no-terminal flow. Invoked by GoReleaser as a per-target
 # post-build hook (see .goreleaser.yaml), after the macOS signing hook, so the
 # binary we pack is the signed one. Notarization happens later (a separate step)
@@ -49,17 +49,17 @@ fi
 # the project root, but resolve it from the script path so it is invariant.
 root="$(cd "$(dirname "$0")/.." && pwd)"
 
-# dist/ is two levels up from the binary (dist/dgx-cli_<os>_<arch>.../dgx-cli).
+# dist/ is two levels up from the binary (dist/digitalx_<os>_<arch>.../digitalx).
 dist="$(cd "$(dirname "$bin")/.." && pwd)"
 out="$dist/digitalx_${goos}_${goarch}.mcpb"
 
 # Map the Go target to the MCPB platform token and the on-disk binary name.
 # MCPB uses Node's process.platform values: win32 (not "windows").
-binname="dgx-cli"
+binname="digitalx"
 platform="$goos"
 case "$goos" in
 windows)
-	binname="dgx-cli.exe"
+	binname="digitalx.exe"
 	platform="win32"
 	;;
 darwin) platform="darwin" ;;
@@ -106,14 +106,14 @@ cat >"$stage/manifest.json" <<EOF
   "display_name": "Digital X",
   "version": "$version",
   "description": "Operate the Digital X cryptocurrency exchange over MCP — every REST endpoint as a tool, with the same validation, signing, journaling, and retries as the CLI.",
-  "long_description": "Exposes the Digital X Open API v2 as MCP tools backed by the dgx-cli binary running locally on your machine, so your API keys never leave it. Read market data, manage orders, and check balances; the order-placement tool supports a dry-run that simulates the fill against the live order book before anything is sent. First-time users with no key yet can complete setup entirely in chat via the setup and doctor tools.",
+  "long_description": "Exposes the Digital X Open API v2 as MCP tools backed by the digitalx binary running locally on your machine, so your API keys never leave it. Read market data, manage orders, and check balances; the order-placement tool supports a dry-run that simulates the fill against the live order book before anything is sent. First-time users with no key yet can complete setup entirely in chat via the setup and doctor tools.",
   "author": { "name": "Digital X Co., Ltd.", "url": "https://digitalx.miraeasset.com" },
   "homepage": "https://developers.digitalx.miraeasset.com/",
   "documentation": "https://developers.digitalx.miraeasset.com/",
   "repository": { "type": "git", "url": "https://github.com/digitalx-official/digitalx-cli.git" },
   "license": "Apache-2.0",
   "icon": "icon.png",
-  "keywords": ["digitalx", "digitalx-cli", "dgx-cli", "cryptocurrency", "exchange", "trading", "mcp"],
+  "keywords": ["digitalx", "digitalx-cli", "cryptocurrency", "exchange", "trading", "mcp"],
   "server": {
     "type": "binary",
     "entry_point": "$entry_point",

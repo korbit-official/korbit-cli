@@ -42,7 +42,7 @@ func TestMCPBManifestPins(t *testing.T) {
 	for _, want := range []string{
 		`"name": "digitalx",`,
 		`"display_name": "Digital X",`,
-		`binname="dgx-cli"`,
+		`binname="digitalx"`,
 		`entry_point="server/$binname"`,
 		`command_path='${__dirname}/server/'"$binname"`,
 		`"entry_point": "$entry_point",`,

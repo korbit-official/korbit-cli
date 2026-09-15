@@ -35,7 +35,7 @@ import (
 // is left unset/false). When a code-signed binary adds a generic-password item
 // without an explicit kSecAttrAccess, the system seeds the item's ACL with that
 // binary's designated requirement, which is rooted in the signing Team ID. The
-// effect for a Developer-ID-signed `dgx-cli`:
+// effect for a Developer-ID-signed `digitalx`:
 //
 //   - this binary, and future versions signed with the SAME code identity
 //     (Developer ID Team ID AND a stable signing identifier — pin it with

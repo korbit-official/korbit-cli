@@ -105,7 +105,7 @@ func TestRenderAdditionShowsContextDiff(t *testing.T) {
 // PATH location is told to be edited (not removed) by hand. Home is abbreviated.
 func TestUninstallViewGroupsSections(t *testing.T) {
 	r := &selfupdate.UninstallResult{
-		Removed:   []string{"/home/u/.local/bin/dgx-cli", "/home/u/.korbit-cli/config.json"},
+		Removed:   []string{"/home/u/.local/bin/digitalx", "/home/u/.korbit-cli/config.json"},
 		Edited:    []string{"/home/u/.zshrc"},
 		KeptPaths: []string{"/home/u/.profile"},
 	}
@@ -115,7 +115,7 @@ func TestUninstallViewGroupsSections(t *testing.T) {
 	if !strings.Contains(out, "Uninstalled digitalx-cli.") {
 		t.Errorf("expected the success header:\n%s", out)
 	}
-	if !strings.Contains(out, "Removed:") || !strings.Contains(out, "~/.local/bin/dgx-cli") {
+	if !strings.Contains(out, "Removed:") || !strings.Contains(out, "~/.local/bin/digitalx") {
 		t.Errorf("expected a Removed section with abbreviated paths:\n%s", out)
 	}
 	if !strings.Contains(out, "Edited (undid the installer's PATH change):") || !strings.Contains(out, "~/.zshrc") {
@@ -213,7 +213,7 @@ func TestDoctorViewReportsAliasAndLegacyLayout(t *testing.T) {
 		RunningVersion: "v1.2.3",
 		Executable:     "/b/korbit",
 		LegacyLayout:   true,
-		Notes:          []string{"this install runs as `korbit`; run `aliased-name self update` to add the `dgx-cli` command and keep `korbit` as an alias for it"},
+		Notes:          []string{"this install runs as `korbit`; run `aliased-name self update` to add the `digitalx` command and keep `korbit` as an alias for it"},
 	}}.FormatText(&legacy)
 	out := legacy.String()
 	if !strings.Contains(out, "    - this install runs as `korbit`") || !strings.Contains(out, "keep `korbit` as an alias") {
@@ -226,19 +226,19 @@ func TestDoctorViewReportsAliasAndLegacyLayout(t *testing.T) {
 	var adopted strings.Builder
 	doctorView{&selfupdate.DoctorReport{
 		RunningVersion: "v1.2.3",
-		Executable:     "/b/dgx-cli",
+		Executable:     "/b/digitalx",
 		Aliases: []selfupdate.AliasStatus{
-			{Name: "korbit", Path: "/b/korbit", Target: "dgx-cli", Present: true, Valid: true},
+			{Name: "korbit", Path: "/b/korbit", Target: "digitalx", Present: true, Valid: true},
 		},
 	}}.FormatText(&adopted)
-	if got := adopted.String(); !strings.Contains(got, "alias korbit") || !strings.Contains(got, "/b/korbit → dgx-cli") {
+	if got := adopted.String(); !strings.Contains(got, "alias korbit") || !strings.Contains(got, "/b/korbit → digitalx") {
 		t.Errorf("alias line missing its symlink target:\n%s", got)
 	}
 
 	var missing strings.Builder
 	doctorView{&selfupdate.DoctorReport{
 		RunningVersion: "v1.2.3",
-		Executable:     "/b/dgx-cli",
+		Executable:     "/b/digitalx",
 		Aliases:        []selfupdate.AliasStatus{{Name: "korbit", Path: "/b/korbit"}},
 		Problems:       []selfupdate.DoctorProblem{{Field: selfupdate.FieldAlias, Message: "the `korbit` command is missing"}},
 	}}.FormatText(&missing)
@@ -255,12 +255,12 @@ func TestDoctorViewReportsAliasAndLegacyLayout(t *testing.T) {
 // than the command actually does.
 func TestExistingListsDanglingSymlink(t *testing.T) {
 	dir := t.TempDir()
-	real := filepath.Join(dir, "dgx-cli")
+	real := filepath.Join(dir, "digitalx")
 	if err := os.WriteFile(real, []byte("bin"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	live := filepath.Join(dir, "korbit")
-	if err := os.Symlink("dgx-cli", live); err != nil {
+	if err := os.Symlink("digitalx", live); err != nil {
 		t.Skipf("symlinks unsupported here: %v", err)
 	}
 	dangling := filepath.Join(dir, "korbit-dangling")

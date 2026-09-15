@@ -11,7 +11,7 @@
 #
 # What it does: detect your architecture, download that release's .zip, verify
 # its SHA-256 against the value embedded below, extract it, and hand off to
-# `dgx-cli self install`, which places the binary, wires the User PATH, and
+# `digitalx self install`, which places the binary, wires the User PATH, and
 # writes the install manifest. Trust is TLS + SHA-256.
 #
 # It touches the command layout only: an existing CLI home is left exactly where
@@ -22,7 +22,7 @@
 # terminating it. Under `irm … | iex` the script's text executes in the CURRENT
 # session, so a top-level `exit` would kill the hosting PowerShell and close the
 # terminal window. `@args` is forwarded into the block so any passthrough
-# arguments still reach `dgx-cli self install`.
+# arguments still reach `digitalx self install`.
 & {
   $ErrorActionPreference = 'Stop'
 
@@ -66,12 +66,12 @@ $PIN_SHA256 = @'
   if (-not $expected) { Die "no embedded checksum for $asset in this installer" }
 
   # --- download ---
-  $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("dgx-cli-" + [System.Guid]::NewGuid().ToString('N'))
+  $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("digitalx-" + [System.Guid]::NewGuid().ToString('N'))
   New-Item -ItemType Directory -Path $tmp -Force | Out-Null
   try {
     $url = "https://github.com/$Repo/releases/download/$PIN_VERSION/$asset"
     $zip = Join-Path $tmp $asset
-    Write-Host "install: downloading dgx-cli $PIN_VERSION (windows/$arch)..."
+    Write-Host "install: downloading digitalx $PIN_VERSION (windows/$arch)..."
     Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
 
     # --- verify SHA-256 (always enforced; no skip) ---
@@ -82,13 +82,13 @@ $PIN_SHA256 = @'
 
     # --- extract and hand off to the binary ---
     Expand-Archive -Path $zip -DestinationPath $tmp -Force
-    $exe = Join-Path $tmp 'dgx-cli.exe'
-    if (-not (Test-Path $exe)) { Die "archive did not contain dgx-cli.exe" }
+    $exe = Join-Path $tmp 'digitalx.exe'
+    if (-not (Test-Path $exe)) { Die "archive did not contain digitalx.exe" }
 
     # The binary owns install policy (PATH location, PATH entry, manifest) and is
     # reconciling, so this both installs fresh and repairs a broken install.
     & $exe self install @args
-    if ($LASTEXITCODE -ne 0) { Die "dgx-cli self install exited with code $LASTEXITCODE" }
+    if ($LASTEXITCODE -ne 0) { Die "digitalx self install exited with code $LASTEXITCODE" }
   }
   finally {
     Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue

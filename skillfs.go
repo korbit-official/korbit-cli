@@ -11,7 +11,7 @@ import (
 )
 
 // embeddedSkills carries the bundled Agent Skill (skills/digitalx-cli) inside the
-// binary, so `dgx-cli agent skill install` needs nothing on disk and the skill
+// binary, so `digitalx agent skill install` needs nothing on disk and the skill
 // can never drift from the CLI it documents. The embed directive's path is
 // relative to this file and cannot use "..", which is why the embed lives here
 // at the repo root rather than in internal/agentskill. `all:` includes any file

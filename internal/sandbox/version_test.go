@@ -337,8 +337,8 @@ func TestLicenseSetsFooterCommandEnv(t *testing.T) {
 		t.Fatalf("License: %v", err)
 	}
 	for _, want := range []string{
-		"LICENSE_CMD=dgx-cli sandbox license",
-		"LEGACY_LICENSE_CMD=dgx-cli sandbox license",
+		"LICENSE_CMD=digitalx sandbox license",
+		"LEGACY_LICENSE_CMD=digitalx sandbox license",
 	} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("expected %q in the child env, got: %q", want, out.String())

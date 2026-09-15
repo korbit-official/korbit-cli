@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-BINARY := dgx-cli
+BINARY := digitalx
 
 .PHONY: build test vet fmt check licenses licenses-check dist dist-unsigned release release-unsigned notarize publish clean
 

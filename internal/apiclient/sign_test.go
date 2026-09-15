@@ -194,7 +194,7 @@ func TestLooksLikeEd25519PublicKey(t *testing.T) {
 
 	negative := map[string]string{
 		"empty":                "",
-		"portal-style id":      "dgx-ak-9f3c2b7e",
+		"portal-style id":      "Vt7qB3mZx0LpH9dKcE2sNfRuA6jYgW1oT5iX8ObQzMk",
 		"sandbox id":           "SANDBOX_ED25519_KEY_00000001_0000002",
 		"uuid":                 "018f1a2b-3c4d-7e5f-8a9b-0c1d2e3f4a5b",
 		"short base64":         base64.StdEncoding.EncodeToString([]byte("hello")),
@@ -235,7 +235,7 @@ func TestLooksLikeEd25519PrivateKey(t *testing.T) {
 			t.Errorf("%s: expected a private key to be detected", name)
 		}
 	}
-	for _, in := range []string{"", "dgx-ak-9f3c2b7e", "SANDBOX_ED25519_KEY_00000001_0000002"} {
+	for _, in := range []string{"", "Vt7qB3mZx0LpH9dKcE2sNfRuA6jYgW1oT5iX8ObQzMk", "SANDBOX_ED25519_KEY_00000001_0000002"} {
 		if LooksLikeEd25519PrivateKey(in) {
 			t.Errorf("%q must not be flagged as a private key", in)
 		}

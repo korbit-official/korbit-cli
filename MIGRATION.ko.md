@@ -1,8 +1,8 @@
-# `korbit`에서 `dgx-cli`로 업그레이드하기
+# `korbit`에서 `digitalx`로 업그레이드하기
 
 [English](MIGRATION.md) · **한국어**
 
-**v1.2.0**에서 CLI의 이름이 바뀝니다. 명령 `korbit` → `dgx-cli`, 홈 `~/.korbit-cli` →
+**v1.2.0**에서 CLI의 이름이 바뀝니다. 명령 `korbit` → `digitalx`, 홈 `~/.korbit-cli` →
 `~/.digitalx-cli`, 변수 `KORBIT_CLI_*` → `DIGITALX_CLI_*`. **고장 나는 것도, 옮겨지는 것도
 없습니다. 전부 그대로 동작합니다.** 이전 이름은 모두 기한 없이 계속 인식되며, 이 CLI의 어떤
 명령도 디스크에 있는 것을 옮기거나 이름을 바꾸지 않습니다.
@@ -11,7 +11,7 @@
 
 | 이런 경우라면 | 할 일 |
 |---|---|
-| `dgx-cli`를 새로 설치했다 | 없습니다. 이 문서는 읽지 않아도 됩니다. |
+| `digitalx`를 새로 설치했다 | 없습니다. 이 문서는 읽지 않아도 됩니다. |
 | `korbit` 설치본이 있다 | `korbit self update`를 **두 번** 실행하세요([왜 두 번인지](#self-update를-두-번-실행하세요)). 데이터는 있던 자리에서 그대로 동작합니다. |
 | `KORBIT_CLI_*` 변수를 설정해 두었다 | 없습니다. 계속 인식되며, 둘 다 설정되어 있으면 `DIGITALX_CLI_*`가 이깁니다. |
 | `.mcpb` 데스크톱 확장을 설치했다 | 이전 확장을 직접 제거하세요 — 새 확장은 그 [옆에 설치됩니다](#mcpb-번들은-별개의-확장으로-나타납니다). |
@@ -21,7 +21,7 @@
 
 | 항목 | 현재 | 이전 | 이전 이름은… |
 |---|---|---|---|
-| 명령 | `dgx-cli` | `korbit` | 그 이름이 있는 설치본에서는 같은 바이너리의 **별칭**(alias)으로 영구 유지. 새 설치에는 `dgx-cli`만 |
+| 명령 | `digitalx` | `korbit` | 그 이름이 있는 설치본에서는 같은 바이너리의 **별칭**(alias)으로 영구 유지. 새 설치에는 `digitalx`만 |
 | CLI 홈 | `~/.digitalx-cli` | `~/.korbit-cli` | 있는 그대로 영구 사용. 옮기지 않음 |
 | 홈 변수 | `DIGITALX_CLI_HOME` | `KORBIT_CLI_HOME` | 계속 인식. 둘 다 설정되면 현재 이름 우선 |
 | 아티팩트 캐시 | `<사용자 캐시 디렉터리>/digitalx-cli` | `<사용자 캐시 디렉터리>/korbit-cli` | 있는 그대로 영구 사용. 옮기지 않음 |
@@ -35,21 +35,21 @@
 
 ```sh
 korbit self update    # 1. 현재 릴리스를 설치합니다 — 아직 `korbit` 이름 그대로입니다
-korbit self update    # 2. `dgx-cli` 명령을 추가하고 `korbit`이 그것을 가리키게 합니다
+korbit self update    # 2. `digitalx` 명령을 추가하고 `korbit`이 그것을 가리키게 합니다
 ```
 
-**두 번인 이유:** `dgx-cli` 명령을 만드는 코드가 첫 번째 실행이 내려받는 릴리스 안에 들어
+**두 번인 이유:** `digitalx` 명령을 만드는 코드가 첫 번째 실행이 내려받는 릴리스 안에 들어
 있기 때문입니다. 그래서 첫 번째 실행을 마치면 최신이 되지만 여전히 `korbit` 하나뿐이고, 두
-번째 실행이 바로 그 새 코드로서 `dgx-cli`를 추가하며, 고친 내용을 `layoutRepaired`에 담아
+번째 실행이 바로 그 새 코드로서 `digitalx`를 추가하며, 고친 내용을 `layoutRepaired`에 담아
 `updated: false`로 보고합니다 — 업데이트된 것은 없고 정비만 되었다는 뜻입니다.
 
-그다음부터는 **두 명령 이름이 모두 최신으로 유지됩니다.** 모든 설치와 업데이트가 `dgx-cli`를
+그다음부터는 **두 명령 이름이 모두 최신으로 유지됩니다.** 모든 설치와 업데이트가 `digitalx`를
 실제 바이너리로 놓고, 그 옆에 같은 바이트를 가리키는 별칭으로 `korbit`을 유지합니다. 어느
 이름으로 실행하든 같은 CLI입니다.
 
 ### Agent Skill은 설치할 때 이름이 바뀝니다
 
-`dgx-cli agent skill install`은 스킬을 현재 디렉터리 이름으로 쓰고 이전 이름으로 남아 있는
+`digitalx agent skill install`은 스킬을 현재 디렉터리 이름으로 쓰고 이전 이름으로 남아 있는
 사본을 제거하므로, 에이전트에게는 스킬이 둘이 아니라 하나로 보입니다. 이 이름 변경은
 에이전트 자신의 스킬 폴더 안에서만 일어나며, CLI 홈은 건드리지 않습니다.
 
@@ -69,7 +69,7 @@ korbit self update    # 2. `dgx-cli` 명령을 추가하고 `korbit`이 그것�
 | 명령 | 하는 일 | 절대 하지 않는 일 |
 |---|---|---|
 | `self install` (설치 한 줄 명령이 실행하는 것) | 바이너리 배치, `PATH` 연결, 매니페스트 기록. 다시 실행하면 망가진 설치를 고치는 것 외에는 아무것도 하지 않음 | 디렉터리 이동, 홈 안의 파일 이름 변경, 사용자 데이터 삭제 |
-| `self update` | 릴리스 내려받기, 바이너리 제자리 교체, 명령 배치 유지(`dgx-cli`가 실제, `korbit`이 그것을 가리킴) | 디렉터리 이동, 파일 이름 변경 |
+| `self update` | 릴리스 내려받기, 바이너리 제자리 교체, 명령 배치 유지(`digitalx`가 실제, `korbit`이 그것을 가리킴) | 디렉터리 이동, 파일 이름 변경 |
 | `self doctor` | 보고만 — 계약상 읽기 전용 | 어떤 변경도 |
 | `self uninstall` | 확인한 것만 삭제([상세](#방법-a--처음부터-다시-제거-후-재설치)) | 이름 변경, 이동 |
 
@@ -147,9 +147,9 @@ korbit self update    # 2. `dgx-cli` 명령을 추가하고 `korbit`이 그것�
 필요한 것을 이미 내보내 두었을 때) 선택하세요.
 
 ```sh
-dgx-cli self uninstall     # 대화형입니다. 정확히 무엇을 하는지는 아래 참고
+digitalx self uninstall     # 대화형입니다. 정확히 무엇을 하는지는 아래 참고
 # 그다음 설치 한 줄 명령을 다시 실행하고:
-dgx-cli setup
+digitalx setup
 ```
 
 `self uninstall`은 **대화형 전용**입니다. 터미널이 필요하며, 파이프나 리다이렉션으로
@@ -162,7 +162,7 @@ dgx-cli setup
 
 | 질문 | 기본값 | 예라고 답하면 제거 | 어떻게 답해도 유지 |
 |---|---|---|---|
-| `dgx-cli` 바이너리와 설치 매니페스트 | **예** | 바이너리, 이 설치본이 소유한 모든 별칭(`korbit` 포함), `install.json`, 남아 있는 교체용 임시 파일 | 자기 것임을 증명할 수 없는 `korbit` 이름의 파일 |
+| `digitalx` 바이너리와 설치 매니페스트 | **예** | 바이너리, 이 설치본이 소유한 모든 별칭(`korbit` 포함), `install.json`, 남아 있는 교체용 임시 파일 | 자기 것임을 증명할 수 없는 `korbit` 이름의 파일 |
 | 설정, API 키, 작업 저널 | **아니오** | `config.json`, `journal.db`/`korbit-cli.db`와 `bot.db`/`korbit-bot.db`(각각의 `-wal`/`-shm` 포함), `debug-*.json`, `keys.json`과 `keystore.json`(각 키를 OS 키체인을 포함한 해당 백엔드에서 먼저 지운 뒤) | — |
 | 다시 만들 수 있는 캐시 | **아니오** | 각 홈의 `sandbox/`, **두** 캐시 이름 아래의 공유 Deno/모듈 캐시(실행 중인 샌드박스는 먼저 중지) | — |
 
@@ -192,7 +192,7 @@ Windows에서는 사용자 `PATH`에서 digitalx-cli 항목만 제거합니다. 
 파일 이름을 바꾸면 그 프로세스가 쓰던 데이터가 손상됩니다.
 
 ```sh
-dgx-cli sandbox stop      # `korbit sandbox stop` 명령이 있다면 그것도 함께
+digitalx sandbox stop      # `korbit sandbox stop` 명령이 있다면 그것도 함께
 # 그다음 실행 중인 `monitor`, `tui`, `mcp serve`를 모두 종료합니다
 ```
 
@@ -272,7 +272,7 @@ Remove-Item -Recurse -Force $env:LOCALAPPDATA\korbit-cli
 마지막으로 확인합니다.
 
 ```sh
-dgx-cli self doctor
+digitalx self doctor
 ```
 
 ## `self doctor`가 보고하는 것
@@ -284,8 +284,8 @@ dgx-cli self doctor
 | `field` | 문제 | 해결 |
 |---|---|---|
 | `managed` | 설치 매니페스트 없음 또는 손상 | 설치 한 줄 명령 |
-| `binary` | 설치된 바이너리 없음 또는 매니페스트와 불일치 — `korbit`은 일치하는데 그 옆의 `dgx-cli`는 불일치하는 경우 포함(문서에 적힌 이름이 이 설치본이 놓은 적 없는 바이트를 실행하게 됨) | 설치 한 줄 명령. `dgx-cli`만 불일치하면 `self update` |
-| `alias` | `korbit` 명령 없음, `dgx-cli`가 아닌 것을 가리킴, 또는 다른 버전의 오래된 사본 | `self update` |
+| `binary` | 설치된 바이너리 없음 또는 매니페스트와 불일치 — `korbit`은 일치하는데 그 옆의 `digitalx`는 불일치하는 경우 포함(문서에 적힌 이름이 이 설치본이 놓은 적 없는 바이트를 실행하게 됨) | 설치 한 줄 명령. `digitalx`만 불일치하면 `self update` |
+| `alias` | `korbit` 명령 없음, `digitalx`가 아닌 것을 가리킴, 또는 다른 버전의 오래된 사본 | `self update` |
 | `path` | 설치 디렉터리가 `PATH`에 없음 | 설치 한 줄 명령 |
 | `home` | 아래 두 상태 중 하나 | 사용자가 직접 |
 

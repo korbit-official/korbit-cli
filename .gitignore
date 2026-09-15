@@ -1,5 +1,5 @@
-# Built binaries: `go build -o dgx-cli .` (dev) and `go install` -> digitalx-cli
-/dgx-cli
+# Built binaries: `go build -o digitalx .` (dev) and `go install` -> digitalx-cli
+/digitalx
 /digitalx-cli
 /korbit
 /dist/

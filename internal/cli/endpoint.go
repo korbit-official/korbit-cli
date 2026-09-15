@@ -214,7 +214,7 @@ func (rt *runtime) runEndpoint(sc surfaceCmd, cmd *cobra.Command, args []string)
 			// the same policy as every other call: public calls are journaled only in
 			// --debug (a normal run opens no DB, so the dry-run still works before any
 			// key is set up and on a read-only home), which is exactly what lets a
-			// `--debug` session troubleshoot the preflight from `dgx-cli logs`.
+			// `--debug` session troubleshoot the preflight from `digitalx logs`.
 			sim, ws, skipErr := rt.preplaceCheck(home, baseURL, params, timeoutMs)
 			if skipErr != nil {
 				doc.ChecksSkipped = fmt.Sprintf("market simulation/safety checks skipped: %v", skipErr)
@@ -556,7 +556,7 @@ func quoteUnit(quoteCurrency string) string {
 //
 // The public reads go through the shared journal-backed recorder under the same
 // "cli" policy as every other command: public calls are journaled only in
-// --debug (a normal run opens no DB), so the preflight shows up in `dgx-cli logs`
+// --debug (a normal run opens no DB), so the preflight shows up in `digitalx logs`
 // for a --debug troubleshooting session, and a normal dry-run still touches
 // nothing. A post-write failure is non-fatal here (a preview shouldn't die over
 // it) — it is surfaced as a stderr warning.

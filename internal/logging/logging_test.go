@@ -96,7 +96,7 @@ func TestAttrsRendering(t *testing.T) {
 	log := New(&buf, slog.LevelInfo)
 	log.Info("signing", "key", "my key", "n", 3)
 	got := strings.TrimSpace(buf.String())
-	want := `dgx-cli: info: signing key="my key" n=3`
+	want := `digitalx: info: signing key="my key" n=3`
 	if got != want {
 		t.Fatalf("attr rendering\n got: %q\nwant: %q", got, want)
 	}
@@ -289,7 +289,7 @@ func TestTextTagIsTheInvokedProgramName(t *testing.T) {
 	orig := progname.Name()
 	t.Cleanup(func() { progname.Set(orig) })
 
-	for _, prog := range []string{"dgx-cli", "korbit"} {
+	for _, prog := range []string{"digitalx", "korbit"} {
 		progname.Set(prog)
 		var buf bytes.Buffer
 		NewStyled(&buf, slog.LevelInfo, Style{}).Warn("tagged")

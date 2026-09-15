@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// Command dgx-cli is a command-line client for the Digital X Open API v2 — market
+// Command digitalx is a command-line client for the Digital X Open API v2 — market
 // data, ED25519-signed trading, and key management — built as a stable,
 // JSON-in/JSON-out tool surface for AI agents.
 package main

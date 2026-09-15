@@ -1,6 +1,6 @@
 # `internal/tui` — the interactive trading terminal
 
-The full-screen terminal behind `dgx-cli tui`: live market data (ticker,
+The full-screen terminal behind `digitalx tui`: live market data (ticker,
 orderbook, trades) plus the account's open orders, fills, and balances, with
 order entry. Built on Bubble Tea v2 (`charm.land/bubbletea/v2`), with the
 textinput bubble and lipgloss for layout. The lists (markets, open orders,

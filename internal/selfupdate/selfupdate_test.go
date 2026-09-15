@@ -304,7 +304,7 @@ func TestManagedBlockGuardsAgainstDuplicatePATH(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("POSIX sh block is unix-only")
 	}
-	const dir = "/opt/dgx/bin"
+	const dir = "/opt/digitalx/bin"
 	block := managedBlock(pathBlockBody(dir))
 	// Fresh PATH, source the block twice, then count how many components equal dir.
 	script := "PATH=/usr/bin:/bin\n" + block + block +
@@ -854,7 +854,7 @@ func TestUpdateRejectsEmptyArchiveEntry(t *testing.T) {
 }
 
 func TestIsPlainFilename(t *testing.T) {
-	for _, ok := range []string{"digitalx-cli_linux_amd64.tar.gz", "dgx-cli", "dgx-cli.exe", "a"} {
+	for _, ok := range []string{"digitalx-cli_linux_amd64.tar.gz", "digitalx", "digitalx.exe", "a"} {
 		if !isPlainFilename(ok) {
 			t.Errorf("isPlainFilename(%q) = false (want true)", ok)
 		}
@@ -1073,7 +1073,7 @@ func TestUninstall(t *testing.T) {
 }
 
 // TestManagedThroughSymlinkedHome pins that a symlinked home (e.g. HOME points
-// at a link onto another volume, so ~/.local/bin/dgx-cli resolves to a different
+// at a link onto another volume, so ~/.local/bin/digitalx resolves to a different
 // real path than its literal form) does not make the installed binary look
 // unmanaged. os.Executable resolves the running binary, so the provenance check
 // must resolve the layout path too — otherwise update/uninstall wrongly refuse
@@ -1130,7 +1130,7 @@ func TestManagedThroughSymlinkedHome(t *testing.T) {
 // absolute operand pointing at the same file).
 func TestResolveOrClean(t *testing.T) {
 	// Nonexistent path: still returns an absolute, cleaned form (no resolution).
-	if got := resolveOrClean("/no/such/dgx/./bin"); got != "/no/such/dgx/bin" {
+	if got := resolveOrClean("/no/such/digitalx/./bin"); got != "/no/such/digitalx/bin" {
 		t.Errorf("nonexistent path: got %q", got)
 	}
 
@@ -1690,9 +1690,9 @@ func TestParseChecksums(t *testing.T) {
 
 func TestExtractBinary(t *testing.T) {
 	for _, goos := range []string{"linux", "windows"} {
-		bin := "dgx-cli"
+		bin := "digitalx"
 		if goos == "windows" {
-			bin = "dgx-cli.exe"
+			bin = "digitalx.exe"
 		}
 		archive := makeArchive(t, goos, bin, "PAYLOAD")
 		got, err := extractBinary(archive, goos, bin)

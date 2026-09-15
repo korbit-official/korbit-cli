@@ -11,7 +11,7 @@
 # signing identity is configured):  goreleaser release --snapshot --clean
 version: 2
 
-# The product's name — the project is digitalx-cli; `dgx-cli` is only the binary
+# The product's name — the project is digitalx-cli; `digitalx` is only the binary
 # it installs (set per build below).
 project_name: digitalx-cli
 
@@ -26,8 +26,8 @@ before:
 builds:
   # Its binary is what a release installs and what `self update` extracts from
   # the archive, by exact basename.
-  - id: dgx-cli
-    binary: dgx-cli
+  - id: digitalx
+    binary: digitalx
     main: .
     env:
       - CGO_ENABLED=0 # pure-Go deps (modernc sqlite, coder/websocket); no C toolchain needed
@@ -73,12 +73,12 @@ builds:
             - VERSION={{ .Version }}
 
 # The ARCHIVE is named after the product (digitalx-cli); the BINARY inside it is
-# dgx-cli. internal/selfupdate/release.go's assetName() builds this same name —
+# digitalx. internal/selfupdate/release.go's assetName() builds this same name —
 # keep the two in sync.
 archives:
   - id: digitalx-cli
     ids:
-      - dgx-cli
+      - digitalx
     name_template: "digitalx-cli_{{ .Os }}_{{ .Arch }}"
     formats:
       - tar.gz
@@ -107,7 +107,7 @@ checksum:
   #
   # release-manifest.json rides along for the same reason: it maps
   # <goos>/<goarch> to the archive to download and the binary basename inside
-  # it, which `dgx-cli self update` reads in place of the names compiled into it
+  # it, which `digitalx self update` reads in place of the names compiled into it
   # (internal/selfupdate/release.go, resolveTarget), and being listed here is
   # what authenticates it — no key and no host of its own.
   #

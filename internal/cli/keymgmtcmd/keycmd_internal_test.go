@@ -56,7 +56,7 @@ func TestRegistrationLink(t *testing.T) {
 }
 
 // TestNewKeyGuidanceLabelsLink pins the default key label prefilled into the
-// registration deep link: "dgx-cli: <key name>", so a CLI-issued key is
+// registration deep link: "digitalx: <key name>", so a CLI-issued key is
 // recognizable in the developers portal.
 func TestNewKeyGuidanceLabelsLink(t *testing.T) {
 	kp, err := apiclient.GenerateKeypair()
@@ -68,8 +68,8 @@ func TestNewKeyGuidanceLabelsLink(t *testing.T) {
 	if err != nil {
 		t.Fatalf("link is not a valid URL: %v (%s)", err, link)
 	}
-	if got := u.Query().Get("label"); got != "dgx-cli: trading-bot" {
-		t.Fatalf("label = %q, want %q", got, "dgx-cli: trading-bot")
+	if got := u.Query().Get("label"); got != "digitalx: trading-bot" {
+		t.Fatalf("label = %q, want %q", got, "digitalx: trading-bot")
 	}
 }
 

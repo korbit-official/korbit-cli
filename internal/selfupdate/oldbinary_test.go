@@ -17,7 +17,7 @@ import (
 )
 
 // Upgrading from a binary that shipped under the EARLIER product name takes TWO
-// `korbit self update` runs: the code that creates the `dgx-cli` command lives
+// `korbit self update` runs: the code that creates the `digitalx` command lives
 // in the binary being DOWNLOADED, and the process performing the download is the
 // old one, which knows only its own command name. So the first run swaps
 // `korbit` and stops there; the second — now executing the new code — repairs
@@ -29,7 +29,7 @@ import (
 // code leaves behind after it installs release newVersion: the binary at the
 // `korbit` name holds the new bytes, the manifest names that path and that
 // version, it records no aliases (the field did not exist), and there is no
-// `dgx-cli` at all.
+// `digitalx` at all.
 func oldBinaryUpdateOutcome(t *testing.T, l Layout, c Config, newVersion, newBytes string) {
 	t.Helper()
 	if err := os.MkdirAll(l.ExecutableDir(), 0o755); err != nil {
@@ -98,7 +98,7 @@ func TestFirstUpdateFromTheOldBinaryLeavesNoPrimaryCommand(t *testing.T) {
 
 // TestSecondUpdateFromTheOldBinaryCreatesThePrimaryCommand: the second
 // `korbit self update` runs the NEW code, finds itself already at the target
-// version, and repairs the layout — which is where `dgx-cli` finally comes from.
+// version, and repairs the layout — which is where `digitalx` finally comes from.
 // No new release is needed, and none is downloaded.
 func TestSecondUpdateFromTheOldBinaryCreatesThePrimaryCommand(t *testing.T) {
 	c := testConfig(t.TempDir())
@@ -138,7 +138,7 @@ func TestSecondUpdateFromTheOldBinaryCreatesThePrimaryCommand(t *testing.T) {
 // TestRepairNeverBlessesAStalePrimary: the running binary carries the alias name
 // and its bytes ARE the manifest's, while a file at the primary name hashes
 // differently — a stale copy an interrupted repair left
-// behind. Adopting it would make `dgx-cli` a version behind while every check
+// behind. Adopting it would make `digitalx` a version behind while every check
 // called it healthy, so it is recreated from the running verified bytes.
 //
 // Two consecutive repairs are run because the failure this guards against is
@@ -197,7 +197,7 @@ func TestRepairNeverBlessesAStalePrimary(t *testing.T) {
 }
 
 // TestDoctorReportsAStalePrimary: the same state doctor must not call healthy.
-// The `dgx-cli` command exists, so nothing looks wrong — which is exactly why it
+// The `digitalx` command exists, so nothing looks wrong — which is exactly why it
 // is a problem and not a note, and why it must be reported by the same predicate
 // the repair uses.
 func TestDoctorReportsAStalePrimary(t *testing.T) {
