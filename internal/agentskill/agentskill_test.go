@@ -13,7 +13,7 @@ import (
 
 func sampleSkill() fstest.MapFS {
 	return fstest.MapFS{
-		"SKILL.md":                 {Data: []byte("---\nname: digitalx-cli\ndescription: drives digitalx\n---\n# skill\n")},
+		"SKILL.md":                 {Data: []byte("---\nname: digitalx\ndescription: drives digitalx\n---\n# skill\n")},
 		"references/monitoring.md": {Data: []byte("monitoring\n")},
 		"references/funding.md":    {Data: []byte("funding\n")},
 	}
@@ -132,7 +132,7 @@ func TestAgentDirHelpers(t *testing.T) {
 		t.Fatal("codex agent not found")
 	}
 	root := "/home/u"
-	if got := claude.SkillDir(root); got != filepath.Join(root, ".claude", "skills", "digitalx-cli") {
+	if got := claude.SkillDir(root); got != filepath.Join(root, ".claude", "skills", "digitalx") {
 		t.Fatalf("Claude SkillDir = %q", got)
 	}
 	if got := claude.LegacySkillDir(root); got != filepath.Join(root, ".claude", "skills", "korbit") {
@@ -141,7 +141,7 @@ func TestAgentDirHelpers(t *testing.T) {
 	if got := claude.ConfigRoot(root); got != filepath.Join(root, ".claude") {
 		t.Fatalf("Claude ConfigRoot = %q", got)
 	}
-	if got := codex.SkillDir(root); got != filepath.Join(root, ".agents", "skills", "digitalx-cli") {
+	if got := codex.SkillDir(root); got != filepath.Join(root, ".agents", "skills", "digitalx") {
 		t.Fatalf("Codex SkillDir = %q", got)
 	}
 	if got := codex.LegacySkillDir(root); got != filepath.Join(root, ".agents", "skills", "korbit") {
@@ -241,6 +241,15 @@ func TestManagedRecognizesOurCopiesOnly(t *testing.T) {
 			name:  "hand-written skill naming this CLI",
 			skill: LegacySkillName,
 			edits: mergeEdits(noRefs, map[string]*string{skillFile: ptr("---\nname: korbit\ndescription: through the korbit-cli tool\n---\nmy own notes\n")}),
+			want:  false,
+		},
+		// The skill's name spells the same word as the command it drives, so the
+		// `name:` line must not double as the marker that proves the frontmatter
+		// describes this CLI.
+		{
+			name:  "frontmatter names us but no command",
+			skill: SkillName,
+			edits: map[string]*string{skillFile: ptr("---\nname: " + SkillName + "\ndescription: my own notes\n---\nsee https://" + repoURL + "\n")},
 			want:  false,
 		},
 		// Frontmatter alone, with our reference set absent.

@@ -20,7 +20,7 @@ import (
 
 func skillFixture() fstest.MapFS {
 	return fstest.MapFS{
-		"SKILL.md":                 {Data: []byte("---\nname: digitalx-cli\ndescription: drives digitalx\n---\n# skill\n")},
+		"SKILL.md":                 {Data: []byte("---\nname: digitalx\ndescription: drives digitalx\n---\n# skill\n")},
 		"references/monitoring.md": {Data: []byte("monitoring\n")},
 	}
 }
@@ -99,18 +99,18 @@ func TestAgentSkillInstallUserScope(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &res); err != nil {
 		t.Fatalf("json: %v\n%s", err, out)
 	}
-	if res.Skill != "digitalx-cli" || res.Scope != "user" || len(res.Installs) != 1 {
+	if res.Skill != "digitalx" || res.Scope != "user" || len(res.Installs) != 1 {
 		t.Fatalf("unexpected result: %+v", res)
 	}
 	in := res.Installs[0]
 	if in.Agent != "Claude" || in.Action != "created" || in.Files != 2 {
 		t.Fatalf("install outcome: %+v", in)
 	}
-	want := filepath.Join(home, ".claude", "skills", "digitalx-cli")
+	want := filepath.Join(home, ".claude", "skills", "digitalx")
 	if in.Dir != want {
 		t.Fatalf("dir = %q, want %q", in.Dir, want)
 	}
-	if b, err := os.ReadFile(filepath.Join(want, "SKILL.md")); err != nil || !strings.Contains(string(b), "name: digitalx-cli") {
+	if b, err := os.ReadFile(filepath.Join(want, "SKILL.md")); err != nil || !strings.Contains(string(b), "name: digitalx") {
 		t.Fatalf("SKILL.md not written: %v %q", err, b)
 	}
 }
@@ -129,7 +129,7 @@ func TestAgentSkillInstallAll(t *testing.T) {
 		t.Fatalf("want 2 installs, got %d", len(res.Installs))
 	}
 	for _, base := range []string{".claude", ".agents"} {
-		if _, err := os.Stat(filepath.Join(home, base, "skills", "digitalx-cli", "SKILL.md")); err != nil {
+		if _, err := os.Stat(filepath.Join(home, base, "skills", "digitalx", "SKILL.md")); err != nil {
 			t.Fatalf("%s skill not installed: %v", base, err)
 		}
 	}
@@ -175,7 +175,7 @@ func TestAgentSkillInstallProjectScope(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit=%d out=%s", code, out)
 	}
-	if _, err := os.Stat(filepath.Join(proj, ".agents", "skills", "digitalx-cli", "SKILL.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(proj, ".agents", "skills", "digitalx", "SKILL.md")); err != nil {
 		t.Fatalf("project skill not installed: %v", err)
 	}
 }
@@ -214,7 +214,7 @@ func TestAgentSkillDoctorFlagsStaleInstall(t *testing.T) {
 		t.Fatalf("install exit=%d", code)
 	}
 	// Tamper with the installed copy so its hash no longer matches the embedded skill.
-	tampered := filepath.Join(home, ".claude", "skills", "digitalx-cli", "SKILL.md")
+	tampered := filepath.Join(home, ".claude", "skills", "digitalx", "SKILL.md")
 	if err := os.WriteFile(tampered, []byte("edited by hand\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -321,7 +321,7 @@ func TestAgentSkillInstallHumanOutput(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit=%d", code)
 	}
-	if !strings.Contains(out, "Installed the \"digitalx-cli\" Agent Skill") || !strings.Contains(out, "Claude") {
+	if !strings.Contains(out, "Installed the \"digitalx\" Agent Skill") || !strings.Contains(out, "Claude") {
 		t.Fatalf("human output unexpected:\n%s", out)
 	}
 }
@@ -358,7 +358,7 @@ func TestAgentSkillInstallClearsLegacyNamedCopy(t *testing.T) {
 		t.Fatalf("legacy skill dir still present: %v", err)
 	}
 	// The new copy is on disk.
-	if _, err := os.Stat(filepath.Join(home, ".claude", "skills", "digitalx-cli", "SKILL.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(home, ".claude", "skills", "digitalx", "SKILL.md")); err != nil {
 		t.Fatalf("skill not installed under the current name: %v", err)
 	}
 }

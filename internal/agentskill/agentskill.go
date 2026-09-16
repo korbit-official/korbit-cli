@@ -28,9 +28,9 @@ import (
 )
 
 // SkillName is the directory name the skill installs under inside an agent's
-// skills directory (…/skills/digitalx-cli). It matches the embedded source's
+// skills directory (…/skills/digitalx). It matches the embedded source's
 // root dir, and the frontmatter `name:` the skill declares.
-const SkillName = "digitalx-cli"
+const SkillName = "digitalx"
 
 // LegacySkillName is the other directory name an installed copy of THIS skill
 // can carry: a binary that shipped the skill under that name wrote
@@ -76,7 +76,7 @@ func AgentByID(id string) (Agent, bool) {
 	return Agent{}, false
 }
 
-// SkillDir is the absolute skill directory under root (…/skills/digitalx-cli).
+// SkillDir is the absolute skill directory under root (…/skills/digitalx).
 func (a Agent) SkillDir(root string) string {
 	return a.skillDirNamed(root, SkillName)
 }
@@ -157,7 +157,7 @@ type Outcome struct {
 	Hash   string   `json:"contentHash"`
 }
 
-// Install writes the skill from src into dir (the skill directory, …/digitalx-cli),
+// Install writes the skill from src into dir (the skill directory, …/digitalx),
 // then prunes any file there that the embedded skill no longer ships — so a
 // renamed or removed reference file from an older binary can't linger. It is
 // idempotent: an on-disk copy already matching the embedded one is left

@@ -41,8 +41,9 @@ var managedNames = []string{SkillName, LegacySkillName}
 
 // managedMarkers are the tool names this skill drives; every copy of it names
 // one of them in its frontmatter (the description says which command to run).
-// The marker is deliberately NOT the skill's own name — that would make any
-// skill at one of our directory names pass.
+// The marker is read outside the `name:` line: the skill's name spells the same
+// word as the command it drives, and a name alone must not make any skill at one
+// of our directory names pass.
 var managedMarkers = []string{SkillBinary, "korbit-cli"}
 
 // managedRepoMarkers are the repository URLs a copy of this skill cites in its
@@ -77,21 +78,19 @@ func Managed(dir string) bool {
 }
 
 // managedFrontmatter is proof 1: the frontmatter declares one of our skill names
-// and names a command this skill drives. It is the weakest of the three (a
-// hand-written skill can say both), so it never stands alone.
+// and, elsewhere than that name line, names a command this skill drives. It is
+// the weakest of the three (a hand-written skill can say both), so it never
+// stands alone.
 func managedFrontmatter(skill string) bool {
 	fm, _, ok := splitFrontmatter(skill)
 	if !ok {
 		return false
 	}
-	if !anyContains(fm, managedMarkers) {
+	name, rest, ok := frontmatterName(fm)
+	if !ok || !slices.Contains(managedNames, name) {
 		return false
 	}
-	name, ok := frontmatterName(fm)
-	if !ok {
-		return false
-	}
-	return slices.Contains(managedNames, name)
+	return anyContains(rest, managedMarkers)
 }
 
 // managedBody is proof 2: the body cites one of this CLI's repository URLs.
@@ -138,24 +137,26 @@ func splitFrontmatter(s string) (fm, body string, ok bool) {
 	return "", "", false
 }
 
-// frontmatterName reads the `name:` scalar out of a frontmatter block. Only a
-// top-level (unindented) key counts, so a `name:` nested inside some other
-// mapping cannot pose as the skill's own, and the value is unquoted so both
-// `name: korbit` and `name: "korbit"` read the same.
-func frontmatterName(fm string) (string, bool) {
-	for _, line := range strings.Split(fm, "\n") {
+// frontmatterName reads the `name:` scalar out of a frontmatter block, and
+// returns the block without that line so a caller can look for a marker the name
+// itself must not supply. Only a top-level (unindented) key counts, so a `name:`
+// nested inside some other mapping cannot pose as the skill's own, and the value
+// is unquoted so both `name: korbit` and `name: "korbit"` read the same.
+func frontmatterName(fm string) (name, rest string, ok bool) {
+	lines := strings.Split(fm, "\n")
+	for i, line := range lines {
 		if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
 			continue
 		}
-		rest, ok := strings.CutPrefix(line, "name:")
+		after, ok := strings.CutPrefix(line, "name:")
 		if !ok {
 			continue
 		}
-		v := strings.TrimSpace(strings.TrimRight(rest, "\r"))
+		v := strings.TrimSpace(strings.TrimRight(after, "\r"))
 		v = strings.Trim(v, `"'`)
-		return v, v != ""
+		return v, strings.Join(slices.Concat(lines[:i:i], lines[i+1:]), "\n"), v != ""
 	}
-	return "", false
+	return "", fm, false
 }
 
 // anyContains reports whether s contains any of subs.

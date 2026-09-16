@@ -142,7 +142,7 @@ func buildTestMCP(t *testing.T, doer apiclient.Doer, key string, multiKey bool) 
 // tool registers with a discoverable topic.
 func testSkillFS() fstest.MapFS {
 	return fstest.MapFS{
-		"SKILL.md":                 {Data: []byte("---\nname: digitalx-cli\n---\n\n# Operating Digital X\n\nbody\n")},
+		"SKILL.md":                 {Data: []byte("---\nname: digitalx\n---\n\n# Operating Digital X\n\nbody\n")},
 		"references/monitoring.md": {Data: []byte("# Monitoring\n\nplaybook\n")},
 	}
 }
@@ -698,7 +698,7 @@ func TestMCPGuideTool(t *testing.T) {
 	if !strings.Contains(overview, "# Operating Digital X") {
 		t.Fatalf("overview missing body:\n%s", overview)
 	}
-	if strings.Contains(overview, "name: digitalx-cli") || strings.HasPrefix(overview, "---") {
+	if strings.Contains(overview, "name: digitalx") || strings.HasPrefix(overview, "---") {
 		t.Fatalf("overview should have frontmatter stripped:\n%s", overview)
 	}
 

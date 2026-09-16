@@ -149,7 +149,7 @@ it receives everything through the `clienv` seam (`cli/clienv`), and `cli`
 dispatches to it via `Run(cx *clienv.Cmd, …)`. Keep this direction acyclic.
 
 **The bundled skill is embedded in `package main`** (`skillfs.go`,
-`//go:embed all:skills/digitalx-cli`) because an embed directive can't use `..`. It is
+`//go:embed all:skills/digitalx`) because an embed directive can't use `..`. It is
 injected into `cli` via `Deps.SkillFS`; `internal/agentskill` only ever takes an
 `fs.FS`, so tests inject an `fstest.MapFS`.
 
@@ -472,7 +472,7 @@ pointer-present/body-absent.
 
 ## The bundled Skill
 
-`skills/digitalx-cli/` is the Agent Skill that consumes this CLI (`SKILL.md` plus
+`skills/digitalx/` is the Agent Skill that consumes this CLI (`SKILL.md` plus
 `references/`). It is mode-agnostic (CLI or `mcp serve`), organized around use
 cases, defers the exhaustive flag/enum surface to `digitalx commands` / `--help`,
 and deliberately **excludes** the experimental JS bot runtime. Shipping is via

@@ -1,5 +1,5 @@
 ---
-name: digitalx-cli
+name: digitalx
 description: >-
   Operate the Digital X cryptocurrency exchange through its CLI — the `digitalx` command,
   packaged as digitalx-cli — or its MCP tools. Consult this
